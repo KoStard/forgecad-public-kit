@@ -1,22 +1,19 @@
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import type { CrossSection } from '../src/forge/backends/manifold/wasm';
-import { buildBrepExportManifest, type BrepExportManifest } from '../src/forge/brepExport';
-import {
-  buildCompiledSceneReport,
-  type CompiledSceneObjectReport,
-} from '../src/forge/compiledScene';
-import { lowerProfileCompilePlanToCadQueryResult } from '../src/forge/compilePlanCadQuery';
 import { lowerProfileCompilePlanToCrossSection, lowerShapeCompilePlanToShapeBackend } from '../src/forge/backends/manifold/lower';
-import type { ShapeCompilerReport } from '../src/forge/compilerReport';
-import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compilePlan';
-import type { CadQueryProfilePlan, CadQueryShapePlan } from '../src/forge/cadqueryPlan';
+import type { CrossSection } from '../src/forge/backends/manifold/wasm';
 import { getWasm } from '../src/forge/backends/manifold/wasm';
-import { type GeometryInfo, type Shape } from '../src/forge/kernel';
+import { type BrepExportManifest, buildBrepExportManifest } from '../src/forge/export/brepExport';
+import type { CadQueryProfilePlan, CadQueryShapePlan } from '../src/forge/cadqueryPlan';
+import { buildCompiledSceneReport, type CompiledSceneObjectReport } from '../src/forge/scene/compiledScene';
+import type { ProfileCompilePlan, ShapeCompilePlan } from '../src/forge/compilePlan';
+import { lowerProfileCompilePlanToCadQueryResult } from '../src/forge/compilePlanCadQuery';
+import type { ShapeCompilerReport } from '../src/forge/compilerReport';
 import { runScript, type SceneObject } from '../src/forge/headless';
-import { getSketchCompileProfilePlan, getSketchPlacementModel } from '../src/forge/sketch/core';
+import { type GeometryInfo, type Shape } from '../src/forge/kernel';
 import type { SketchPlacementModel } from '../src/forge/sketch/core';
+import { getSketchCompileProfilePlan, getSketchPlacementModel } from '../src/forge/sketch/core';
 import { collectProjectFiles } from './collect-files';
 
 type ShapeRuntimeLike = Pick<Shape, 'boundingBox' | 'getMesh' | 'numTri' | 'surfaceArea' | 'volume'>;
@@ -153,7 +150,9 @@ function summarizeShapeRuntime(shape: ShapeRuntimeLike): ShapeRuntimeSummary {
   };
 }
 
-function summarizeCrossSectionRuntime(crossSection: Pick<CrossSection, 'area' | 'bounds' | 'numVert' | 'toPolygons'>): SketchRuntimeSummary {
+function summarizeCrossSectionRuntime(
+  crossSection: Pick<CrossSection, 'area' | 'bounds' | 'numVert' | 'toPolygons'>,
+): SketchRuntimeSummary {
   const bounds = crossSection.bounds() as { min: [number, number]; max: [number, number] };
   const polygons = (crossSection.toPolygons() as [number, number][][]).map((polygon) =>
     polygon.map((point) => [roundNumber(point[0]), roundNumber(point[1])]),

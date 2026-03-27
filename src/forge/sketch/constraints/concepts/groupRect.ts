@@ -55,10 +55,7 @@ export interface ConstrainedGroupRect extends SketchGroupHandle {
  * sk.distance(panel.bottomLeft, otherPoint, 30);
  * ```
  */
-export function addGroupRect(
-  sk: ConstrainedSketchBuilder,
-  options: GroupRectOptions,
-): ConstrainedGroupRect {
+export function addGroupRect(sk: ConstrainedSketchBuilder, options: GroupRectOptions): ConstrainedGroupRect {
   const { x = 0, y = 0, width, height, allowRotation = false } = options;
 
   if (!Number.isFinite(width) || !Number.isFinite(height)) {

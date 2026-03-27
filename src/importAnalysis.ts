@@ -109,10 +109,7 @@ export interface DependencyTree {
  * @param allFiles - All available files (filename → code)
  * @returns The full dependency tree
  */
-export function collectDependencies(
-  entryFile: string,
-  allFiles: Record<string, string>,
-): DependencyTree {
+export function collectDependencies(entryFile: string, allFiles: Record<string, string>): DependencyTree {
   const codeFiles: Record<string, string> = {};
   const meshFiles: string[] = [];
   const svgFiles: string[] = [];

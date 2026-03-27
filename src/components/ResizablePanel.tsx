@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 type ResizeEdge = 'left' | 'right';
 
@@ -61,9 +69,7 @@ export function ResizablePanel({
   handleLabel,
   panelStyle,
 }: ResizablePanelProps) {
-  const [width, setWidth] = useState(() => (
-    readStoredWidth(storageKey, defaultWidth, minWidth, maxWidth)
-  ));
+  const [width, setWidth] = useState(() => readStoredWidth(storageKey, defaultWidth, minWidth, maxWidth));
   const [isDragging, setIsDragging] = useState(false);
   const dragStateRef = useRef<DragState | null>(null);
   const bodyStyleRef = useRef<BodyStyleState | null>(null);
@@ -219,17 +225,15 @@ export function ResizablePanel({
     </div>
   );
 
-  return edge === 'right'
-    ? (
-      <>
-        {panel}
-        {handle}
-      </>
-    )
-    : (
-      <>
-        {handle}
-        {panel}
-      </>
-    );
+  return edge === 'right' ? (
+    <>
+      {panel}
+      {handle}
+    </>
+  ) : (
+    <>
+      {handle}
+      {panel}
+    </>
+  );
 }

@@ -13,8 +13,8 @@
  *  - Error cases throw appropriate messages
  */
 import assert from 'node:assert/strict';
-import { init, text2d, textWidth, Sketch } from '../src/forge/headless';
 import type { TrackedShape } from '../src/forge/headless';
+import { init, Sketch, text2d, textWidth } from '../src/forge/headless';
 
 const EPS = 1e-3;
 
@@ -108,9 +108,9 @@ function checkTextWidth(): void {
 // Horizontal alignment
 // ---------------------------------------------------------------------------
 function checkHorizontalAlignment(): void {
-  const left   = text2d('CAD', { size: 10, align: 'left' });
+  const left = text2d('CAD', { size: 10, align: 'left' });
   const center = text2d('CAD', { size: 10, align: 'center' });
-  const right  = text2d('CAD', { size: 10, align: 'right' });
+  const right = text2d('CAD', { size: 10, align: 'right' });
 
   const bl = bounds(left);
   const bc = bounds(center);
@@ -136,9 +136,9 @@ function checkHorizontalAlignment(): void {
 // Vertical baseline
 // ---------------------------------------------------------------------------
 function checkBaseline(): void {
-  const base   = text2d('M', { size: 10, baseline: 'baseline' });
+  const base = text2d('M', { size: 10, baseline: 'baseline' });
   const center = text2d('M', { size: 10, baseline: 'center' });
-  const top    = text2d('M', { size: 10, baseline: 'top' });
+  const top = text2d('M', { size: 10, baseline: 'top' });
 
   const bb = bounds(base);
   const bc = bounds(center);
@@ -173,7 +173,7 @@ function checkExtrusion(): void {
 function checkWhitespaceHandling(): void {
   // Space character
   const withSpace = text2d('A B', { size: 10 });
-  const without   = text2d('AB',  { size: 10 });
+  const without = text2d('AB', { size: 10 });
   // Space should make it wider
   assert(bounds(withSpace).w > bounds(without).w, 'Space character should widen text');
 }
@@ -182,21 +182,9 @@ function checkWhitespaceHandling(): void {
 // Error cases
 // ---------------------------------------------------------------------------
 function checkErrors(): void {
-  assert.throws(
-    () => text2d('', { size: 10 }),
-    /must not be empty/,
-    'Empty string should throw',
-  );
-  assert.throws(
-    () => text2d('A', { size: 0 }),
-    /must be a positive number/,
-    'Zero size should throw',
-  );
-  assert.throws(
-    () => text2d('A', { size: -1 }),
-    /must be a positive number/,
-    'Negative size should throw',
-  );
+  assert.throws(() => text2d('', { size: 10 }), /must not be empty/, 'Empty string should throw');
+  assert.throws(() => text2d('A', { size: 0 }), /must be a positive number/, 'Zero size should throw');
+  assert.throws(() => text2d('A', { size: -1 }), /must be a positive number/, 'Negative size should throw');
 }
 
 // ---------------------------------------------------------------------------

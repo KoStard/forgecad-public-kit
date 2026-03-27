@@ -30,9 +30,7 @@ export function analyzeRigidity(def: ConstraintDefinition): RigidityResult {
     working.constraints
       .filter((constraint) => {
         const equations = getConstraintDef(constraint.type)?.equations ?? 0;
-        return equations > 0
-          && !redundantConstraintIds.has(constraint.id)
-          && !conflictingConstraintIds.has(constraint.id);
+        return equations > 0 && !redundantConstraintIds.has(constraint.id) && !conflictingConstraintIds.has(constraint.id);
       })
       .map((constraint) => constraint.id),
   );
@@ -41,8 +39,6 @@ export function analyzeRigidity(def: ConstraintDefinition): RigidityResult {
     totalDof,
     redundantConstraintIds,
     independentConstraintIds,
-    isRigid: totalDof <= 0
-      && redundantConstraintIds.size === 0
-      && conflictingConstraintIds.size === 0,
+    isRigid: totalDof <= 0 && redundantConstraintIds.size === 0 && conflictingConstraintIds.size === 0,
   };
 }

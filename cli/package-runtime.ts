@@ -1,6 +1,6 @@
+import { type ChildProcess, type SpawnOptions, spawn } from 'child_process';
 import { existsSync, realpathSync } from 'fs';
 import { dirname, resolve } from 'path';
-import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
 import { fileURLToPath } from 'url';
 
 export function packageRootFrom(metaUrl: string): string {
@@ -31,10 +31,6 @@ export function viteBinPath(metaUrl: string): string {
   return vitePath;
 }
 
-export function spawnPackageVite(
-  metaUrl: string,
-  args: string[],
-  options: SpawnOptions = {},
-): ChildProcess {
+export function spawnPackageVite(metaUrl: string, args: string[], options: SpawnOptions = {}): ChildProcess {
   return spawn(process.execPath, [viteBinPath(metaUrl), ...args], options);
 }

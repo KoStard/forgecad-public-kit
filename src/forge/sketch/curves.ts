@@ -1,14 +1,9 @@
-import { Sketch, getSketchCompileProfilePlan } from './core';
-import { polygon } from './primitives';
-import { stroke } from './path';
 import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
-import { buildShapeFromCompilePlan, type Shape } from '../kernel';
-import {
-  scaleLevelSetBoundsPadding,
-  scaleLevelSetEdgeLength,
-  scaleSplineSamples,
-  scaleSweepPathSamples,
-} from '../quality';
+import { buildShapeFromCompilePlan, getActiveBackend, type Shape } from '../kernel';
+import { scaleLevelSetBoundsPadding, scaleLevelSetEdgeLength, scaleSplineSamples, scaleSweepPathSamples } from '../quality';
+import { getSketchCompileProfilePlan, Sketch } from './core';
+import { stroke } from './path';
+import { polygon } from './primitives';
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
@@ -77,12 +72,8 @@ function vec3Dot(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-function vec3Cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+function _vec3Cross(a: Vec3, b: Vec3): Vec3 {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function vec3Len(v: Vec3): number {
@@ -94,7 +85,6 @@ function vec3Norm(v: Vec3): Vec3 {
   if (len < 1e-9) return [0, 0, 1];
   return [v[0] / len, v[1] / len, v[2] / len];
 }
-
 
 function catmullRom2D(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number, tension: number): Vec2 {
   const tt = t * t;
@@ -111,10 +101,7 @@ function catmullRom2D(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number, tension
   const h01 = -2 * ttt + 3 * tt;
   const h11 = ttt - tt;
 
-  return [
-    h00 * p1[0] + h10 * m1x + h01 * p2[0] + h11 * m2x,
-    h00 * p1[1] + h10 * m1y + h01 * p2[1] + h11 * m2y,
-  ];
+  return [h00 * p1[0] + h10 * m1x + h01 * p2[0] + h11 * m2x, h00 * p1[1] + h10 * m1y + h01 * p2[1] + h11 * m2y];
 }
 
 function catmullRom3D(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number, tension: number): Vec3 {
@@ -260,10 +247,11 @@ export class Curve3D {
 }
 
 /**
- * Create a smooth 2D spline sketch from control points.
+ * Build a smooth Catmull-Rom spline sketch from 2D control points.
  *
- * - Closed spline returns a filled profile.
- * - Open spline requires strokeWidth to return a solid sketch.
+ * A closed spline (default) returns a filled profile. An open spline requires
+ * a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5)
+ * to control curve tightness.
  */
 export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch {
   const closed = options.closed ?? true;
@@ -278,29 +266,33 @@ export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch 
   return stroke(sampled, options.strokeWidth, options.join ?? 'Round');
 }
 
-/** Create a reusable 3D spline curve object. */
+/**
+ * Create a reusable 3D spline curve object (Catmull-Rom).
+ *
+ * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
+ * downstream use in sweep() or manual path operations.
+ */
 export function spline3d(points: Vec3[], options: Spline3DOptions = {}): Curve3D {
   return new Curve3D(points, options);
 }
 
 /**
- * Loft between sketches along Z stations.
+ * Loft between multiple sketches along Z stations.
  *
- * Profiles can differ in topology/vertex count: interpolation is done on
- * signed-distance fields and meshed with level-set extraction.
+ * Profiles can differ in topology and vertex count: interpolation is done on
+ * signed-distance fields and meshed with level-set extraction. Heights must be
+ * strictly increasing. Compatible loft stacks can export through the OCCT exact route.
+ *
+ * Performance note: loft is significantly heavier than primitive/extrude/revolve.
+ * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
  */
-export function loft(
-  profiles: Sketch[],
-  heights: number[],
-  options: LoftOptions = {},
-): Shape {
+export function loft(profiles: Sketch[], heights: number[], options: LoftOptions = {}): Shape {
   if (profiles.length < 2) throw new Error('loft requires at least two profiles');
   if (profiles.length !== heights.length) {
     throw new Error('loft requires heights.length === profiles.length');
   }
 
-  const pairs = profiles.map((profile, i) => ({ profile, z: heights[i] }))
-    .sort((a, b) => a.z - b.z);
+  const pairs = profiles.map((profile, i) => ({ profile, z: heights[i] })).sort((a, b) => a.z - b.z);
 
   for (let i = 1; i < pairs.length; i++) {
     if (Math.abs(pairs[i].z - pairs[i - 1].z) < 1e-8) {
@@ -338,41 +330,34 @@ export function loft(
     throw new Error('loft: one or more profiles is missing a compile plan. All sketches must have compile profile plans.');
   }
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft')!;
+  const isOCCT = getActiveBackend() === 'occt';
   return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
-    fidelity: 'sampled',
-    sources: ['loft', 'level-set'],
+    fidelity: isOCCT ? 'kernel-native' : 'sampled',
+    sources: isOCCT ? ['loft'] : ['loft', 'level-set'],
   });
 }
 
 /**
- * Sweep a 2D profile along a 3D path.
+ * Sweep a 2D profile along a 3D path to create a solid.
  *
- * Path can be:
- * - `Curve3D` from spline3d(...)
- * - array of [x,y,z] points (polyline)
+ * Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline).
+ * The profile is interpreted in the local frame normal plane. Compatible sweeps can
+ * export through the OCCT exact route using the canonical path representation.
  *
- * The profile is interpreted in the local frame normal plane (x,y axes).
+ * Performance note: sweep uses level-set meshing internally. Prefer direct
+ * primitives/extrude/revolve when they can express the same shape.
  */
-export function sweep(
-  profile: Sketch,
-  path: Curve3D | Vec3[],
-  options: SweepOptions = {},
-): Shape {
+export function sweep(profile: Sketch, path: Curve3D | Vec3[], options: SweepOptions = {}): Shape {
   const requestedPathSamples = Math.max(4, options.samples ?? 48);
   const effectivePathSamples = scaleSweepPathSamples(requestedPathSamples);
-  const pathPts = Array.isArray(path)
-    ? path
-    : path.sample(effectivePathSamples);
+  const pathPts = Array.isArray(path) ? path : path.sample(effectivePathSamples);
 
   if (pathPts.length < 2) throw new Error('sweep requires a path with at least two points');
 
   const up = options.up ?? [0, 0, 1];
 
   const pb = profile.bounds();
-  const pr = Math.max(
-    Math.abs(pb.min[0]), Math.abs(pb.max[0]),
-    Math.abs(pb.min[1]), Math.abs(pb.max[1]),
-  );
+  const pr = Math.max(Math.abs(pb.min[0]), Math.abs(pb.max[0]), Math.abs(pb.min[1]), Math.abs(pb.max[1]));
 
   let minX = Infinity;
   let minY = Infinity;
@@ -411,8 +396,9 @@ export function sweep(
     throw new Error('sweep: profile is missing a compile plan. The sketch must have a compile profile plan.');
   }
   const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep')!;
+  const isOCCTSweep = getActiveBackend() === 'occt';
   return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
-    fidelity: 'sampled',
-    sources: ['sweep', 'level-set'],
+    fidelity: isOCCTSweep ? 'kernel-native' : 'sampled',
+    sources: isOCCTSweep ? ['sweep'] : ['sweep', 'level-set'],
   });
 }

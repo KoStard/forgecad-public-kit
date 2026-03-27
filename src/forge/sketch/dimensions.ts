@@ -12,7 +12,7 @@
  *   dim([0,0,0], [100,0,0], { currentComponent: true }); // bind to owning imported instance
  */
 
-import { Point2D, Line2D } from './entities';
+import { Line2D, Point2D } from './entities';
 
 export interface DimensionDef {
   id: string;
@@ -85,9 +85,7 @@ export function dim(from: PointArg, to: PointArg, opts?: DimOpts): void {
       return v ? [v] : undefined;
     }
     if (Array.isArray(opts?.component)) {
-      const unique = Array.from(new Set(
-        opts.component.map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean),
-      ));
+      const unique = Array.from(new Set(opts.component.map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean)));
       return unique.length > 0 ? unique : undefined;
     }
     return undefined;

@@ -207,7 +207,7 @@ This exporter is `uv`-first. `cli/forge-brep-export.py` carries inline dependenc
 
 By default this exporter is exact-subset only. It does **not** silently convert arbitrary triangle meshes back into fake BREP. Instead, Forge lowers compile-covered geometry into the `cadquery-occt` compiler target and exports that exact subset through CadQuery/OpenCascade.
 
-If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps hull-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
+If you pass `--allow-faceted`, unsupported closed mesh solids are exported as explicit faceted OCCT solids. This keeps mesh-heavy designs exportable to STEP/BREP, but that fallback is tessellation-driven rather than exact replay.
 
 The maintained feature matrix lives in [`docs/permanent/API/output/brep-export.md`](API/output/brep-export.md).
 
@@ -224,6 +224,32 @@ uv run scripts/brep/rerun_failures.py tmp/brep-matrix-step-20260306T120000Z.json
 ```
 
 These scripts use the repo-local `.venv-brep/.venv/bin/python` by default, run exports through a bounded parallel worker pool, and write JSON reports under `tmp/`.
+
+### G-code Toolpath Export
+
+```bash
+forgecad export gcode examples/gcode/parametric-vase.forge.js
+forgecad export gcode examples/gcode/parametric-vase.forge.js --output out/vase.gcode
+```
+
+Exports a G-code toolpath script directly to `.gcode` for FDM 3D printing. The script must return a `GCodeBuilder` instance (created via the `gcode()` factory function).
+
+This is a **toolpath scripting API**, not a slicer. You define print movements directly in code — enabling parametric vases, mathematical surfaces, non-planar paths, and other geometries that conventional slicers cannot produce.
+
+**How it works:** Initializes the forge kernel, runs the script, extracts the `GCodeBuilder` result, and writes the generated G-code text to disk. Prints segment count, estimated time, filament usage, and bounding box.
+
+**Options:**
+- `--output <path>` / `-o <path>` — Output file path (default: replaces `.forge.js` with `.gcode`)
+
+**Demo scripts:**
+- `examples/gcode/parametric-vase.forge.js` — Sine-wave modulated continuous spiral vase
+- `examples/gcode/spiral-tower.forge.js` — Twisted hexagonal polygon tower
+- `examples/gcode/math-surface.forge.js` — Non-planar bowl with wave rim
+- `examples/gcode/lissajous-vase.forge.js` — Lissajous curve vase with morphing profile
+
+Preview these scripts in ForgeCAD's interactive viewport. The current `forgecad render` CLI expects shape outputs and does not render `GCodeBuilder` scenes yet.
+
+See [`docs/permanent/API/output/gcode.md`](API/output/gcode.md) for the dedicated G-code mode guide and full `GCodeBuilder` API reference.
 
 ### SDF Robot Export (Gazebo package)
 
@@ -479,7 +505,6 @@ This check also fails if:
 
 ```bash
 forgecad check query-propagation
-forgecad check query-propagation --case hull-runtime-boundary
 forgecad check query-propagation --update
 ```
 
@@ -588,8 +613,8 @@ forgecad check dimensions
 
 Runs shape-level invariants for dimension metadata propagation across:
 - transform APIs (`translate`, `rotate`, `transform`, `scale`, `mirror`, `rotateAround`)
-- copy/style APIs (`clone`, `color`, `setColor`, `smooth/refine/simplify`)
-- boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection/hull3d`)
+- copy/style APIs (`clone`, `color`, `setColor`)
+- boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection`)
 - import runtime path (`importPart(...).color(...).translate(...)`)
 
 ### Dimension Debugger
@@ -669,6 +694,9 @@ for (const obj of result.objects) {
   }
   if (obj.sketch) {
     console.log(`${obj.name}: area=${obj.sketch.area().toFixed(1)}mm²`);
+  }
+  if (obj.toolpath) {
+    console.log(`${obj.name}: ${obj.toolpath.segments.length} G-code segments`);
   }
 }
 ```

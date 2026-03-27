@@ -112,7 +112,6 @@ return part.subtract(chamfer);
 
 - `offset(-r).offset(+r)` for rounding every convex corner of a closed outline
 - `stroke(points, width, 'Round')` for centerline-based geometry such as ribs or traces
-- `hull2d()` of circles for a blended cap/capsule silhouette
 - `filletCorners(points, ...)` for selective true-corner fillets on mixed profiles
 
 ## Best Practices

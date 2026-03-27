@@ -7,29 +7,29 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
+import { mergeViewportRenderSceneStates, parseRenderSceneCliSpec, type ViewportRenderSceneState } from '../src/capture/renderSceneState';
 import {
-  init,
-  runScript,
-  shapeToGeometry,
   CAD_MATERIAL_PROPS,
-  EDGE_MATERIAL_PROPS,
-  findJointAnimationClip,
-  resolveJointAnimation,
-  resolveJointViewValues,
   type CutPlaneDef,
+  EDGE_MATERIAL_PROPS,
   type ForgeQualityPreset,
+  findJointAnimationClip,
+  init,
   type JointViewAnimationDef,
   type JointViewCouplingDef,
   type JointViewDef,
   type RunResult,
+  resolveJointAnimation,
+  resolveJointViewValues,
+  runScript,
+  type SceneCaptureConfig,
+  type SceneConfig,
+  type SceneLightConfig,
   type SceneObject,
+  type ShapeMaterialProps,
+  shapeToGeometry,
 } from '../src/forge/headless';
-import { parseCameraCliSpec, type ViewportCameraState } from '../src/capture/cameraState';
-import {
-  mergeViewportRenderSceneStates,
-  parseRenderSceneCliSpec,
-  type ViewportRenderSceneState,
-} from '../src/capture/renderSceneState';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const exportCanvas = document.createElement('canvas');
@@ -108,6 +108,7 @@ interface CaptureSession {
   orbitRadius: number;
   orbitBaseTurn: number;
   orbitBasePitchDeg: number;
+  captureDefaults: SceneCaptureConfig | null;
 }
 
 function getRenderer(size: number, pixelRatio = 1): THREE.WebGLRenderer {
@@ -167,10 +168,7 @@ function normalizeVector(dir: [number, number, number]): [number, number, number
   return [dir[0] / len, dir[1] / len, dir[2] / len];
 }
 
-function renderFromDirection(
-  session: CaptureSession,
-  dir: [number, number, number],
-): string {
+function renderFromDirection(session: CaptureSession, dir: [number, number, number]): string {
   const d = normalizeVector(dir);
   session.camera.position.set(
     session.center.x + d[0] * session.distance,
@@ -199,6 +197,90 @@ function addDefaultLights(scene: THREE.Scene): void {
   scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
 }
 
+function createSceneLight(def: SceneLightConfig): THREE.Light {
+  const color = def.color ? new THREE.Color(def.color) : new THREE.Color(0xffffff);
+  const intensity = def.intensity ?? 1;
+  switch (def.type) {
+    case 'ambient':
+      return new THREE.AmbientLight(color, intensity);
+    case 'directional': {
+      const l = new THREE.DirectionalLight(color, intensity);
+      if (def.position) l.position.set(...def.position);
+      if (def.target) l.target.position.set(...def.target);
+      return l;
+    }
+    case 'point': {
+      const l = new THREE.PointLight(color, intensity, def.distance ?? 0, def.decay ?? 2);
+      if (def.position) l.position.set(...def.position);
+      return l;
+    }
+    case 'spot': {
+      const l = new THREE.SpotLight(color, intensity, def.distance ?? 0, def.angle ?? Math.PI / 6, def.penumbra ?? 0, def.decay ?? 2);
+      if (def.position) l.position.set(...def.position);
+      if (def.target) l.target.position.set(...def.target);
+      return l;
+    }
+    case 'hemisphere': {
+      const sky = def.skyColor ? new THREE.Color(def.skyColor) : color;
+      const ground = def.groundColor ? new THREE.Color(def.groundColor) : new THREE.Color(0x444444);
+      return new THREE.HemisphereLight(sky, ground, intensity);
+    }
+    default:
+      return new THREE.AmbientLight(color, intensity);
+  }
+}
+
+function applySceneConfig(scene: THREE.Scene, config: SceneConfig, r: THREE.WebGLRenderer): void {
+  // Background
+  if (config.background !== null) {
+    if (typeof config.background === 'string') {
+      scene.background = new THREE.Color(config.background);
+    } else {
+      // Gradient — render to a small texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 2;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+      gradient.addColorStop(0, config.background.top);
+      gradient.addColorStop(1, config.background.bottom);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 2, 256);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      scene.background = tex;
+    }
+  }
+
+  // Lights — replace defaults
+  if (config.lights !== null) {
+    config.lights.forEach((def) => {
+      const light = createSceneLight(def);
+      scene.add(light);
+      if ('target' in light && light.target instanceof THREE.Object3D) {
+        scene.add(light.target);
+      }
+    });
+  } else {
+    addDefaultLights(scene);
+  }
+
+  // Fog
+  if (config.fog) {
+    const fogColor = config.fog.color ? new THREE.Color(config.fog.color) : new THREE.Color(0x000000);
+    if (config.fog.density !== undefined) {
+      scene.fog = new THREE.FogExp2(fogColor, config.fog.density);
+    } else {
+      scene.fog = new THREE.Fog(fogColor, config.fog.near ?? 100, config.fog.far ?? 1000);
+    }
+  }
+
+  // Tone mapping exposure
+  if (config.postProcessing?.toneMappingExposure !== undefined) {
+    r.toneMappingExposure = config.postProcessing.toneMappingExposure;
+  }
+}
+
 function parseColor(input: string | undefined, fallback: number): THREE.Color {
   if (!input) return new THREE.Color(fallback);
   try {
@@ -208,21 +290,14 @@ function parseColor(input: string | undefined, fallback: number): THREE.Color {
   }
 }
 
-function buildRevoluteMatrix(
-  axisWorld: THREE.Vector3,
-  pivotWorld: THREE.Vector3,
-  angleDeg: number,
-): THREE.Matrix4 {
+function buildRevoluteMatrix(axisWorld: THREE.Vector3, pivotWorld: THREE.Vector3, angleDeg: number): THREE.Matrix4 {
   const rotation = new THREE.Matrix4().makeRotationAxis(axisWorld, THREE.MathUtils.degToRad(angleDeg));
   const toPivot = new THREE.Matrix4().makeTranslation(pivotWorld.x, pivotWorld.y, pivotWorld.z);
   const fromPivot = new THREE.Matrix4().makeTranslation(-pivotWorld.x, -pivotWorld.y, -pivotWorld.z);
   return toPivot.multiply(rotation).multiply(fromPivot);
 }
 
-function computeJointNodeMatrices(
-  joints: JointViewDef[],
-  jointValues: Record<string, number>,
-): Map<string, THREE.Matrix4> {
+function computeJointNodeMatrices(joints: JointViewDef[], jointValues: Record<string, number>): Map<string, THREE.Matrix4> {
   const byChild = new Map<string, JointViewDef>();
   joints.forEach((joint) => {
     byChild.set(joint.child, joint);
@@ -299,10 +374,7 @@ function setSessionMode(session: CaptureSession, mode: OrbitMode): void {
   });
 }
 
-function applyCameraPose(
-  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
-  state: ViewportCameraState,
-): void {
+function applyCameraPose(camera: THREE.PerspectiveCamera | THREE.OrthographicCamera, state: ViewportCameraState): void {
   camera.position.set(state.position[0], state.position[1], state.position[2]);
   camera.up.set(state.up[0], state.up[1], state.up[2]);
   if (camera.isOrthographicCamera) {
@@ -312,25 +384,13 @@ function applyCameraPose(
   camera.updateProjectionMatrix();
 }
 
-function applyOrbitPose(
-  session: CaptureSession,
-  turn: number,
-  pitchDeg?: number,
-): void {
+function applyOrbitPose(session: CaptureSession, turn: number, pitchDeg?: number): void {
   const normalizedTurn = ((turn % 1) + 1) % 1;
-  const clampedPitch = THREE.MathUtils.clamp(
-    pitchDeg ?? session.orbitBasePitchDeg,
-    -80,
-    80,
-  );
+  const clampedPitch = THREE.MathUtils.clamp(pitchDeg ?? session.orbitBasePitchDeg, -80, 80);
   const yaw = (session.orbitBaseTurn + normalizedTurn) * Math.PI * 2;
   const pitch = THREE.MathUtils.degToRad(clampedPitch);
   const cosPitch = Math.cos(pitch);
-  const dir: [number, number, number] = [
-    Math.sin(yaw) * cosPitch,
-    -Math.cos(yaw) * cosPitch,
-    Math.sin(pitch),
-  ];
+  const dir: [number, number, number] = [Math.sin(yaw) * cosPitch, -Math.cos(yaw) * cosPitch, Math.sin(pitch)];
   const d = normalizeVector(dir);
 
   session.camera.position.set(
@@ -338,11 +398,7 @@ function applyOrbitPose(
     session.orbitTarget.y + d[1] * session.orbitRadius,
     session.orbitTarget.z + d[2] * session.orbitRadius,
   );
-  session.camera.up.set(
-    session.fixedCameraState.up[0],
-    session.fixedCameraState.up[1],
-    session.fixedCameraState.up[2],
-  );
+  session.camera.up.set(session.fixedCameraState.up[0], session.fixedCameraState.up[1], session.fixedCameraState.up[2]);
   session.camera.lookAt(session.orbitTarget);
   session.camera.updateProjectionMatrix();
 }
@@ -370,10 +426,7 @@ function resolveSelectedAnimation(
   return null;
 }
 
-function createDefaultCameraState(
-  center: THREE.Vector3,
-  distance: number,
-): ViewportCameraState {
+function createDefaultCameraState(center: THREE.Vector3, distance: number): ViewportCameraState {
   return {
     projectionMode: 'perspective',
     position: [
@@ -389,7 +442,7 @@ function createDefaultCameraState(
 function buildCameraRig(
   center: THREE.Vector3,
   distance: number,
-  maxDim: number,
+  _maxDim: number,
   spec?: ViewportCameraState | null,
 ): {
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
@@ -408,17 +461,14 @@ function buildCameraRig(
   const ORTHO_BASE_SIZE = 960;
   const orthoSpan = ORTHO_BASE_SIZE;
 
-  const camera = fixedCameraState.projectionMode === 'orthographic'
-    ? new THREE.OrthographicCamera(-orthoSpan * 0.5, orthoSpan * 0.5, orthoSpan * 0.5, -orthoSpan * 0.5, -nearFar, nearFar)
-    : new THREE.PerspectiveCamera(45, 1, 0.1, Math.max(10, distance * 10));
+  const camera =
+    fixedCameraState.projectionMode === 'orthographic'
+      ? new THREE.OrthographicCamera(-orthoSpan * 0.5, orthoSpan * 0.5, orthoSpan * 0.5, -orthoSpan * 0.5, -nearFar, nearFar)
+      : new THREE.PerspectiveCamera(45, 1, 0.1, Math.max(10, distance * 10));
   camera.aspect = 1;
   applyCameraPose(camera, fixedCameraState);
 
-  const orbitTarget = new THREE.Vector3(
-    fixedCameraState.target[0],
-    fixedCameraState.target[1],
-    fixedCameraState.target[2],
-  );
+  const orbitTarget = new THREE.Vector3(fixedCameraState.target[0], fixedCameraState.target[1], fixedCameraState.target[2]);
   const offset = new THREE.Vector3(
     fixedCameraState.position[0] - fixedCameraState.target[0],
     fixedCameraState.position[1] - fixedCameraState.target[1],
@@ -426,7 +476,7 @@ function buildCameraRig(
   );
   const orbitRadius = offset.length() > 1e-3 ? offset.length() : distance;
   const orbitBasePitchDeg = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(offset.z / orbitRadius, -1, 1)));
-  const orbitBaseTurn = ((Math.atan2(offset.x, -offset.y) / (Math.PI * 2)) % 1 + 1) % 1;
+  const orbitBaseTurn = (((Math.atan2(offset.x, -offset.y) / (Math.PI * 2)) % 1) + 1) % 1;
 
   return {
     camera,
@@ -462,10 +512,7 @@ function resolveRequestedSceneState(opts?: OrbitInitOptions): ViewportRenderScen
   return sceneState;
 }
 
-function resolveRenderableJointNodeName(
-  obj: SceneObject,
-  joints: JointViewDef[],
-): string | null {
+function resolveRenderableJointNodeName(obj: SceneObject, joints: JointViewDef[]): string | null {
   const jointByChild = new Map<string, JointViewDef>();
   joints.forEach((joint) => {
     jointByChild.set(joint.child, joint);
@@ -476,20 +523,9 @@ function resolveRenderableJointNodeName(
   return null;
 }
 
-function applyObjectTransforms(
-  session: CaptureSession,
-  animationProgress?: number,
-): void {
-  const animatedValues = resolveJointAnimation(
-    session.selectedAnimation,
-    animationProgress ?? 0,
-    session.baseJointValues,
-  );
-  const effectiveJointValues = resolveJointViewValues(
-    session.joints,
-    session.jointCouplings,
-    animatedValues,
-  );
+function applyObjectTransforms(session: CaptureSession, animationProgress?: number): void {
+  const animatedValues = resolveJointAnimation(session.selectedAnimation, animationProgress ?? 0, session.baseJointValues);
+  const effectiveJointValues = resolveJointViewValues(session.joints, session.jointCouplings, animatedValues);
   const jointMatrices = computeJointNodeMatrices(session.joints, effectiveJointValues);
 
   session.renderables.forEach((renderable) => {
@@ -541,10 +577,7 @@ function destroyCaptureSession(): void {
   captureSession = null;
 }
 
-function createSession(
-  code: string,
-  opts?: OrbitInitOptions,
-): { ok: true; session: CaptureSession } | { ok: false; error: string } {
+function createSession(code: string, opts?: OrbitInitOptions): { ok: true; session: CaptureSession } | { ok: false; error: string } {
   const size = opts?.size ?? 1024;
   const pixelRatio = opts?.pixelRatio ?? 1;
   const r = getRenderer(size, pixelRatio);
@@ -556,12 +589,7 @@ function createSession(
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
-  const result: RunResult = runScript(
-    code,
-    opts?.fileName || 'main.forge.js',
-    opts?.allFiles || {},
-    { quality: opts?.quality ?? 'high' },
-  );
+  const result: RunResult = runScript(code, opts?.fileName || 'main.forge.js', opts?.allFiles || {}, { quality: opts?.quality ?? 'high' });
 
   if (result.error) {
     return { ok: false, error: String(result.error) };
@@ -572,16 +600,22 @@ function createSession(
       source: obj,
       shape: obj.shape || (obj.sketch ? obj.sketch.extrude(1) : null),
       color: requestedSceneState?.objects?.[obj.id]?.color ?? obj.color,
-      opacity: THREE.MathUtils.clamp(requestedSceneState?.objects?.[obj.id]?.opacity ?? 1, 0, 1),
+      materialProps: obj.materialProps as ShapeMaterialProps | undefined,
+      opacity: THREE.MathUtils.clamp(requestedSceneState?.objects?.[obj.id]?.opacity ?? obj.materialProps?.opacity ?? 1, 0, 1),
       visible: requestedSceneState?.objects?.[obj.id]?.visible !== false,
     }))
-    .filter((entry): entry is {
-      source: SceneObject;
-      shape: NonNullable<typeof entry.shape>;
-      color?: string;
-      opacity: number;
-      visible: boolean;
-    } => entry.shape != null);
+    .filter(
+      (
+        entry,
+      ): entry is {
+        source: SceneObject;
+        shape: NonNullable<typeof entry.shape>;
+        color?: string;
+        materialProps?: ShapeMaterialProps;
+        opacity: number;
+        visible: boolean;
+      } => entry.shape != null,
+    );
 
   if (objs.length === 0) {
     return { ok: false, error: 'No shape returned' };
@@ -591,9 +625,15 @@ function createSession(
   const boundsObjs = visibleObjs.length > 0 ? visibleObjs : objs;
 
   const scene = new THREE.Scene();
+  const sceneConfig: SceneConfig | null = result.sceneConfig ?? null;
   scene.background = parseColor(opts?.background, DEFAULT_BACKGROUND);
   scene.environment = getStudioEnvironment(r);
-  addDefaultLights(scene);
+
+  if (sceneConfig) {
+    applySceneConfig(scene, sceneConfig, r);
+  } else {
+    addDefaultLights(scene);
+  }
 
   const allShape = boundsObjs.slice(1).reduce((acc, cur) => acc.add(cur.shape), boundsObjs[0].shape);
   const shapeBB = allShape.boundingBox();
@@ -602,10 +642,7 @@ function createSession(
     max: [shapeBB.max[0], shapeBB.max[1], shapeBB.max[2]] as [number, number, number],
   };
 
-  const bb = new THREE.Box3(
-    new THREE.Vector3(...bbox.min),
-    new THREE.Vector3(...bbox.max),
-  );
+  const bb = new THREE.Box3(new THREE.Vector3(...bbox.min), new THREE.Vector3(...bbox.max));
   const center = new THREE.Vector3();
   bb.getCenter(center);
   const bsize = new THREE.Vector3();
@@ -613,7 +650,7 @@ function createSession(
   const maxDim = Math.max(1, bsize.x, bsize.y, bsize.z);
 
   const fov = 45;
-  const distance = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
+  const distance = (maxDim / (2 * Math.tan((fov * Math.PI) / 360))) * 1.6;
   const joints = result.jointsView?.enabled === false ? [] : (result.jointsView?.joints ?? []);
   const jointCouplings = result.jointsView?.enabled === false ? [] : (result.jointsView?.couplings ?? []);
   const animationClips = result.jointsView?.enabled === false ? [] : (result.jointsView?.animations ?? []);
@@ -621,20 +658,13 @@ function createSession(
   let selectedAnimation: JointViewAnimationDef | null;
 
   try {
-    selectedAnimation = resolveSelectedAnimation(
-      animationClips,
-      opts?.capture ?? 'orbit',
-      defaultAnimation,
-      opts?.animationName,
-    );
+    selectedAnimation = resolveSelectedAnimation(animationClips, opts?.capture ?? 'orbit', defaultAnimation, opts?.animationName);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
   const enabledCutPlanes = new Set(opts?.enabledCutPlanes ?? []);
-  const availableCutPlanes = result.cutPlanes.filter((cp) => (
-    new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8
-  ));
+  const availableCutPlanes = result.cutPlanes.filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
 
   if (enabledCutPlanes.size > 0) {
     const availableNames = new Set(availableCutPlanes.map((cp) => cp.name));
@@ -652,9 +682,17 @@ function createSession(
 
   for (const obj of visibleObjs) {
     const geo = shapeToGeometry(obj.shape);
+    const mp = obj.materialProps;
     const solidMaterialProps = {
       ...CAD_MATERIAL_PROPS,
       color: parseColor(obj.color, CAD_MATERIAL_PROPS.color),
+      ...(mp?.metalness !== undefined && { metalness: mp.metalness }),
+      ...(mp?.roughness !== undefined && { roughness: mp.roughness }),
+      ...(mp?.clearcoat !== undefined && { clearcoat: mp.clearcoat }),
+      ...(mp?.clearcoatRoughness !== undefined && { clearcoatRoughness: mp.clearcoatRoughness }),
+      ...(mp?.emissive !== undefined && { emissive: new THREE.Color(mp.emissive) }),
+      ...(mp?.emissiveIntensity !== undefined && { emissiveIntensity: mp.emissiveIntensity }),
+      ...(mp?.wireframe && { wireframe: true }),
     };
     const applicableCutPlanes = activeCutPlanes
       .filter((cutPlane) => !isObjectExcludedFromCutPlane(obj.source, cutPlane))
@@ -693,7 +731,30 @@ function createSession(
     });
   }
 
-  const cameraRig = buildCameraRig(center, distance, maxDim, requestedSceneState?.camera);
+  // Scene config camera — apply as default if no explicit camera was requested via CLI/state
+  let sceneConfigCameraState: ViewportCameraState | null = null;
+  if (sceneConfig?.camera && !requestedSceneState?.camera) {
+    const cam = sceneConfig.camera;
+    sceneConfigCameraState = {
+      projectionMode: cam.type ?? 'perspective',
+      position: cam.position ?? [
+        center.x + DEFAULT_FIXED_DIR.x * distance,
+        center.y + DEFAULT_FIXED_DIR.y * distance,
+        center.z + DEFAULT_FIXED_DIR.z * distance,
+      ],
+      target: cam.target ?? [center.x, center.y, center.z],
+      up: cam.up ?? [0, 0, 1],
+    };
+  }
+
+  const cameraRig = buildCameraRig(center, distance, maxDim, requestedSceneState?.camera ?? sceneConfigCameraState);
+
+  // Apply FOV from scene config
+  if (sceneConfig?.camera?.fov && cameraRig.camera instanceof THREE.PerspectiveCamera) {
+    cameraRig.camera.fov = sceneConfig.camera.fov;
+    cameraRig.camera.updateProjectionMatrix();
+  }
+
   const session: CaptureSession = {
     scene,
     camera: cameraRig.camera,
@@ -717,6 +778,7 @@ function createSession(
     orbitRadius: cameraRig.orbitRadius,
     orbitBaseTurn: cameraRig.orbitBaseTurn,
     orbitBasePitchDeg: cameraRig.orbitBasePitchDeg,
+    captureDefaults: sceneConfig?.capture ?? null,
   };
 
   setSessionMode(session, 'solid');
@@ -731,7 +793,7 @@ async function setup() {
   (window as any).__forgeReady = true;
 }
 
-(window as any).__forgeRender = function (
+(window as any).__forgeRender = (
   code: string,
   opts?: {
     angles?: string[];
@@ -746,7 +808,7 @@ async function setup() {
     sceneState?: ViewportRenderSceneState | null;
     sceneSpec?: string | null;
   },
-) {
+) => {
   const angles = opts?.angles || ['front', 'side', 'top', 'iso'];
   const built = createSession(code, {
     size: opts?.size || 1024,
@@ -784,7 +846,7 @@ async function setup() {
   };
 };
 
-(window as any).__forgeCaptureInit = function (code: string, opts?: OrbitInitOptions) {
+(window as any).__forgeCaptureInit = (code: string, opts?: OrbitInitOptions) => {
   destroyCaptureSession();
   const built = createSession(code, opts);
   if (!built.ok) {
@@ -804,10 +866,11 @@ async function setup() {
     })),
     defaultAnimation: captureSession.defaultAnimation,
     selectedAnimation: captureSession.selectedAnimation?.name ?? null,
+    captureDefaults: captureSession.captureDefaults ?? null,
   };
 };
 
-(window as any).__forgeCaptureFrame = function (opts?: OrbitFrameOptions) {
+(window as any).__forgeCaptureFrame = (opts?: OrbitFrameOptions) => {
   if (!captureSession) {
     return { ok: false, error: 'No active capture session. Call __forgeCaptureInit first.' };
   }
@@ -819,20 +882,14 @@ async function setup() {
   }
 };
 
-(window as any).__forgeCaptureDispose = function () {
+(window as any).__forgeCaptureDispose = () => {
   destroyCaptureSession();
   return { ok: true };
 };
 
 // Backwards-compatible aliases for older GIF-only callers.
-(window as any).__forgeOrbitInit = (code: string, opts?: OrbitInitOptions) => (
-  (window as any).__forgeCaptureInit(code, opts)
-);
-(window as any).__forgeOrbitFrame = (opts?: OrbitFrameOptions) => (
-  (window as any).__forgeCaptureFrame(opts)
-);
-(window as any).__forgeOrbitDispose = () => (
-  (window as any).__forgeCaptureDispose()
-);
+(window as any).__forgeOrbitInit = (code: string, opts?: OrbitInitOptions) => (window as any).__forgeCaptureInit(code, opts);
+(window as any).__forgeOrbitFrame = (opts?: OrbitFrameOptions) => (window as any).__forgeCaptureFrame(opts);
+(window as any).__forgeOrbitDispose = () => (window as any).__forgeCaptureDispose();
 
 setup();

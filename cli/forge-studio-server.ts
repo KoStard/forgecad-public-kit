@@ -1,10 +1,9 @@
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
 import { exec } from 'child_process';
 import chokidar from 'chokidar';
+import fs from 'fs';
+import http from 'http';
+import path from 'path';
 import { init, resolveForgeQualityPreset } from '../src/forge/headless';
-import { buildNotebookOutputs } from '../src/notebook/output';
 import {
   appendNotebookCell,
   createNotebook,
@@ -13,6 +12,7 @@ import {
   serializeNotebook,
   updateNotebookCellExecution,
 } from '../src/notebook/model';
+import { buildNotebookOutputs } from '../src/notebook/output';
 import { runNotebook } from '../src/notebook/runtime';
 
 export interface StudioServerOptions {
@@ -56,9 +56,15 @@ function sendJson(res: http.ServerResponse, status: number, payload: unknown): v
 function readJsonBody(req: http.IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk) => { body += chunk; });
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
     req.on('end', () => {
-      try { resolve(body ? JSON.parse(body) : {}); } catch (e) { reject(e); }
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (e) {
+        reject(e);
+      }
     });
     req.on('error', reject);
   });
@@ -71,15 +77,18 @@ function scanProjectFiles(projectDir: string | null): Record<string, string> {
   function scan(dir: string, prefix: string): void {
     for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
       const rel = prefix ? `${prefix}/${item.name}` : item.name;
-      if (item.isDirectory()) { scan(path.join(dir, item.name), rel); }
-      else if (item.isFile() && isProjectFile(item.name)) {
+      if (item.isDirectory()) {
+        scan(path.join(dir, item.name), rel);
+      } else if (item.isFile() && isProjectFile(item.name)) {
         entries[rel] = fs.readFileSync(path.join(dir, item.name), 'utf-8');
       } else if (item.isFile() && isMeshFile(item.name)) {
         entries[rel] = '';
       }
     }
   }
-  try { scan(abs, ''); } catch {}
+  try {
+    scan(abs, '');
+  } catch {}
   return entries;
 }
 
@@ -152,9 +161,7 @@ async function executeNotebookRequest(projectDir: string | null, body: any, crea
     filename,
     notebook: nextNotebook,
     notebookText: nextNotebookText,
-    outputs: run.targetCellId
-      ? (nextNotebook.cells.find((c) => c.id === run.targetCellId)?.outputs ?? [])
-      : [],
+    outputs: run.targetCellId ? (nextNotebook.cells.find((c) => c.id === run.targetCellId)?.outputs ?? []) : [],
     summary: {
       error: run.cellResult.error,
       objectCount: run.cellResult.objects.length,
@@ -207,17 +214,13 @@ async function pickPort(preferred: number, host: string, strict: boolean): Promi
 // ---- Browser open ----
 
 function openBrowser(url: string): void {
-  const cmd = process.platform === 'darwin' ? `open "${url}"`
-    : process.platform === 'win32' ? `start "" "${url}"`
-    : `xdg-open "${url}"`;
+  const cmd = process.platform === 'darwin' ? `open "${url}"` : process.platform === 'win32' ? `start "" "${url}"` : `xdg-open "${url}"`;
   exec(cmd, () => {});
 }
 
 // ---- Server ----
 
-export async function startStudioServer(
-  options: StudioServerOptions,
-): Promise<{ url: string; close(): Promise<void> }> {
+export async function startStudioServer(options: StudioServerOptions): Promise<{ url: string; close(): Promise<void> }> {
   const { projectDir, distDir, open, strictPort } = options;
   const host = options.host || '127.0.0.1';
   const port = await pickPort(options.port || 5173, host, strictPort);
@@ -226,7 +229,11 @@ export async function startStudioServer(
   const broadcast = (event: string, data: object): void => {
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of sseClients) {
-      try { client.write(msg); } catch { sseClients.delete(client); }
+      try {
+        client.write(msg);
+      } catch {
+        sseClients.delete(client);
+      }
     }
   };
 
@@ -237,7 +244,9 @@ export async function startStudioServer(
     watcher.on('add', (f) => {
       const rel = path.relative(abs, f).replace(/\\/g, '/');
       if (isProjectFile(f)) {
-        try { broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') }); } catch {}
+        try {
+          broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') });
+        } catch {}
       } else if (isMeshFile(f)) {
         broadcast('change', { filename: rel, content: '' });
       }
@@ -245,7 +254,9 @@ export async function startStudioServer(
     watcher.on('change', (f) => {
       const rel = path.relative(abs, f).replace(/\\/g, '/');
       if (isProjectFile(f)) {
-        try { broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') }); } catch {}
+        try {
+          broadcast('change', { filename: rel, content: fs.readFileSync(f, 'utf-8') });
+        } catch {}
       } else if (isMeshFile(f)) {
         broadcast('change', { filename: rel, content: '' });
       }
@@ -284,9 +295,15 @@ export async function startStudioServer(
     if (method === 'POST' && url === '/api/save') {
       readJsonBody(req)
         .then((body) => {
-          if (!projectDir) { sendJson(res, 400, { error: 'No project directory' }); return; }
+          if (!projectDir) {
+            sendJson(res, 400, { error: 'No project directory' });
+            return;
+          }
           const { filename, content } = body;
-          if (!filename || typeof content !== 'string') { sendJson(res, 400, { error: 'Invalid request' }); return; }
+          if (!filename || typeof content !== 'string') {
+            sendJson(res, 400, { error: 'Invalid request' });
+            return;
+          }
           const resolved = resolveProjectFile(projectDir, filename);
           fs.mkdirSync(path.dirname(resolved.filePath), { recursive: true });
           fs.writeFileSync(resolved.filePath, content, 'utf-8');
@@ -299,9 +316,15 @@ export async function startStudioServer(
     if (method === 'POST' && url === '/api/delete') {
       readJsonBody(req)
         .then((body) => {
-          if (!projectDir) { sendJson(res, 400, { error: 'No project directory' }); return; }
+          if (!projectDir) {
+            sendJson(res, 400, { error: 'No project directory' });
+            return;
+          }
           const { filename } = body;
-          if (!filename || typeof filename !== 'string') { sendJson(res, 400, { error: 'Invalid request' }); return; }
+          if (!filename || typeof filename !== 'string') {
+            sendJson(res, 400, { error: 'Invalid request' });
+            return;
+          }
           const resolved = resolveProjectFile(projectDir, filename);
           if (fs.existsSync(resolved.filePath)) {
             fs.unlinkSync(resolved.filePath);
@@ -357,21 +380,18 @@ export async function startStudioServer(
         .then(async (body) => {
           const filename = typeof body.filename === 'string' ? body.filename : '';
           const source = typeof body.source === 'string' ? body.source : '';
-          const loaded = loadNotebook(
-            projectDir, filename,
-            typeof body.notebook === 'string' ? body.notebook : undefined,
+          const loaded = loadNotebook(projectDir, filename, typeof body.notebook === 'string' ? body.notebook : undefined, true);
+          const appended = appendNotebookCell(loaded.notebook, source, typeof body.afterCellId === 'string' ? body.afterCellId : undefined);
+          return executeNotebookRequest(
+            projectDir,
+            {
+              ...body,
+              filename: loaded.filename,
+              notebook: serializeNotebook(appended.notebook),
+              cellId: appended.cell.id,
+            },
             true,
           );
-          const appended = appendNotebookCell(
-            loaded.notebook, source,
-            typeof body.afterCellId === 'string' ? body.afterCellId : undefined,
-          );
-          return executeNotebookRequest(projectDir, {
-            ...body,
-            filename: loaded.filename,
-            notebook: serializeNotebook(appended.notebook),
-            cellId: appended.cell.id,
-          }, true);
         })
         .then((payload) => sendJson(res, 200, payload))
         .catch((e: any) => sendJson(res, 500, { error: e.message }));
@@ -393,7 +413,11 @@ export async function startStudioServer(
   const close = (): Promise<void> =>
     new Promise((resolve) => {
       watcher?.close();
-      sseClients.forEach((c) => { try { c.end(); } catch {} });
+      sseClients.forEach((c) => {
+        try {
+          c.end();
+        } catch {}
+      });
       sseClients.clear();
       server.close(() => resolve());
     });

@@ -6,7 +6,7 @@
  */
 import type { ShapeId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
-import { shapeVertices, shapeCentroid, traverseShapeVertices, polygonSignedArea } from '../helpers';
+import { shapeVertices, shapeCentroid } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {

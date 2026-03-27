@@ -2,19 +2,19 @@ import './holeCut';
 
 import { createOwnedShapeCompilePlan } from './compilePlan';
 import { buildShapeFromCompilePlan, type GeometryInfo, type Shape } from './kernel';
-import { type Anchor, getSketchCompileProfilePlan, getSketchPlacementModel, type Sketch } from './sketch/core';
 import {
   cloneSheetMetalModel,
   deriveSheetMetalModel,
   isSheetMetalPlanarRegionName,
-  sheetMetalPlanarRegionNames,
   type SheetMetalEdge,
   type SheetMetalModel,
   type SheetMetalOutput,
   type SheetMetalPlanarRegionName,
   type SheetMetalRegionName,
+  sheetMetalPlanarRegionNames,
   validateSheetMetalModel,
 } from './sheetMetalModel';
+import { type Anchor, getSketchCompileProfilePlan, getSketchPlacementModel, type Sketch } from './sketch/core';
 
 export type {
   SheetMetalEdge,
@@ -94,7 +94,7 @@ function regionLabel(region: SheetMetalPlanarRegionName): string {
   return region === 'panel' ? 'panel' : `"${region}"`;
 }
 
-function regionEdge(region: SheetMetalPlanarRegionName): SheetMetalEdge | null {
+function _regionEdge(region: SheetMetalPlanarRegionName): SheetMetalEdge | null {
   if (region === 'panel') return null;
   return region.slice('flange-'.length) as SheetMetalEdge;
 }
@@ -192,10 +192,17 @@ export class SheetMetalPart {
   }
 
   regionNames(): SheetMetalRegionName[] {
-    return ['panel', ...Array.from(new Set(this.model.flanges.flatMap((flange) => [
-      `bend-${flange.edge}` as SheetMetalRegionName,
-      `flange-${flange.edge}` as SheetMetalRegionName,
-    ])))];
+    return [
+      'panel',
+      ...Array.from(
+        new Set(
+          this.model.flanges.flatMap((flange) => [
+            `bend-${flange.edge}` as SheetMetalRegionName,
+            `flange-${flange.edge}` as SheetMetalRegionName,
+          ]),
+        ),
+      ),
+    ];
   }
 
   folded(): Shape {
@@ -224,6 +231,12 @@ export class SheetMetalPart {
   }
 }
 
+/**
+ * Create a sheet-metal part with flanges, bend allowances, and flat pattern unfolding.
+ *
+ * Define the base panel, thickness, bend radius, and K-factor, then chain
+ * .flange() and .cutout() calls. Materialize with .folded() or .flatPattern().
+ */
 export function sheetMetal(options: SheetMetalOptions): SheetMetalPart {
   const model = normalizeSheetMetalModel(options);
   const issue = validateSheetMetalModel(model);

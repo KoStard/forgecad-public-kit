@@ -6,18 +6,14 @@
  * Runs inside the eval worker.
  */
 
+import type { SerializedRunResult, SerializedSceneObject, SerializedShapeData, SerializedSketchData } from '../workers/evalWorkerProtocol';
+import { isOCCTShapeBackend } from './backends/occt/shapeBackend';
+import { computeGeometryArrays } from './mesh/geometryArrays';
+import { getShapeCompilePlan, getShapeRuntimeBackend } from './kernel';
 import type { RunResult, SceneObject } from './runner';
-import { getSketchPlacement3D } from './sketch/core';
-import { isConstraintSketch, ConstraintSketch } from './sketch/constraints';
-import { computeGeometryArrays } from './geometryArrays';
-import { getShapeCompilePlan } from './kernel';
+import { isConstraintSketch } from './sketch/constraints';
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
-import type {
-  SerializedRunResult,
-  SerializedSceneObject,
-  SerializedShapeData,
-  SerializedSketchData,
-} from '../workers/evalWorkerProtocol';
+import { getSketchPlacement3D } from './sketch/core';
 
 interface ShapeTimings {
   getMeshMs: number;
@@ -32,8 +28,26 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
   if (!shape) return null;
 
   try {
+    // Detect OCCT backend for B-rep edge curves and smooth normals
+    let occtBackend: import('./backends/occt/shapeBackend').OCCTShapeBackend | null = null;
+    try {
+      const backend = getShapeRuntimeBackend(shape);
+      if (isOCCTShapeBackend(backend)) occtBackend = backend;
+    } catch {
+      // Not OCCT — use standard mesh pipeline
+    }
+
     let t = performance.now();
-    const rawMesh = shape.getMesh();
+    let rawMesh;
+    let vertNormals: Float32Array | null = null;
+    if (occtBackend) {
+      // OCCT: extract mesh + per-vertex normals from B-rep surface in one pass
+      const result = occtBackend.getMeshWithNormals();
+      rawMesh = result.mesh;
+      vertNormals = result.vertNormals;
+    } else {
+      rawMesh = shape.getMesh();
+    }
     timings.getMeshMs += performance.now() - t;
 
     t = performance.now();
@@ -62,15 +76,27 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
     const numTriangles = shape.numTri();
 
     const tGeom = performance.now();
-    const { positions: geometryPositions, normals: geometryNormals, edgePositions: geometryEdgePositions } =
-      computeGeometryArrays({
-        numProp: rawMesh.numProp,
-        numTri: numTriangles,
-        triVerts: meshTriVerts,
-        vertProperties: meshVertProperties,
-        mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
-        mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
-      });
+    const hasSmoothNormals = vertNormals !== null;
+    const {
+      positions: geometryPositions,
+      normals: geometryNormals,
+      edgePositions: meshEdgePositions,
+    } = computeGeometryArrays({
+      numProp: rawMesh.numProp,
+      numTri: numTriangles,
+      triVerts: meshTriVerts,
+      vertProperties: meshVertProperties,
+      mergeFromVert: meshMergeFromVert.length > 0 ? meshMergeFromVert : undefined,
+      mergeToVert: meshMergeToVert.length > 0 ? meshMergeToVert : undefined,
+      vertNormals: vertNormals ?? undefined,
+    });
+
+    // For OCCT-backed shapes, extract smooth edge curves from the B-rep
+    // topology instead of using the mesh-derived sharp edges.
+    let geometryEdgePositions = meshEdgePositions;
+    if (occtBackend) {
+      geometryEdgePositions = occtBackend.getEdgeCurves();
+    }
     timings.geomArraysMs += performance.now() - tGeom;
 
     return {
@@ -89,6 +115,7 @@ function serializeShape(obj: SceneObject, timings: ShapeTimings): SerializedShap
       geometryPositions,
       geometryNormals,
       geometryEdgePositions,
+      hasSmoothNormals,
     };
   } catch {
     return null;
@@ -152,8 +179,10 @@ export function serializeRunResult(
       name: obj.name,
       shapeData,
       sketchData,
+      toolpathData: obj.toolpath ?? null,
       compilePlan: obj.shape ? getShapeCompilePlan(obj.shape) : null,
       color: obj.color,
+      materialProps: obj.materialProps,
       geometryInfo: obj.geometryInfo,
       sketchMeta: (obj as any).sketchMeta,
       groupName: obj.groupName,
@@ -175,29 +204,20 @@ export function serializeRunResult(
 
   console.log(
     `[serialize] ${result.objects.length} obj` +
-    ` | getMesh=${timings.getMeshMs.toFixed(0)}ms` +
-    ` copy=${timings.copyMs.toFixed(0)}ms` +
-    ` bb=${timings.bbMs.toFixed(0)}ms` +
-    ` geomArrays=${timings.geomArraysMs.toFixed(0)}ms` +
-    ` sketch=${timings.sketchMs.toFixed(0)}ms`,
+      ` | getMesh=${timings.getMeshMs.toFixed(0)}ms` +
+      ` copy=${timings.copyMs.toFixed(0)}ms` +
+      ` bb=${timings.bbMs.toFixed(0)}ms` +
+      ` geomArrays=${timings.geomArraysMs.toFixed(0)}ms` +
+      ` sketch=${timings.sketchMs.toFixed(0)}ms`,
   );
 
+  // Spread all plain-data fields from RunResult, then override the WASM-backed
+  // ones with their serialized equivalents. New fields added to RunResult
+  // automatically flow through without touching this code.
+  const { shape: _s, sketch: _sk, objects: _objs, ...passthrough } = result;
   const serialized: SerializedRunResult = {
+    ...passthrough,
     objects,
-    params: result.params,
-    dimensions: result.dimensions,
-    highlights: result.highlights,
-    bom: result.bom,
-    cutPlanes: result.cutPlanes,
-    explodeView: result.explodeView,
-    jointsView: result.jointsView,
-    viewConfig: result.viewConfig,
-    robotExport: result.robotExport,
-    quality: result.quality,
-    error: result.error,
-    timeMs: result.timeMs,
-    logs: result.logs,
-    verifications: result.verifications,
     solverDebug,
   };
 

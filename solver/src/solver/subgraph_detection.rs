@@ -503,6 +503,12 @@ fn constraint_point_indices(
             // axis is "x" or "y" (not a point ID), only points matter.
             for p in pts { push_pt!(p); }
         }
+        Constraint::ArcTangentArc { .. } => {
+            // Arc-only — points are reached through arc entity expansion.
+        }
+        Constraint::BezierTangentArc { tangent_base, tangent_control, .. } => {
+            push_pt!(tangent_base); push_pt!(tangent_control);
+        }
     }
 
     out

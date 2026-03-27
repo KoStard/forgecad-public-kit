@@ -1,12 +1,12 @@
 import type { ForgeQualityPreset } from '@forge/index';
 import type {
-  EvalWorkerRequest,
-  EvalWorkerResponse,
-  EvalWorkerFaceInfoResult,
-  SerializedRunResult,
   ActiveBackend,
   EvalPhase,
+  EvalWorkerFaceInfoResult,
+  EvalWorkerRequest,
+  EvalWorkerResponse,
   ExactExportFormat,
+  SerializedRunResult,
 } from './evalWorkerProtocol';
 
 interface PendingRun {
@@ -226,14 +226,17 @@ class EvalWorkerClient {
    * Includes script context so the worker can re-evaluate if needed.
    * Uses a generous 5-minute timeout that resets on each progress phase.
    */
-  exportExact(format: ExactExportFormat, scriptContext: {
-    code: string;
-    file: string;
-    files: Record<string, string>;
-    quality: ForgeQualityPreset;
-    paramOverrides: Record<string, number>;
-    isNotebook: boolean;
-  }): Promise<Blob> {
+  exportExact(
+    format: ExactExportFormat,
+    scriptContext: {
+      code: string;
+      file: string;
+      files: Record<string, string>;
+      quality: ForgeQualityPreset;
+      paramOverrides: Record<string, number>;
+      isNotebook: boolean;
+    },
+  ): Promise<Blob> {
     const reqId = ++this.exportExactReqId;
     return new Promise<Blob>((resolve, reject) => {
       this.pendingExportExact.set(reqId, {

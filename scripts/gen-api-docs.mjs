@@ -358,7 +358,7 @@ const CATEGORIES = [
   {
     title: "3D Primitives",
     desc: "Create basic 3D shapes.",
-    names: ["box", "cylinder", "sphere", "hull3d", "levelSet"],
+    names: ["box", "cylinder", "sphere", "hull3d"],
   },
   {
     title: "Boolean Operations",
@@ -439,7 +439,7 @@ const CATEGORIES = [
   {
     title: "Viewport & Runtime",
     desc: "Configure viewport behavior: cut planes, exploded views, joint controls.",
-    names: ["cutPlane", "explodeView", "jointsView", "viewConfig"],
+    names: ["cutPlane", "explodeView", "jointsView", "viewConfig", "scene"],
   },
   {
     title: "Annotations & Output",

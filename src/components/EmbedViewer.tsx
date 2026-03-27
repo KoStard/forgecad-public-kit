@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
 import { initKernel } from '@forge/kernel';
 import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
+import { useEffect, useState } from 'react';
+import { buildShareUrl, fetchGistModel, fetchUrlModel, getExternalUrl, getGistId } from '../share';
 import { useForgeStore } from '../store/forgeStore';
 import { Viewport } from './Viewport';
-import { getGistId, fetchGistModel, buildShareUrl } from '../share';
 
 /**
  * Minimal embed view — just the 3D viewport with a small watermark link.
@@ -20,22 +20,36 @@ export function EmbedViewer() {
   const [gistError, setGistError] = useState<string | null>(null);
   const [gistLoading, setGistLoading] = useState(false);
 
-  // Load gist if ?gist=<id> is present
+  // Load external model if ?url=<url> or ?gist=<id> is present
   useEffect(() => {
+    const externalUrl = getExternalUrl();
     const gistId = getGistId();
-    if (!gistId) return;
 
-    setGistLoading(true);
-    fetchGistModel(gistId)
-      .then((model) => {
-        updateFileCode(model.filename, model.code);
-        setActiveFile(model.filename);
-        setGistLoading(false);
-      })
-      .catch((err) => {
-        setGistError(err.message);
-        setGistLoading(false);
-      });
+    if (externalUrl) {
+      setGistLoading(true);
+      fetchUrlModel(externalUrl)
+        .then((model) => {
+          updateFileCode(model.filename, model.code);
+          setActiveFile(model.filename);
+          setGistLoading(false);
+        })
+        .catch((err) => {
+          setGistError(err.message);
+          setGistLoading(false);
+        });
+    } else if (gistId) {
+      setGistLoading(true);
+      fetchGistModel(gistId)
+        .then((model) => {
+          updateFileCode(model.filename, model.code);
+          setActiveFile(model.filename);
+          setGistLoading(false);
+        })
+        .catch((err) => {
+          setGistError(err.message);
+          setGistLoading(false);
+        });
+    }
   }, []);
 
   // Init kernel
@@ -55,6 +69,11 @@ export function EmbedViewer() {
 
   // Build the "Open in ForgeCAD" link — point to the full editor with the same model
   const openUrl = (() => {
+    const externalUrl = getExternalUrl();
+    if (externalUrl) {
+      const base = `${window.location.origin}${window.location.pathname}`;
+      return `${base}?url=${encodeURIComponent(externalUrl)}`;
+    }
     const gistId = getGistId();
     if (gistId) {
       const base = `${window.location.origin}${window.location.pathname}`;
@@ -69,10 +88,17 @@ export function EmbedViewer() {
 
   if (gistError) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', color: '#e74c3c', background: '#1e1e1e', fontFamily: 'system-ui',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: '#e74c3c',
+          background: '#1e1e1e',
+          fontFamily: 'system-ui',
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 16, marginBottom: 8 }}>Failed to load model</div>
           <div style={{ fontSize: 13, color: '#999' }}>{gistError}</div>
@@ -83,10 +109,16 @@ export function EmbedViewer() {
 
   if (!kernelReady || gistLoading) {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh', color: 'var(--fc-textDim)', background: 'var(--fc-bg, #1e1e1e)',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: 'var(--fc-textDim)',
+          background: 'var(--fc-bg, #1e1e1e)',
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 18, marginBottom: 8 }}>ForgeCAD</div>
           <div style={{ fontSize: 13 }}>{gistLoading ? 'Loading model...' : 'Loading geometry kernel...'}</div>

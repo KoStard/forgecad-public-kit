@@ -1,9 +1,4 @@
-import {
-  exactRoute,
-  facetedRoute,
-  partExample,
-  type ExampleManifestEntry,
-} from './types';
+import { type ExampleManifestEntry, exactRoute, facetedRoute, partExample } from './types';
 
 const DEFAULT_EXACT_NOTE = 'This product demo now stays inside the defended exact-route subset.';
 
@@ -83,10 +78,13 @@ const PRODUCT_DEMO_EXACT_PARTS = [
     primaryShapes: FIVE_FIGEN_PRIMARY_SHAPES,
   },
   'examples/adjustable-table.forge.js',
+  'examples/airplane-propeller.forge.js',
   'examples/bathroom.forge.js',
   'examples/bolt-pattern.forge.js',
   'examples/bottle.forge.js',
   'examples/chair.forge.js',
+  'examples/chess-set.forge.js',
+  'examples/classical-piano.forge.js',
   'examples/clock.forge.js',
   'examples/cup.forge.js',
   'examples/headphone-hanger-v2.forge.js',
@@ -113,18 +111,6 @@ const PRODUCT_DEMO_RECOVERED_FACETED_PARTS = [
     note: 'The bolt now stays exact; this contract scopes the faceted claim to the nut.',
     primaryShapes: ['Nut'],
   },
-  {
-    path: 'examples/classical-piano.forge.js',
-    blocker: 'The lid prop shape uses runtime geometry outside the exact CadQuery/OCCT subset.',
-    note: 'All other piano shapes stay exact; this contract scopes the route claim to the lid prop.',
-    primaryShapes: ['Lid Prop'],
-  },
-  {
-    path: 'examples/chess-set.forge.js',
-    blocker: 'The knight pieces still depend on shape-hull construction outside the exact CadQuery/OCCT subset, so the four knight bodies intentionally stay on the faceted route.',
-    note: 'The board and every non-knight piece still stay exact; this contract scopes the route claim to the four knight bodies that still need faceted fallback.',
-    primaryShapes: ['White Knight 2', 'White Knight 7', 'Black Knight 2', 'Black Knight 7'],
-  },
 ] as const;
 
 export const PRODUCT_DEMO_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
@@ -134,9 +120,7 @@ export const PRODUCT_DEMO_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     }
     return partExample('product-demos', entry.path, exactRoute(entry.note), undefined, entry.primaryShapes);
   }),
-  ...PRODUCT_DEMO_FACETED_PARTS.map((entry) =>
-    partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note)),
-  ),
+  ...PRODUCT_DEMO_FACETED_PARTS.map((entry) => partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note))),
   ...PRODUCT_DEMO_RECOVERED_FACETED_PARTS.map((entry) =>
     partExample('product-demos', entry.path, facetedRoute(entry.blocker, entry.note), undefined, entry.primaryShapes),
   ),

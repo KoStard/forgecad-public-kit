@@ -5,24 +5,35 @@
  * the eval worker. The underlying ShapeBackend is lazy — it answers getMesh(),
  * boundingBox(), isEmpty(), and numTri() from cached data with zero WASM calls.
  * A real backend is only reconstructed on demand, when geometric operations
- * like splitByPlane() are actually needed (e.g. cut planes).
+ * like splitByPlane() are actually needed (e.g. cut planes). Reconstruction
+ * always uses Manifold because OCCT B-rep topology cannot be recovered from
+ * a triangle mesh.
  *
  * Also exposes pre-computed Three.js-ready geometry arrays (positions, normals,
  * edge positions) built in the worker, so shapeToGeometry() on the main thread
- * is a zero-cost BufferGeometry assembly with no CPU work.
+ * is a zero-cost BufferGeometry assembly with no CPU work. For OCCT-backed
+ * shapes, normals are smooth per-vertex from the B-rep surface and edges are
+ * smooth polylines from parametric curves — indicated by `hasSmoothNormals`.
  */
 
-import { Shape } from './kernel';
-import { SHAPE_BACKEND_MARKER, type ShapeBackend, type ShapeRuntimeBounds, type ShapeRuntimeMesh, type ShapeRuntimeCrossSection } from './shapeBackend';
-import { reconstructBackendFromMesh } from './backends/manifold';
-import type { FaceRef } from './sketch/topology';
-import type { FaceTransformationHistory } from './faceHistory';
 import type { SerializedShapeData } from '../workers/evalWorkerProtocol';
+import { reconstructBackendFromMesh } from './backends/manifold';
+import type { FaceTransformationHistory } from './face-tracking/faceHistory';
+import { Shape } from './kernel';
+import {
+  SHAPE_BACKEND_MARKER,
+  type ShapeBackend,
+  type ShapeRuntimeBounds,
+  type ShapeRuntimeCrossSection,
+  type ShapeRuntimeMesh,
+} from './shapeBackend';
+import type { FaceRef } from './sketch/topology';
 
 export interface PrecomputedGeometry {
   positions: Float32Array;
   normals: Float32Array;
   edgePositions: Float32Array;
+  hasSmoothNormals: boolean;
 }
 
 /**
@@ -48,6 +59,7 @@ class FrozenShapeBackend implements ShapeBackend {
       positions: this._data.geometryPositions,
       normals: this._data.geometryNormals,
       edgePositions: this._data.geometryEdgePositions,
+      hasSmoothNormals: this._data.hasSmoothNormals ?? false,
     };
   }
 
@@ -102,20 +114,45 @@ class FrozenShapeBackend implements ShapeBackend {
 
   // --- Delegated to lazy reconstructed backend ---
 
-  clone(): ShapeBackend { return this.getReconstructedBackend().clone(); }
-  translate(x: number, y: number, z: number): ShapeBackend { return this.getReconstructedBackend().translate(x, y, z); }
-  rotate(x: number, y: number, z: number): ShapeBackend { return this.getReconstructedBackend().rotate(x, y, z); }
-  transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend { return this.getReconstructedBackend().transform(m); }
-  scale(v: number | [number, number, number]): ShapeBackend { return this.getReconstructedBackend().scale(v); }
-  mirror(normal: [number, number, number]): ShapeBackend { return this.getReconstructedBackend().mirror(normal); }
-  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().split(other); }
-  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] { return this.getReconstructedBackend().splitByPlane(normal, originOffset); }
-  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend { return this.getReconstructedBackend().trimByPlane(normal, originOffset); }
-  hull(): ShapeBackend { return this.getReconstructedBackend().hull(); }
-  volume(): number { return this.getReconstructedBackend().volume(); }
-  surfaceArea(): number { return this.getReconstructedBackend().surfaceArea(); }
-  slice(offset: number): ShapeRuntimeCrossSection { return this.getReconstructedBackend().slice(offset); }
-  project(): ShapeRuntimeCrossSection { return this.getReconstructedBackend().project(); }
+  clone(): ShapeBackend {
+    return this.getReconstructedBackend().clone();
+  }
+  translate(x: number, y: number, z: number): ShapeBackend {
+    return this.getReconstructedBackend().translate(x, y, z);
+  }
+  rotate(x: number, y: number, z: number): ShapeBackend {
+    return this.getReconstructedBackend().rotate(x, y, z);
+  }
+  transform(m: Parameters<ShapeBackend['transform']>[0]): ShapeBackend {
+    return this.getReconstructedBackend().transform(m);
+  }
+  scale(v: number | [number, number, number]): ShapeBackend {
+    return this.getReconstructedBackend().scale(v);
+  }
+  mirror(normal: [number, number, number]): ShapeBackend {
+    return this.getReconstructedBackend().mirror(normal);
+  }
+  split(other: ShapeBackend): [ShapeBackend, ShapeBackend] {
+    return this.getReconstructedBackend().split(other);
+  }
+  splitByPlane(normal: [number, number, number], originOffset: number): [ShapeBackend, ShapeBackend] {
+    return this.getReconstructedBackend().splitByPlane(normal, originOffset);
+  }
+  trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend {
+    return this.getReconstructedBackend().trimByPlane(normal, originOffset);
+  }
+  volume(): number {
+    return this.getReconstructedBackend().volume();
+  }
+  surfaceArea(): number {
+    return this.getReconstructedBackend().surfaceArea();
+  }
+  slice(offset: number): ShapeRuntimeCrossSection {
+    return this.getReconstructedBackend().slice(offset);
+  }
+  project(): ShapeRuntimeCrossSection {
+    return this.getReconstructedBackend().project();
+  }
 }
 
 export class FrozenShape extends Shape {

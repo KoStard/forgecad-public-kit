@@ -63,6 +63,43 @@ Export a 2D sketch to a DXF string.
 
 See the auto-generated [API reference](../../generated/api-reference.md) for full signatures.
 
+## G-code Toolpath Export
+
+ForgeCAD also supports direct G-code authoring for FDM printing by returning a `GCodeBuilder` from a `.forge.js` script.
+
+This is a separate workflow from mesh export:
+- mesh export: model geometry, then slice elsewhere
+- G-code mode: script the toolpaths directly
+
+Use `forgecad export gcode script.forge.js -o output.gcode` for machine output.
+
+See [`gcode.md`](gcode.md) for the dedicated G-code mode guide, including:
+- the `gcode(profile?)` factory
+- the full `GCodeBuilder` API
+- viewport behavior
+- limitations and safety notes
+- recommended authoring patterns for continuous and non-planar prints
+
+## Robot Export (SDF / URDF)
+
+Assemblies with `robotExport({...})` can be exported as simulation-ready packages. See the [Assembly docs](../assembly/assembly.md#robot-export) for the full `robotExport()` API.
+
+```bash
+# SDF package (Gazebo/Ignition)
+forgecad export sdf model.forge.js [--output dir]
+
+# URDF package (ROS / PyBullet / MuJoCo)
+forgecad export urdf model.forge.js [--output dir]
+```
+
+Both formats produce:
+- Per-link STL meshes (visual + separate collision meshes)
+- Inertia tensors computed from actual mesh geometry
+- Joint limits, dynamics, and mimic (from joint couplings)
+- Manifest JSON with link/joint mappings
+
+SDF additionally supports: demo world generation, diff-drive plugin, joint state publisher, keyboard teleop.
+
 ## Exact Geometry Export (STEP/BREP)
 
 For exact geometry (no tessellation), ForgeCAD uses the OCCT backend. See [`brep-export.md`](brep-export.md) for the parity matrix showing which operations produce exact vs. mesh geometry.

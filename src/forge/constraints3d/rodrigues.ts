@@ -16,11 +16,7 @@ import type { Vec3 } from '../transform';
 const EPS = 1e-10;
 
 /** 3x3 rotation matrix stored as row-major flat array. */
-export type Mat3 = [
-  number, number, number,
-  number, number, number,
-  number, number, number,
-];
+export type Mat3 = [number, number, number, number, number, number, number, number, number];
 
 /** Convert axis-angle vector to 3x3 rotation matrix. */
 export function rodrigues(rv: Vec3): Mat3 {
@@ -29,11 +25,7 @@ export function rodrigues(rv: Vec3): Mat3 {
 
   if (theta < EPS) {
     // First-order Taylor: R ≈ I + K
-    return [
-      1, -rz, ry,
-      rz, 1, -rx,
-      -ry, rx, 1,
-    ];
+    return [1, -rz, ry, rz, 1, -rx, -ry, rx, 1];
   }
 
   const c = Math.cos(theta);
@@ -46,30 +38,28 @@ export function rodrigues(rv: Vec3): Mat3 {
   const kz = rz / theta;
 
   return [
-    t * kx * kx + c,      t * kx * ky - s * kz,  t * kx * kz + s * ky,
-    t * ky * kx + s * kz,  t * ky * ky + c,       t * ky * kz - s * kx,
-    t * kz * kx - s * ky,  t * kz * ky + s * kx,  t * kz * kz + c,
+    t * kx * kx + c,
+    t * kx * ky - s * kz,
+    t * kx * kz + s * ky,
+    t * ky * kx + s * kz,
+    t * ky * ky + c,
+    t * ky * kz - s * kx,
+    t * kz * kx - s * ky,
+    t * kz * ky + s * kx,
+    t * kz * kz + c,
   ];
 }
 
 /** Rotate a vector by the rotation matrix. */
 export function rotateVec3(R: Mat3, v: Vec3): Vec3 {
-  return [
-    R[0] * v[0] + R[1] * v[1] + R[2] * v[2],
-    R[3] * v[0] + R[4] * v[1] + R[5] * v[2],
-    R[6] * v[0] + R[7] * v[1] + R[8] * v[2],
-  ];
+  return [R[0] * v[0] + R[1] * v[1] + R[2] * v[2], R[3] * v[0] + R[4] * v[1] + R[5] * v[2], R[6] * v[0] + R[7] * v[1] + R[8] * v[2]];
 }
 
 /** Apply rigid transform: R * point + translation. */
 export function transformPoint(rv: Vec3, translation: Vec3, point: Vec3): Vec3 {
   const R = rodrigues(rv);
   const rotated = rotateVec3(R, point);
-  return [
-    rotated[0] + translation[0],
-    rotated[1] + translation[1],
-    rotated[2] + translation[2],
-  ];
+  return [rotated[0] + translation[0], rotated[1] + translation[1], rotated[2] + translation[2]];
 }
 
 /** Apply rotation only (for directions/normals): R * dir. */
@@ -84,11 +74,7 @@ export function dot3(a: Vec3, b: Vec3): number {
 }
 
 export function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 export function sub3(a: Vec3, b: Vec3): Vec3 {

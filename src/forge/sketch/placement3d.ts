@@ -1,11 +1,5 @@
-import { Transform, type Mat4 } from '../transform';
-import {
-  Sketch,
-  getSketchPlacement3D,
-  setSketchPlacement3D,
-  setSketchPlacementModel,
-  type SketchFace3D,
-} from './core';
+import { type Mat4, Transform } from '../transform';
+import { getSketchPlacement3D, Sketch, setSketchPlacement3D, setSketchPlacementModel } from './core';
 import type { FaceRef } from './topology';
 import {
   buildSketchPlacementMatrix,
@@ -15,15 +9,13 @@ import {
   type SketchOnFaceOptions,
 } from './workplane';
 
-export type { ShapeAnchorTarget, SketchFaceTarget, SketchOnFaceOptions } from './workplane';
 export type { SketchFace3D } from './core';
+export type { ShapeAnchorTarget, SketchFaceTarget, SketchOnFaceOptions } from './workplane';
 
 function isFaceRef(value: unknown): value is FaceRef {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<FaceRef>;
-  return typeof candidate.name === 'string'
-    && Array.isArray(candidate.normal)
-    && Array.isArray(candidate.center);
+  return typeof candidate.name === 'string' && Array.isArray(candidate.normal) && Array.isArray(candidate.center);
 }
 
 export function sketchOnFace(
@@ -49,10 +41,7 @@ export function sketchOnFace(
     selfAnchor: opts.selfAnchor ?? 'center',
   } as const;
 
-  return setSketchPlacementModel(
-    setSketchPlacement3D(sketch.clone(), buildSketchPlacementMatrix(sketch, model)),
-    model,
-  );
+  return setSketchPlacementModel(setSketchPlacement3D(sketch.clone(), buildSketchPlacementMatrix(sketch, model)), model);
 }
 
 export function getSketchWorldMatrix(sketch: Sketch): Mat4 {

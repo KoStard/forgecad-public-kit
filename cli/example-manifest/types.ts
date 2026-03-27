@@ -1,17 +1,6 @@
-export type ExampleManifestFamily =
-  | 'api-parts'
-  | 'compiler-corpus'
-  | 'product-demos'
-  | 'non-part'
-  | 'experimental';
+export type ExampleManifestFamily = 'api-parts' | 'compiler-corpus' | 'product-demos' | 'non-part' | 'experimental';
 
-export type ExampleValidationClass =
-  | 'part'
-  | 'assembly'
-  | 'runtime-scene'
-  | 'sketch'
-  | 'notebook'
-  | 'experimental';
+export type ExampleValidationClass = 'part' | 'assembly' | 'runtime-scene' | 'sketch' | 'notebook' | 'experimental';
 
 export type ExampleValidationPath =
   | 'part-runtime'
@@ -136,11 +125,7 @@ export function partExample(
   };
 }
 
-export function assemblyExample(
-  path: string,
-  note?: string,
-  expect?: NonPartValidationExpectations,
-): AssemblyExampleManifestEntry {
+export function assemblyExample(path: string, note?: string, expect?: NonPartValidationExpectations): AssemblyExampleManifestEntry {
   return {
     path,
     family: 'non-part',
@@ -151,11 +136,7 @@ export function assemblyExample(
   };
 }
 
-export function runtimeSceneExample(
-  path: string,
-  note?: string,
-  expect?: NonPartValidationExpectations,
-): RuntimeSceneExampleManifestEntry {
+export function runtimeSceneExample(path: string, note?: string, expect?: NonPartValidationExpectations): RuntimeSceneExampleManifestEntry {
   return {
     path,
     family: 'non-part',
@@ -166,11 +147,7 @@ export function runtimeSceneExample(
   };
 }
 
-export function sketchExample(
-  path: string,
-  note?: string,
-  expect?: NonPartValidationExpectations,
-): SketchExampleManifestEntry {
+export function sketchExample(path: string, note?: string, expect?: NonPartValidationExpectations): SketchExampleManifestEntry {
   return {
     path,
     family: 'non-part',
@@ -181,11 +158,7 @@ export function sketchExample(
   };
 }
 
-export function notebookExample(
-  path: string,
-  note?: string,
-  expect?: NonPartValidationExpectations,
-): NotebookExampleManifestEntry {
+export function notebookExample(path: string, note?: string, expect?: NonPartValidationExpectations): NotebookExampleManifestEntry {
   return {
     path,
     family: 'non-part',
@@ -196,12 +169,7 @@ export function notebookExample(
   };
 }
 
-export function experimentalExample(
-  path: string,
-  blocker: string,
-  taskRef: string,
-  note?: string,
-): ExperimentalExampleManifestEntry {
+export function experimentalExample(path: string, blocker: string, taskRef: string, note?: string): ExperimentalExampleManifestEntry {
   return {
     path,
     family: 'experimental',

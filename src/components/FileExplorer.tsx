@@ -1,10 +1,14 @@
-import { useMemo, useState, useCallback, DragEvent, useEffect, useRef } from 'react';
+import { DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 const MESH_EXTS = ['.stl', '.obj', '.3mf'];
 function isMeshFile(name: string): boolean {
   const lower = name.toLowerCase();
   return MESH_EXTS.some((ext) => lower.endsWith(ext));
+}
+
+function isSvgFile(name: string): boolean {
+  return name.toLowerCase().endsWith('.svg');
 }
 
 export function FileExplorer() {
@@ -35,10 +39,11 @@ export function FileExplorer() {
   const lastClickedPath = useRef<string | null>(null);
   const treeContainerRef = useRef<HTMLDivElement>(null);
 
-  const normalizePath = (value: string): string => value
-    .replace(/\\/g, '/')
-    .replace(/\/+/g, '/')
-    .replace(/^\/+|\/+$/g, '');
+  const normalizePath = (value: string): string =>
+    value
+      .replace(/\\/g, '/')
+      .replace(/\/+/g, '/')
+      .replace(/^\/+|\/+$/g, '');
 
   const getBaseName = (value: string): string => {
     const normalized = normalizePath(value);
@@ -211,9 +216,7 @@ export function FileExplorer() {
   };
 
   const toggleFolder = (path: string) => {
-    setExpandedFolders((prev) => (
-      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
-    ));
+    setExpandedFolders((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
   };
 
   // Flat list of visible paths for shift-click range selection
@@ -244,44 +247,47 @@ export function FileExplorer() {
     setSelection(new Set());
   }, [selection, files, deleteFile, deleteFolder]);
 
-  const handleNodeClick = useCallback((e: React.MouseEvent, node: TreeNode) => {
-    const metaKey = e.metaKey || e.ctrlKey;
-    const { shiftKey } = e;
+  const handleNodeClick = useCallback(
+    (e: React.MouseEvent, node: TreeNode) => {
+      const metaKey = e.metaKey || e.ctrlKey;
+      const { shiftKey } = e;
 
-    if (metaKey) {
-      // Toggle this item in selection
-      setSelection((prev) => {
-        const next = new Set(prev);
-        if (next.has(node.path)) next.delete(node.path);
-        else next.add(node.path);
-        return next;
-      });
-      lastClickedPath.current = node.path;
-    } else if (shiftKey && lastClickedPath.current) {
-      // Range select between last clicked and this node
-      const startIdx = flatVisiblePaths.indexOf(lastClickedPath.current);
-      const endIdx = flatVisiblePaths.indexOf(node.path);
-      if (startIdx !== -1 && endIdx !== -1) {
-        const lo = Math.min(startIdx, endIdx);
-        const hi = Math.max(startIdx, endIdx);
-        setSelection(new Set(flatVisiblePaths.slice(lo, hi + 1)));
-      }
-    } else {
-      // Single click — select only this item
-      setSelection(new Set([node.path]));
-      lastClickedPath.current = node.path;
-    }
-
-    if (node.type === 'folder') setFocusedFolder(node.path);
-    if (node.type === 'file' && !metaKey && !shiftKey) {
-      if (isMeshFile(node.path)) {
-        // Mesh file clicked — preview it in the viewport without changing active file
-        setMeshPreview(node.path);
+      if (metaKey) {
+        // Toggle this item in selection
+        setSelection((prev) => {
+          const next = new Set(prev);
+          if (next.has(node.path)) next.delete(node.path);
+          else next.add(node.path);
+          return next;
+        });
+        lastClickedPath.current = node.path;
+      } else if (shiftKey && lastClickedPath.current) {
+        // Range select between last clicked and this node
+        const startIdx = flatVisiblePaths.indexOf(lastClickedPath.current);
+        const endIdx = flatVisiblePaths.indexOf(node.path);
+        if (startIdx !== -1 && endIdx !== -1) {
+          const lo = Math.min(startIdx, endIdx);
+          const hi = Math.max(startIdx, endIdx);
+          setSelection(new Set(flatVisiblePaths.slice(lo, hi + 1)));
+        }
       } else {
-        setActiveFile(node.path);
+        // Single click — select only this item
+        setSelection(new Set([node.path]));
+        lastClickedPath.current = node.path;
       }
-    }
-  }, [flatVisiblePaths, setActiveFile, setMeshPreview]);
+
+      if (node.type === 'folder') setFocusedFolder(node.path);
+      if (node.type === 'file' && !metaKey && !shiftKey) {
+        if (isMeshFile(node.path)) {
+          // Mesh file clicked — preview it in the viewport without changing active file
+          setMeshPreview(node.path);
+        } else {
+          setActiveFile(node.path);
+        }
+      }
+    },
+    [flatVisiblePaths, setActiveFile, setMeshPreview],
+  );
 
   const renderNode = (node: TreeNode, depth: number) => {
     const isFolder = node.type === 'folder';
@@ -296,16 +302,28 @@ export function FileExplorer() {
     return (
       <div
         key={node.path}
-        onDragOver={isFolder ? (e) => { e.preventDefault(); e.stopPropagation(); } : undefined}
-        onDrop={isFolder ? (e) => { e.stopPropagation(); handleDropToFolder(e, node.path); } : undefined}
+        onDragOver={
+          isFolder
+            ? (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            : undefined
+        }
+        onDrop={
+          isFolder
+            ? (e) => {
+                e.stopPropagation();
+                handleDropToFolder(e, node.path);
+              }
+            : undefined
+        }
       >
         <div
           draggable
           onDragStart={(e) => {
             // If dragging a selected item, drag all selected; otherwise drag just this one
-            const paths = selection.has(node.path) && selection.size > 1
-              ? Array.from(selection)
-              : [node.path];
+            const paths = selection.has(node.path) && selection.size > 1 ? Array.from(selection) : [node.path];
             e.dataTransfer.setData('application/x-forge-paths', JSON.stringify(paths));
             e.dataTransfer.setData('application/x-forge-path', node.path);
             e.dataTransfer.setData('text/plain', node.path);
@@ -335,12 +353,19 @@ export function FileExplorer() {
             alignItems: 'center',
             gap: 6,
           }}
-          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--fc-bgHover)'; }}
-          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+          onMouseEnter={(e) => {
+            if (!isSelected) e.currentTarget.style.background = 'var(--fc-bgHover)';
+          }}
+          onMouseLeave={(e) => {
+            if (!isSelected) e.currentTarget.style.background = 'transparent';
+          }}
         >
           {isFolder ? (
             <span
-              onClick={(e) => { e.stopPropagation(); toggleFolder(node.path); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(node.path);
+              }}
               style={{ width: 14, textAlign: 'center', color: 'var(--fc-textDim)', flexShrink: 0 }}
             >
               {isExpanded ? '▾' : '▸'}
@@ -348,16 +373,27 @@ export function FileExplorer() {
           ) : (
             <span style={{ width: 14, flexShrink: 0 }} />
           )}
-          <span style={{ width: 16 }}>{isFolder ? '📁' : isMeshFile(node.path) ? '🔶' : '📄'}</span>
+          <span style={{ width: 16 }}>{isFolder ? '📁' : isMeshFile(node.path) ? '🔶' : isSvgFile(node.path) ? '🖼' : '📄'}</span>
           {isRenaming ? (
             <input
               autoFocus
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onBlur={() => handleRename(node.path)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleRename(node.path); if (e.key === 'Escape') setRenamingPath(null); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename(node.path);
+                if (e.key === 'Escape') setRenamingPath(null);
+              }}
               onClick={(e) => e.stopPropagation()}
-              style={{ flex: 1, background: 'var(--fc-bg)', border: '1px solid var(--fc-accent)', color: 'var(--fc-text)', fontSize: 12, padding: '1px 4px', outline: 'none' }}
+              style={{
+                flex: 1,
+                background: 'var(--fc-bg)',
+                border: '1px solid var(--fc-accent)',
+                color: 'var(--fc-text)',
+                fontSize: 12,
+                padding: '1px 4px',
+                outline: 'none',
+              }}
             />
           ) : (
             <>
@@ -377,7 +413,7 @@ export function FileExplorer() {
             </>
           )}
         </div>
-        {isFolder && isExpanded && node.children && node.children.map((child) => renderNode(child, depth + 1))}
+        {isFolder && isExpanded && node.children?.map((child) => renderNode(child, depth + 1))}
       </div>
     );
   };
@@ -386,7 +422,18 @@ export function FileExplorer() {
     <div
       ref={treeContainerRef}
       tabIndex={0}
-      style={{ width: '100%', minWidth: 0, minHeight: 0, flex: 1, background: 'var(--fc-bgSurface)', borderRight: '1px solid var(--fc-border)', display: 'flex', flexDirection: 'column', fontSize: 13, outline: 'none' }}
+      style={{
+        width: '100%',
+        minWidth: 0,
+        minHeight: 0,
+        flex: 1,
+        background: 'var(--fc-bgSurface)',
+        borderRight: '1px solid var(--fc-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        fontSize: 13,
+        outline: 'none',
+      }}
       onDrop={(e) => handleDropToFolder(e, '')}
       onDragOver={(e) => e.preventDefault()}
       onClick={(e) => {
@@ -433,7 +480,9 @@ export function FileExplorer() {
                   setCreating('file');
                   setContextMenu(null);
                 }}
-              >New File</div>
+              >
+                New File
+              </div>
               <div
                 style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-text)', fontSize: 12 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
@@ -444,7 +493,9 @@ export function FileExplorer() {
                   setCreating('folder');
                   setContextMenu(null);
                 }}
-              >New Folder</div>
+              >
+                New Folder
+              </div>
               <div style={{ borderTop: '1px solid var(--fc-border)', margin: '4px 0' }} />
             </>
           )}
@@ -457,7 +508,9 @@ export function FileExplorer() {
               setRenameValue(getBaseName(contextMenu.path));
               setContextMenu(null);
             }}
-          >Rename</div>
+          >
+            Rename
+          </div>
           <div
             style={{ padding: '5px 12px', cursor: 'pointer', color: 'var(--fc-error)', fontSize: 12 }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--fc-bgHover)')}
@@ -466,22 +519,32 @@ export function FileExplorer() {
               setContextMenu(null);
               handleDeleteSelection();
             }}
-          >Delete{selection.size > 1 ? ` (${selection.size})` : ''}</div>
+          >
+            Delete{selection.size > 1 ? ` (${selection.size})` : ''}
+          </div>
         </div>
       )}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--fc-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div
+        style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid var(--fc-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <span style={{ fontWeight: 600, color: 'var(--fc-textMuted)', fontSize: 12 }}>Project Files</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <span
-            onClick={() => setCreating('file')}
-            style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
-            title="New file"
-          >+ File</span>
+          <span onClick={() => setCreating('file')} style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }} title="New file">
+            + File
+          </span>
           <span
             onClick={() => setCreating('folder')}
             style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
             title="New folder"
-          >+ Folder</span>
+          >
+            + Folder
+          </span>
         </div>
       </div>
 
@@ -492,9 +555,23 @@ export function FileExplorer() {
             placeholder={creating === 'folder' ? 'Folder name' : 'name.forge.js, utils.js, name.forge-notebook.json, or asset.svg'}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(null); }}
-            onBlur={() => { if (!newName.trim()) setCreating(null); }}
-            style={{ width: '100%', background: 'var(--fc-bg)', border: '1px solid var(--fc-accent)', color: 'var(--fc-text)', fontSize: 11, padding: '3px 6px', outline: 'none', boxSizing: 'border-box' }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate();
+              if (e.key === 'Escape') setCreating(null);
+            }}
+            onBlur={() => {
+              if (!newName.trim()) setCreating(null);
+            }}
+            style={{
+              width: '100%',
+              background: 'var(--fc-bg)',
+              border: '1px solid var(--fc-accent)',
+              color: 'var(--fc-text)',
+              fontSize: 11,
+              padding: '3px 6px',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
           />
         </div>
       )}

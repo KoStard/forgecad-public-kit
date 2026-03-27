@@ -1,23 +1,12 @@
-import type {
-  ForgeQualityPreset,
-  LogEntry,
-  ParamDef,
-  VerificationResult,
-} from '@forge/index';
-import type { DimensionDef } from '../forge/sketch/dimensions';
-import type { HighlightDef } from '../forge/sketch/highlights';
-import type { BomDef } from '../forge/bom';
-import type { CutPlaneDef } from '../forge/cutPlane';
-import type { ExplodeViewOptions } from '../forge/explodeView';
-import type { CollectedJointsView } from '../forge/jointsView';
-import type { ViewConfig } from '../forge/viewConfig';
-import type { CollectedRobotExport } from '../forge/robotExport';
-import type { FaceRef } from '../forge/sketch/topology';
-import type { FaceTransformationHistory } from '../forge/faceHistory';
-import type { GeometryInfo } from '../forge/kernel';
+import type { ForgeQualityPreset, LogEntry } from '@forge/index';
 import type { ShapeCompilePlan } from '../forge/compilePlan';
-import type { SketchConstraintMeta, ConstraintDefinition } from '../forge/sketch/constraints';
+import type { FaceTransformationHistory } from '../forge/face-tracking/faceHistory';
+import type { ToolpathData } from '../forge/export/gcode';
+import type { GeometryInfo } from '../forge/kernel';
+import type { RunResult } from '../forge/runner';
+import type { ConstraintDefinition, SketchConstraintMeta } from '../forge/sketch/constraints';
 import type { SolverWasmRunDebugSnapshot } from '../forge/sketch/constraints/solver-wasm';
+import type { FaceRef } from '../forge/sketch/topology';
 
 /** Wire format for a serialized Shape — all WASM data extracted into transferable TypedArrays. */
 export interface SerializedShapeData {
@@ -37,6 +26,8 @@ export interface SerializedShapeData {
   geometryPositions: Float32Array;
   geometryNormals: Float32Array;
   geometryEdgePositions: Float32Array;
+  /** True when normals are smooth per-vertex normals from B-rep surface (OCCT). */
+  hasSmoothNormals: boolean;
 }
 
 /** Wire format for a serialized Sketch — polygon data extracted into plain arrays. */
@@ -59,33 +50,28 @@ export interface SerializedSceneObject {
   name: string;
   shapeData: SerializedShapeData | null;
   sketchData: SerializedSketchData | null;
+  toolpathData?: ToolpathData | null;
   compilePlan?: ShapeCompilePlan | null;
   color?: string;
+  materialProps?: import('../forge/kernel').ShapeMaterialProps;
   geometryInfo?: GeometryInfo | null;
   sketchMeta?: SketchConstraintMeta;
   groupName?: string;
   treePath?: string[];
 }
 
-/** Full serialized RunResult — no WASM objects, safe to postMessage. */
-export interface SerializedRunResult {
+/**
+ * Full serialized RunResult — no WASM objects, safe to postMessage.
+ *
+ * Derived from RunResult: drops `shape` and `sketch` (WASM-only),
+ * replaces `objects` with serialized equivalents, adds `solverDebug`.
+ * All other fields pass through unchanged — adding a new plain-data
+ * field to RunResult automatically includes it here.
+ */
+export type SerializedRunResult = Omit<RunResult, 'shape' | 'sketch' | 'objects'> & {
   objects: SerializedSceneObject[];
-  params: ParamDef[];
-  dimensions: DimensionDef[];
-  highlights: HighlightDef[];
-  bom: BomDef[];
-  cutPlanes: CutPlaneDef[];
-  explodeView: ExplodeViewOptions | null;
-  jointsView: CollectedJointsView | null;
-  viewConfig: ViewConfig | null;
-  robotExport: CollectedRobotExport | null;
-  quality: ForgeQualityPreset;
-  error: string | null;
-  timeMs: number;
-  logs: LogEntry[];
-  verifications: VerificationResult[];
   solverDebug?: SolverWasmRunDebugSnapshot | null;
-}
+};
 
 // ---- Message types ----
 
@@ -188,4 +174,11 @@ export interface EvalWorkerExportExactError {
 }
 
 export type EvalWorkerRequest = EvalWorkerRunRequest | EvalWorkerFaceInfoRequest | EvalWorkerExportExactRequest;
-export type EvalWorkerResponse = EvalWorkerRunSuccess | EvalWorkerRunError | EvalWorkerProgressMessage | EvalWorkerFaceInfoSuccess | EvalWorkerFaceInfoError | EvalWorkerExportExactSuccess | EvalWorkerExportExactError;
+export type EvalWorkerResponse =
+  | EvalWorkerRunSuccess
+  | EvalWorkerRunError
+  | EvalWorkerProgressMessage
+  | EvalWorkerFaceInfoSuccess
+  | EvalWorkerFaceInfoError
+  | EvalWorkerExportExactSuccess
+  | EvalWorkerExportExactError;

@@ -75,9 +75,7 @@ export function AISkillDialog({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px 0', gap: 8 }}>
           <span style={{ fontSize: 18 }}>🤖</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--fc-text)', flex: 1 }}>
-            Use AI with ForgeCAD
-          </span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--fc-text)', flex: 1 }}>Use AI with ForgeCAD</span>
           <button
             onClick={onClose}
             style={{
@@ -113,8 +111,8 @@ export function AISkillDialog({ onClose }: { onClose: () => void }) {
           {tab === 'paste' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <p style={{ margin: 0, fontSize: 12, color: 'var(--fc-textMuted)', lineHeight: 1.5 }}>
-                Copy the full ForgeCAD context (175 KB) to your clipboard, then paste it as the first message
-                in Claude.ai, ChatGPT, Gemini, or any chat UI. The AI will then know every ForgeCAD API.
+                Copy the full ForgeCAD context (175 KB) to your clipboard, then paste it as the first message in Claude.ai, ChatGPT, Gemini,
+                or any chat UI. The AI will then know every ForgeCAD API.
               </p>
               <button
                 onClick={handleCopyContext}
@@ -139,8 +137,8 @@ export function AISkillDialog({ onClose }: { onClose: () => void }) {
           {tab === 'install' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <p style={{ margin: 0, fontSize: 12, color: 'var(--fc-textMuted)', lineHeight: 1.5 }}>
-                For AI coding agents (Claude Code, Codex, OpenCode, etc.), install the full multi-file skill
-                so the agent can load docs on demand:
+                For AI coding agents (Claude Code, Codex, OpenCode, etc.), install the full multi-file skill so the agent can load docs on
+                demand:
               </p>
               <code style={codeStyle}>npx forgecad skill install</code>
               <p style={{ margin: 0, fontSize: 12, color: 'var(--fc-textMuted)', lineHeight: 1.5 }}>

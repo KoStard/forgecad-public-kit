@@ -58,16 +58,8 @@ Notes:
 
 - `offset(-r).offset(+r)` rounds all convex corners of an existing closed profile
 - `stroke(points, width, 'Round')` thickens a centerline path; use it for ribs, traces, and wire-like geometry
-- `hull2d()` of circles creates a blended convex silhouette, closer to a capsule or cap than a true corner fillet
 - `filletCorners(points, ...)` is the right tool when some corners stay sharp and others need true tangent fillets
 - See `examples/api/sketch-rounding-strategies.forge.js` for a side-by-side comparison
-
-### `.hull()`
-Returns the convex hull of this sketch.
-
-```javascript
-const hull = complexShape.hull();
-```
 
 ### `.simplify(epsilon?)`
 Removes vertices that don't significantly affect the shape.

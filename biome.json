@@ -1,0 +1,113 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.8/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["src/**", "cli/**"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noForEach": "off",
+        "noVoid": "off",
+        "noBannedTypes": "off",
+        "useLiteralKeys": "off",
+        "useOptionalChain": "warn"
+      },
+      "correctness": {
+        "noUnusedImports": "warn",
+        "noUnusedVariables": "warn",
+        "noUnusedFunctionParameters": "warn",
+        "useExhaustiveDependencies": "off",
+        "useHookAtTopLevel": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useImportType": "off",
+        "noParameterAssign": "off",
+        "useDefaultParameterLast": "off",
+        "noUnusedTemplateLiteral": "off",
+        "useNumberNamespace": "off",
+        "useNodejsImportProtocol": "off",
+        "useTemplate": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noAssignInExpressions": "off",
+        "noDoubleEquals": "warn",
+        "noControlCharactersInRegex": "off",
+        "noFallthroughSwitchClause": "off",
+        "useIterableCallbackReturn": "off",
+        "noArrayIndexKey": "off",
+        "noImplicitAnyLet": "warn",
+        "noGlobalIsFinite": "off",
+        "noGlobalIsNan": "off",
+        "noUnsafeDeclarationMerging": "off",
+        "noEmptyInterface": "off",
+        "noRedeclare": "off",
+        "noDuplicateProperties": "off",
+        "noPrototypeBuiltins": "off"
+      },
+      "a11y": {
+        "noStaticElementInteractions": "off",
+        "useKeyWithClickEvents": "off",
+        "useButtonType": "off",
+        "noAutofocus": "off",
+        "noAriaHiddenOnFocusable": "off",
+        "noNoninteractiveTabindex": "off",
+        "useFocusableInteractive": "off",
+        "useValidAriaProps": "off",
+        "noSvgWithoutTitle": "off",
+        "useHtmlLang": "off",
+        "useSemanticElements": "off",
+        "noAriaUnsupportedElements": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "noLabelWithoutControl": "off"
+      },
+      "performance": {
+        "noAccumulatingSpread": "off"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/forge/sketch/constraints/**"],
+      "assist": {
+        "actions": {
+          "source": {
+            "organizeImports": "off"
+          }
+        }
+      }
+    }
+  ]
+}

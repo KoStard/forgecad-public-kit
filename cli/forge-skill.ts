@@ -9,8 +9,7 @@ export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
 
   if (!existsSync(srcSkill)) {
     throw new Error(
-      `Built skill file not found at ${srcSkill}.\n` +
-        `If you are running from a source checkout, run: npm run build:skill:forgecad`,
+      `Built skill file not found at ${srcSkill}.\n` + `If you are running from a source checkout, run: npm run build:skill:forgecad`,
     );
   }
 
@@ -33,17 +32,13 @@ export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
 export async function runSkillOneFileCli(argv: string[] = []): Promise<void> {
   const outputArg = argv.find((a) => !a.startsWith('-'));
   if (!outputArg) {
-    throw new Error(
-      `Usage: forgecad skill one-file <output-path>\n` +
-        `Example: forgecad skill one-file ~/Desktop/forgecad-context.md`,
-    );
+    throw new Error(`Usage: forgecad skill one-file <output-path>\n` + `Example: forgecad skill one-file ~/Desktop/forgecad-context.md`);
   }
 
   const src = resolvePackagePath(import.meta.url, 'dist-skill', 'CONTEXT.md');
   if (!existsSync(src)) {
     throw new Error(
-      `Built context file not found at ${src}.\n` +
-        `If you are running from a source checkout, run: npm run build:skill:forgecad`,
+      `Built context file not found at ${src}.\n` + `If you are running from a source checkout, run: npm run build:skill:forgecad`,
     );
   }
 

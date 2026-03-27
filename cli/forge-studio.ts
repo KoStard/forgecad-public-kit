@@ -2,8 +2,8 @@
 
 import { existsSync } from 'fs';
 import { resolve } from 'path';
-import { resolvePackagePath } from './package-runtime';
 import { startStudioServer } from './forge-studio-server';
+import { resolvePackagePath } from './package-runtime';
 
 interface StudioOptions {
   blank: boolean;
@@ -50,9 +50,18 @@ function parseStudioArgs(argv: string[]): StudioOptions {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--blank') { options.blank = true; continue; }
-    if (arg === '--open') { options.open = true; continue; }
-    if (arg === '--strict-port') { options.strictPort = true; continue; }
+    if (arg === '--blank') {
+      options.blank = true;
+      continue;
+    }
+    if (arg === '--open') {
+      options.open = true;
+      continue;
+    }
+    if (arg === '--strict-port') {
+      options.strictPort = true;
+      continue;
+    }
     if (arg === '--port') {
       const raw = argv[i + 1];
       if (!raw) throw new Error('--port requires a value');
@@ -82,9 +91,7 @@ function parseStudioArgs(argv: string[]): StudioOptions {
 
 export async function runStudioCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const options = parseStudioArgs(argv);
-  const projectDir = options.blank
-    ? null
-    : options.projectPath ?? resolvePackagePath(import.meta.url, 'examples');
+  const projectDir = options.blank ? null : (options.projectPath ?? resolvePackagePath(import.meta.url, 'examples'));
 
   const distDir = resolvePackagePath(import.meta.url, 'dist');
 

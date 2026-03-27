@@ -14,8 +14,8 @@
  * but we also constrain the normal-direction translation (coplanar), giving 3 total.
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
 import { dot3, sub3 } from '../rodrigues';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const flushDef: Constraint3DDef<'flush'> = {
   type: 'flush',

@@ -29,7 +29,7 @@ export class PathBuilder {
   }
 
   lineAngled(length: number, degrees: number): this {
-    const rad = degrees * Math.PI / 180;
+    const rad = (degrees * Math.PI) / 180;
     return this.lineTo(this.x + length * Math.cos(rad), this.y + length * Math.sin(rad));
   }
 
@@ -54,12 +54,14 @@ export class PathBuilder {
 
     const normals: [number, number][] = [];
     for (let i = 0; i < n - 1; i++) {
-      const dx = pts[i + 1][0] - pts[i][0], dy = pts[i + 1][1] - pts[i][1];
+      const dx = pts[i + 1][0] - pts[i][0],
+        dy = pts[i + 1][1] - pts[i][1];
       const len = Math.sqrt(dx * dx + dy * dy);
       normals.push([-dy / len, dx / len]);
     }
 
-    const left: [number, number][] = [], right: [number, number][] = [];
+    const left: [number, number][] = [],
+      right: [number, number][] = [];
     for (let i = 0; i < n; i++) {
       const [px, py] = pts[i];
       if (i === 0 || i === n - 1) {
@@ -67,11 +69,18 @@ export class PathBuilder {
         left.push([px + ni[0] * hw, py + ni[1] * hw]);
         right.push([px - ni[0] * hw, py - ni[1] * hw]);
       } else {
-        const n1 = normals[i - 1], n2 = normals[i];
-        let mx = n1[0] + n2[0], my = n1[1] + n2[1];
+        const n1 = normals[i - 1],
+          n2 = normals[i];
+        let mx = n1[0] + n2[0],
+          my = n1[1] + n2[1];
         let mlen = Math.sqrt(mx * mx + my * my);
-        if (mlen < 1e-9) { mx = n1[0]; my = n1[1]; mlen = 1; }
-        mx /= mlen; my /= mlen;
+        if (mlen < 1e-9) {
+          mx = n1[0];
+          my = n1[1];
+          mlen = 1;
+        }
+        mx /= mlen;
+        my /= mlen;
         const scale = hw / (mx * n1[0] + my * n1[1]);
         left.push([px + mx * scale, py + my * scale]);
         right.push([px - mx * scale, py - my * scale]);
@@ -93,10 +102,12 @@ export class PathBuilder {
   }
 }
 
+/** Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/close/stroke. */
 export function path(): PathBuilder {
   return new PathBuilder();
 }
 
+/** Create a stroked polyline sketch from an array of 2D points with the given width and corner join style. */
 export function stroke(points: [number, number][], width: number, join: 'Round' | 'Square' = 'Square'): Sketch {
   const builder = new PathBuilder();
   builder.moveTo(points[0][0], points[0][1]);

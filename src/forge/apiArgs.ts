@@ -19,14 +19,7 @@ export function describeApiArg(value: unknown): string {
   return typeof value;
 }
 
-export function normalizeVariadicArgs<T>({
-  apiName,
-  inputs,
-  minCount,
-  itemName,
-  usage,
-  coerce,
-}: NormalizeVariadicArgsOptions<T>): T[] {
+export function normalizeVariadicArgs<T>({ apiName, inputs, minCount, itemName, usage, coerce }: NormalizeVariadicArgsOptions<T>): T[] {
   const flattened: unknown[] = [];
   for (const input of inputs) {
     if (Array.isArray(input)) flattened.push(...input);

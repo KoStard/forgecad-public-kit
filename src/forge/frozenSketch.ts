@@ -7,12 +7,12 @@
  * main-thread kernel that's also initialized for the loading screen).
  */
 
+import type { SerializedSketchData } from '../workers/evalWorkerProtocol';
 import { PROFILE_BACKEND_MARKER, type ProfileBackend, type ProfileBounds } from './profileBackend';
 import type { ShapeBackend } from './shapeBackend';
-import { Sketch, setSketchPlacement3D } from './sketch/core';
+import type { ConstraintDefinition, SketchConstraintMeta } from './sketch/constraints';
 import { ConstraintSketch } from './sketch/constraints';
-import type { SketchConstraintMeta, ConstraintDefinition } from './sketch/constraints';
-import type { SerializedSketchData } from '../workers/evalWorkerProtocol';
+import { Sketch, setSketchPlacement3D } from './sketch/core';
 
 function frozenError(method: string): never {
   throw new Error(`FrozenProfileBackend.${method}(): frozen sketches are read-only`);
@@ -30,23 +30,52 @@ class FrozenProfileBackend implements ProfileBackend {
     private readonly _bounds: { min: [number, number]; max: [number, number] },
   ) {}
 
-  toPolygons(): number[][][] { return this.polygons; }
-  bounds(): ProfileBounds { return { min: this._bounds.min, max: this._bounds.max }; }
-  area(): number { return 0; }
-  isEmpty(): boolean { return this.polygons.length === 0; }
-  numVert(): number { return this.polygons.reduce((sum, poly) => sum + poly.length, 0); }
+  toPolygons(): number[][][] {
+    return this.polygons;
+  }
+  bounds(): ProfileBounds {
+    return { min: this._bounds.min, max: this._bounds.max };
+  }
+  area(): number {
+    return 0;
+  }
+  isEmpty(): boolean {
+    return this.polygons.length === 0;
+  }
+  numVert(): number {
+    return this.polygons.reduce((sum, poly) => sum + poly.length, 0);
+  }
 
-  translate(): ProfileBackend { return frozenError('translate'); }
-  rotate(): ProfileBackend { return frozenError('rotate'); }
-  scale(): ProfileBackend { return frozenError('scale'); }
-  mirror(): ProfileBackend { return frozenError('mirror'); }
-  offset(): ProfileBackend { return frozenError('offset'); }
-  hull(): ProfileBackend { return frozenError('hull'); }
-  simplify(): ProfileBackend { return frozenError('simplify'); }
-  warp(): ProfileBackend { return frozenError('warp'); }
-  subtract(): ProfileBackend { return frozenError('subtract'); }
-  extrude(): ShapeBackend { return frozenError('extrude'); }
-  revolve(): ShapeBackend { return frozenError('revolve'); }
+  translate(): ProfileBackend {
+    return frozenError('translate');
+  }
+  rotate(): ProfileBackend {
+    return frozenError('rotate');
+  }
+  scale(): ProfileBackend {
+    return frozenError('scale');
+  }
+  mirror(): ProfileBackend {
+    return frozenError('mirror');
+  }
+  offset(): ProfileBackend {
+    return frozenError('offset');
+  }
+  simplify(): ProfileBackend {
+    return frozenError('simplify');
+  }
+  warp(): ProfileBackend {
+    return frozenError('warp');
+  }
+  subtract(): ProfileBackend {
+    return frozenError('subtract');
+  }
+  extrude(): ShapeBackend {
+    return frozenError('extrude');
+  }
+  revolve(): ShapeBackend {
+    return frozenError('revolve');
+  }
 }
 
 function makeFrozenProfileBackend(
@@ -74,11 +103,7 @@ export class FrozenSketch extends Sketch {
  */
 export class FrozenConstraintSketch extends ConstraintSketch {
   constructor(data: SerializedSketchData & { constraintMeta: SketchConstraintMeta; constraintDefinition: ConstraintDefinition }) {
-    super(
-      makeFrozenProfileBackend(data.polygons, data.bounds),
-      data.constraintMeta,
-      data.constraintDefinition,
-    );
+    super(makeFrozenProfileBackend(data.polygons, data.bounds), data.constraintMeta, data.constraintDefinition);
     if (data.worldMatrix) {
       setSketchPlacement3D(this, data.worldMatrix as Parameters<typeof setSketchPlacement3D>[1]);
     }

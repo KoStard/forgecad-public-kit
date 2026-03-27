@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForgeStore } from '../store/forgeStore';
 
 export function FileSwitcher() {
@@ -37,7 +37,10 @@ export function FileSwitcher() {
       for (let ci = 0; ci < candidates.length; ci++) {
         const q = candidates[ci];
         if (!q) continue;
-        let qi = 0, firstMatchIdx = -1, consecutiveBonus = 0, prevMatchIdx = -1;
+        let qi = 0,
+          firstMatchIdx = -1,
+          consecutiveBonus = 0,
+          prevMatchIdx = -1;
         for (let i = 0; i < name.length && qi < q.length; i++) {
           if (name[i] === q[qi]) {
             if (firstMatchIdx === -1) firstMatchIdx = i;
@@ -66,7 +69,10 @@ export function FileSwitcher() {
       let allMatched = true;
       for (const token of tokens) {
         const { matched, score } = matchToken(name, token, 1);
-        if (!matched) { allMatched = false; break; }
+        if (!matched) {
+          allMatched = false;
+          break;
+        }
         totalScore += score;
       }
       if (!allMatched) continue;
@@ -80,7 +86,8 @@ export function FileSwitcher() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'k') {
         e.preventDefault();
-        if (open) close(); else openSwitcher();
+        if (open) close();
+        else openSwitcher();
       }
     };
     window.addEventListener('keydown', handler);
@@ -95,12 +102,17 @@ export function FileSwitcher() {
     }
   }, [open]);
 
-  useEffect(() => { setSelected(0); }, [query]);
+  useEffect(() => {
+    setSelected(0);
+  }, [query]);
 
-  const pick = useCallback((name: string) => {
-    setActiveFile(name);
-    close();
-  }, [setActiveFile, close]);
+  const pick = useCallback(
+    (name: string) => {
+      setActiveFile(name);
+      close();
+    },
+    [setActiveFile, close],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') close();
@@ -127,15 +139,22 @@ export function FileSwitcher() {
       const lower = name.toLowerCase();
       let qi = 0;
       for (let i = 0; i < lower.length && qi < token.length; i++) {
-        if (lower[i] === token[qi]) { highlighted.add(i); qi++; }
+        if (lower[i] === token[qi]) {
+          highlighted.add(i);
+          qi++;
+        }
       }
     }
     return (
       <>
         {name.split('').map((ch, i) =>
-          highlighted.has(i)
-            ? <span key={i} style={{ color: 'var(--fc-accent)' }}>{ch}</span>
-            : <span key={i}>{ch}</span>
+          highlighted.has(i) ? (
+            <span key={i} style={{ color: 'var(--fc-accent)' }}>
+              {ch}
+            </span>
+          ) : (
+            <span key={i}>{ch}</span>
+          ),
         )}
       </>
     );
@@ -150,10 +169,16 @@ export function FileSwitcher() {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'relative', width: 420, maxHeight: 340,
-          background: 'var(--fc-bgPanel)', border: '1px solid var(--fc-border)',
-          borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          position: 'relative',
+          width: 420,
+          maxHeight: 340,
+          background: 'var(--fc-bgPanel)',
+          border: '1px solid var(--fc-border)',
+          borderRadius: 8,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
         <input
@@ -163,22 +188,26 @@ export function FileSwitcher() {
           onKeyDown={handleKeyDown}
           placeholder="Switch to file..."
           style={{
-            padding: '10px 14px', background: 'transparent', border: 'none',
-            borderBottom: '1px solid var(--fc-border)', color: 'var(--fc-text)',
-            fontSize: 14, outline: 'none',
+            padding: '10px 14px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid var(--fc-border)',
+            color: 'var(--fc-text)',
+            fontSize: 14,
+            outline: 'none',
           }}
         />
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          {filtered.length === 0 && (
-            <div style={{ padding: '12px 14px', color: 'var(--fc-textDim)', fontSize: 13 }}>No matching files</div>
-          )}
+          {filtered.length === 0 && <div style={{ padding: '12px 14px', color: 'var(--fc-textDim)', fontSize: 13 }}>No matching files</div>}
           {filtered.map((name, i) => (
             <div
               key={name}
               onClick={() => pick(name)}
               onMouseEnter={() => setSelected(i)}
               style={{
-                padding: '8px 14px', cursor: 'pointer', fontSize: 13,
+                padding: '8px 14px',
+                cursor: 'pointer',
+                fontSize: 13,
                 color: name === activeFile ? 'var(--fc-textDim)' : 'var(--fc-text)',
                 background: i === selected ? 'var(--fc-bgHover)' : 'transparent',
               }}

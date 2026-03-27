@@ -50,6 +50,18 @@ Use `useMemo` for any derived-with-fallback value that feeds into other hooks.
 - Memoize expensive computations with `useMemo`
 - Keep component tree shallow
 
+## Linting & Formatting
+
+[Biome](https://biomejs.dev/) handles both linting and formatting for all TS/JS code.
+
+```bash
+npm run lint          # check for lint issues (no changes)
+npm run lint:fix      # auto-fix lint issues
+npm run format        # auto-format all files
+```
+
+Biome runs as part of `forgecad check suite`. Configuration lives in `biome.json` at the repo root.
+
 ## Self-Review Before Commit
 
 1. Remove console.logs and debug code

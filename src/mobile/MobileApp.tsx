@@ -6,16 +6,17 @@
  * - Passive 3D viewport (orbit/zoom/pan only)
  * - Mesh-only exports (3MF/STL/OBJ)
  */
-import { useEffect, useState, useCallback } from 'react';
+
 import { initKernelManifoldOnly } from '@forge/kernel';
 import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
-import { useForgeStore } from '../store/forgeStore';
+import { useCallback, useEffect, useState } from 'react';
 import { fileSystem } from '../fs';
-import { MobileViewport } from './MobileViewport';
+import { useForgeStore } from '../store/forgeStore';
 import { MobileCodeEditor } from './MobileCodeEditor';
-import { MobileFilePicker } from './MobileFilePicker';
 import { MobileExport } from './MobileExport';
+import { MobileFilePicker } from './MobileFilePicker';
 import { MobileParams } from './MobileParams';
+import { MobileViewport } from './MobileViewport';
 import './mobile.css';
 
 type Tab = 'code' | 'model';
@@ -76,30 +77,38 @@ export function MobileApp() {
   }
 
   // Extract display filename
-  const displayName = activeFile
-    ? activeFile.replace(/^.*[\\/]/, '')
-    : 'No file';
+  const displayName = activeFile ? activeFile.replace(/^.*[\\/]/, '') : 'No file';
 
   return (
     <div className="fc-mobile">
       {/* ── Top bar ── */}
       <div className="fc-mobile-topbar">
-        <button
-          className="fc-mobile-topbar-btn"
-          onClick={() => setFilePickerOpen(true)}
-          title="Switch file"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="fc-mobile-topbar-btn" onClick={() => setFilePickerOpen(true)} title="Switch file">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         </button>
         <span className="fc-mobile-topbar-title">{displayName}</span>
-        <button
-          className="fc-mobile-topbar-btn"
-          onClick={() => setExportOpen(true)}
-          title="Export"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="fc-mobile-topbar-btn" onClick={() => setExportOpen(true)} title="Export">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
           </svg>
         </button>
@@ -111,9 +120,7 @@ export function MobileApp() {
         <div className="fc-mobile-tab-panel" data-active={tab === 'code' ? 'true' : undefined}>
           <MobileCodeEditor />
           <MobileParams />
-          {errorMessage && (
-            <div className="fc-mobile-error">{errorMessage}</div>
-          )}
+          {errorMessage && <div className="fc-mobile-error">{errorMessage}</div>}
         </div>
 
         {/* Model tab */}
@@ -124,13 +131,18 @@ export function MobileApp() {
 
       {/* ── Bottom bar ── */}
       <div className="fc-mobile-bottombar">
-        <button
-          className="fc-mobile-tab-btn"
-          data-active={tab === 'code' ? 'true' : undefined}
-          onClick={() => setTab('code')}
-        >
+        <button className="fc-mobile-tab-btn" data-active={tab === 'code' ? 'true' : undefined} onClick={() => setTab('code')}>
           <span className="fc-mobile-tab-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="16 18 22 12 16 6" />
               <polyline points="8 6 2 12 8 18" />
             </svg>
@@ -138,11 +150,7 @@ export function MobileApp() {
           Code
         </button>
 
-        <button
-          className="fc-mobile-run-btn"
-          onClick={handleRun}
-          disabled={isEvaluating}
-        >
+        <button className="fc-mobile-run-btn" onClick={handleRun} disabled={isEvaluating}>
           {isEvaluating ? (
             <span className="fc-mobile-spinner" />
           ) : (
@@ -153,13 +161,18 @@ export function MobileApp() {
           Run
         </button>
 
-        <button
-          className="fc-mobile-tab-btn"
-          data-active={tab === 'model' ? 'true' : undefined}
-          onClick={() => setTab('model')}
-        >
+        <button className="fc-mobile-tab-btn" data-active={tab === 'model' ? 'true' : undefined} onClick={() => setTab('model')}>
           <span className="fc-mobile-tab-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M2 17l10 5 10-5" />
               <path d="M2 12l10 5 10-5" />
@@ -170,12 +183,8 @@ export function MobileApp() {
       </div>
 
       {/* ── Overlays ── */}
-      {filePickerOpen && (
-        <MobileFilePicker onClose={() => setFilePickerOpen(false)} />
-      )}
-      {exportOpen && (
-        <MobileExport onClose={() => setExportOpen(false)} />
-      )}
+      {filePickerOpen && <MobileFilePicker onClose={() => setFilePickerOpen(false)} />}
+      {exportOpen && <MobileExport onClose={() => setExportOpen(false)} />}
     </div>
   );
 }

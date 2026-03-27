@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { FLAG_DEFINITIONS, useFeatureFlagStore } from '../featureFlags';
+import { fileSystem } from '../fs';
+import { fetchGistModel, fetchUrlModel } from '../share';
 import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore, exportSketchFromStore } from './exportActions';
-import { fileSystem } from '../fs';
-import { fetchGistModel } from '../share';
-import { FLAG_DEFINITIONS, useFeatureFlagStore } from '../featureFlags';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? '⌘' : 'Ctrl';
@@ -48,15 +48,18 @@ export function CommandPalette() {
   const [selected, setSelected] = useState(0);
   const [subCommands, setSubCommands] = useState<Command[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
-  const hasSketches = (result?.objects?.some((obj) => Boolean(obj.sketch)) ?? false);
+  const hasShapes = result?.objects?.some((obj) => Boolean(obj.shape)) ?? false;
+  const hasSketches = result?.objects?.some((obj) => Boolean(obj.sketch)) ?? false;
   const hiddenObjectCount = (result?.objects ?? []).filter((obj) => !(objectSettings[obj.id]?.visible ?? true)).length;
   const hasObjectCommands = (result?.objects?.length ?? 0) > 0 || Object.keys(objectSettings).length > 0;
 
   const themeChoices: Command[] = (['dark', 'light', 'gruvbox', 'tokyo-night', 'kanagawa-lotus'] as const).map((t) => ({
     id: `theme-${t}`,
     label: `${t.charAt(0).toUpperCase() + t.slice(1)}${theme === t ? '  ✓' : ''}`,
-    action: () => { setTheme(t); close(); },
+    action: () => {
+      setTheme(t);
+      close();
+    },
   }));
 
   const exportChoices: Command[] = [
@@ -97,7 +100,11 @@ export function CommandPalette() {
       label: `Export Sketch SVG${hasSketches ? '' : ' (no sketches)'}`,
       action: () => {
         close();
-        try { exportSketchFromStore('svg'); } catch (err) { handleCommandError(err); }
+        try {
+          exportSketchFromStore('svg');
+        } catch (err) {
+          handleCommandError(err);
+        }
       },
     },
     {
@@ -105,7 +112,11 @@ export function CommandPalette() {
       label: `Export Sketch DXF${hasSketches ? '' : ' (no sketches)'}`,
       action: () => {
         close();
-        try { exportSketchFromStore('dxf'); } catch (err) { handleCommandError(err); }
+        try {
+          exportSketchFromStore('dxf');
+        } catch (err) {
+          handleCommandError(err);
+        }
       },
     },
     {
@@ -113,7 +124,11 @@ export function CommandPalette() {
       label: `Export Sketch PDF${hasSketches ? '' : ' (no sketches)'}`,
       action: () => {
         close();
-        try { exportSketchFromStore('pdf'); } catch (err) { handleCommandError(err); }
+        try {
+          exportSketchFromStore('pdf');
+        } catch (err) {
+          handleCommandError(err);
+        }
       },
     },
   ];
@@ -124,12 +139,15 @@ export function CommandPalette() {
     action: () => {
       close();
       if (!activeFile) return;
-      fileSystem.projectPath()
+      fileSystem
+        .projectPath()
         .then((projectDir) => {
           const absPath = projectDir ? `${projectDir}/${activeFile}` : activeFile;
           return navigator.clipboard.writeText(absPath);
         })
-        .catch((err: unknown) => { console.error('Failed to copy path:', err); });
+        .catch((err: unknown) => {
+          console.error('Failed to copy path:', err);
+        });
     },
   };
 
@@ -138,34 +156,48 @@ export function CommandPalette() {
     {
       id: 'toggle-file-explorer',
       label: `${fileExplorerOpen ? 'Hide' : 'Show'} File Explorer`,
-      action: () => { toggleFileExplorer(); close(); },
+      action: () => {
+        toggleFileExplorer();
+        close();
+      },
     },
     {
       id: 'toggle-view-panel',
       label: `${viewPanelOpen ? 'Hide' : 'Show'} View Panel`,
-      action: () => { toggleViewPanel(); close(); },
+      action: () => {
+        toggleViewPanel();
+        close();
+      },
     },
     {
       id: 'fit-viewport',
       label: 'Fit Geometry to View',
       shortcut: `${mod}⇧F`,
-      action: () => { requestViewCommand({ type: 'fit' }); close(); },
+      action: () => {
+        requestViewCommand({ type: 'fit' });
+        close();
+      },
     },
     {
       id: 'iso-view',
       label: 'Snap to Isometric View',
       shortcut: `${mod}⇧H`,
-      action: () => { requestViewCommand({ type: 'snap', view: 'iso' }); close(); },
+      action: () => {
+        requestViewCommand({ type: 'snap', view: 'iso' });
+        close();
+      },
     },
     ...(hasObjectCommands
-      ? [{
-        id: 'show-all-objects',
-        label: hiddenObjectCount > 0 ? `Show All Objects (${hiddenObjectCount} hidden)` : 'Show All Objects',
-        action: () => {
-          showAllObjects();
-          close();
-        },
-      } satisfies Command]
+      ? [
+          {
+            id: 'show-all-objects',
+            label: hiddenObjectCount > 0 ? `Show All Objects (${hiddenObjectCount} hidden)` : 'Show All Objects',
+            action: () => {
+              showAllObjects();
+              close();
+            },
+          } satisfies Command,
+        ]
       : []),
     {
       id: 'toggle-performance-info',
@@ -192,6 +224,20 @@ export function CommandPalette() {
           .catch(handleCommandError);
       },
     },
+    {
+      id: 'open-url',
+      label: 'Open from URL',
+      action: () => {
+        close();
+        const input = window.prompt('Paste a URL to a .forge.js file:');
+        if (!input) return;
+        fetchUrlModel(input.trim())
+          .then((model) => {
+            useForgeStore.getState().loadFromText(model.code, model.filename);
+          })
+          .catch(handleCommandError);
+      },
+    },
     { id: 'export', label: 'Export', children: exportChoices, action: () => {} },
     { id: 'theme', label: 'Change Theme', children: themeChoices, action: () => {} },
     {
@@ -200,28 +246,36 @@ export function CommandPalette() {
       action: () => {},
       children: Object.entries(FLAG_DEFINITIONS).map(([name, def]) => ({
         id: `ff-${name}`,
-        label: `${featureFlags[name] ?? def.defaultEnabled ? '✓' : '✗'}  ${def.label}`,
-        action: () => { toggleFeatureFlag(name); close(); },
+        label: `${(featureFlags[name] ?? def.defaultEnabled) ? '✓' : '✗'}  ${def.label}`,
+        action: () => {
+          toggleFeatureFlag(name);
+          close();
+        },
       })),
     },
     {
       id: 'keyboard-shortcuts',
       label: 'Keyboard Shortcuts',
       shortcut: '?',
-      action: () => { close(); openShortcutsOverlay(); },
+      action: () => {
+        close();
+        openShortcutsOverlay();
+      },
     },
   ];
 
   const commands = subCommands ?? rootCommands;
-  const filtered = commands.filter((c) =>
-    c.label.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filtered = commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()));
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
-        if (open) { close(); } else { openPalette(); }
+        if (open) {
+          close();
+        } else {
+          openPalette();
+        }
       }
     };
     window.addEventListener('keydown', handler);
@@ -237,7 +291,9 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  useEffect(() => { setSelected(0); }, [query, subCommands]);
+  useEffect(() => {
+    setSelected(0);
+  }, [query, subCommands]);
 
   const select = useCallback((cmd: Command) => {
     if (cmd.children) {
@@ -250,8 +306,10 @@ export function CommandPalette() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      if (subCommands) { setSubCommands(null); setQuery(''); }
-      else close();
+      if (subCommands) {
+        setSubCommands(null);
+        setQuery('');
+      } else close();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelected((s) => Math.min(s + 1, filtered.length - 1));
@@ -268,8 +326,12 @@ export function CommandPalette() {
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        display: 'flex', justifyContent: 'center', paddingTop: '15vh',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        justifyContent: 'center',
+        paddingTop: '15vh',
       }}
       onClick={close}
     >
@@ -310,9 +372,7 @@ export function CommandPalette() {
         />
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {filtered.length === 0 && (
-            <div style={{ padding: '12px 14px', color: 'var(--fc-textDim)', fontSize: 13 }}>
-              No matching commands
-            </div>
+            <div style={{ padding: '12px 14px', color: 'var(--fc-textDim)', fontSize: 13 }}>No matching commands</div>
           )}
           {filtered.map((cmd, i) => (
             <div
@@ -333,17 +393,19 @@ export function CommandPalette() {
             >
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cmd.label}</span>
               {cmd.shortcut && (
-                <kbd style={{
-                  fontSize: 11,
-                  color: 'var(--fc-textDim)',
-                  background: 'var(--fc-bgSurface)',
-                  border: '1px solid var(--fc-border)',
-                  borderRadius: 3,
-                  padding: '1px 5px',
-                  fontFamily: 'inherit',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}>
+                <kbd
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--fc-textDim)',
+                    background: 'var(--fc-bgSurface)',
+                    border: '1px solid var(--fc-border)',
+                    borderRadius: 3,
+                    padding: '1px 5px',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
                   {cmd.shortcut}
                 </kbd>
               )}

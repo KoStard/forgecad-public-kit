@@ -1,4 +1,4 @@
-import type { SketchConstraintMeta, ConstraintDisplay } from '../src/forge/sketch/constraints/types.js';
+import type { ConstraintDisplay, SketchConstraintMeta } from '../src/forge/sketch/constraints/types.js';
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -53,22 +53,11 @@ function estimateBBox(pos: [number, number], text: string): BBox {
 // ─── Geometry helpers ───────────────────────────────────────────────────────
 
 function bboxesOverlap(a: BBox, b: BBox): boolean {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 /** Test whether a line segment (p0→p1) intersects an axis-aligned bounding box. */
-function segmentIntersectsAABB(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  box: BBox,
-): boolean {
+function segmentIntersectsAABB(x1: number, y1: number, x2: number, y2: number, box: BBox): boolean {
   // Liang-Barsky algorithm for segment vs AABB
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -112,10 +101,7 @@ function dist(a: [number, number], b: [number, number]): number {
 
 // ─── Entity centroid lookup ─────────────────────────────────────────────────
 
-function computeEntityCentroid(
-  entityIds: string[],
-  meta: SketchConstraintMeta,
-): [number, number] | null {
+function computeEntityCentroid(entityIds: string[], meta: SketchConstraintMeta): [number, number] | null {
   const positions: [number, number][] = [];
 
   // Build lookup maps
@@ -137,7 +123,6 @@ function computeEntityCentroid(
     const circle = circleMap.get(eid);
     if (circle) {
       positions.push(circle.center);
-      continue;
     }
     // Entity not found in edges — skip
   }
@@ -257,8 +242,7 @@ export function computeLabelMetrics(meta: SketchConstraintMeta): LabelMetrics {
 
   // Entity distance stats
   const distances = details.map((d) => d.entityDistance);
-  const meanEntityDistance =
-    distances.length > 0 ? distances.reduce((s, d) => s + d, 0) / distances.length : 0;
+  const meanEntityDistance = distances.length > 0 ? distances.reduce((s, d) => s + d, 0) / distances.length : 0;
   const maxEntityDistance = distances.length > 0 ? Math.max(...distances) : 0;
 
   return {

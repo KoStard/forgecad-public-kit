@@ -259,7 +259,7 @@ const cables = fingerBases.map((end, i) => {
 });
 
 // --- Grasp target object ---
-const graspObject = hull3d(
+const graspObject = union(
     sphere(18 * scale).translate(0, baseY - 45 * scale, baseZ + 6 * scale),
     box(32 * scale, 20 * scale, 26 * scale, true).translate(12 * scale, baseY - 65 * scale, baseZ + 2 * scale)
 ).color('#88ccee');

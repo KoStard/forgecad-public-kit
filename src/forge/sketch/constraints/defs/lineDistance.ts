@@ -40,17 +40,21 @@ registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
     if (lineA) {
-      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      const a1 = points.get(lineA.a);
+      const a2 = points.get(lineA.b);
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
   },
 
   displayAnnotations(c, { lines, points }): AnnotationElement[] {
-    const lineA = lines.get(c.a), lineB = lines.get(c.b);
+    const lineA = lines.get(c.a),
+      lineB = lines.get(c.b);
     if (!lineA || !lineB) return [];
-    const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
-    const b1 = points.get(lineB.a), b2 = points.get(lineB.b);
+    const a1 = points.get(lineA.a),
+      a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a),
+      b2 = points.get(lineB.b);
     if (!a1 || !a2 || !b1 || !b2) return [];
     const midA: [number, number] = [(a1.x + a2.x) / 2, (a1.y + a2.y) / 2];
     const midB: [number, number] = [(b1.x + b2.x) / 2, (b1.y + b2.y) / 2];

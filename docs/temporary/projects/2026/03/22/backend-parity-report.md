@@ -1,8 +1,8 @@
 # Backend Parity Report: Manifold vs OCCT
 
-**Date**: 2026-03-22
-**Files tested**: 1
-**Passed (≥95%)**: 1
+**Date**: 2026-03-25
+**Files tested**: 4
+**Passed (≥95%)**: 4
 **Failed (<95%)**: 0
 **Errored**: 0
 
@@ -10,4 +10,7 @@
 
 | File | Score | Manifold ms | OCCT ms |
 |------|-------|-------------|---------|
-| examples/bolt-and-nut.forge.js | 100% | 207 | 198550 |
+| examples/api/boolean-operations.forge.js | 98% | 119 | 630 |
+| examples/api/constrained-sketch-basics.forge.js | 99% | 97 | 210 |
+| examples/cup.forge.js | 100% | 40 | 74 |
+| examples/api/constrained-sketch-mechanical.forge.js | 100% | 62 | 2161 |

@@ -44,12 +44,18 @@ function readStoredFlag(name: string): boolean | null {
     const v = localStorage.getItem(`${LS_PREFIX}${name}`);
     if (v === '1' || v === 'true') return true;
     if (v === '0' || v === 'false') return false;
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   return null;
 }
 
 function writeStoredFlag(name: string, enabled: boolean): void {
-  try { localStorage.setItem(`${LS_PREFIX}${name}`, enabled ? '1' : '0'); } catch { /* */ }
+  try {
+    localStorage.setItem(`${LS_PREFIX}${name}`, enabled ? '1' : '0');
+  } catch {
+    /* */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +72,9 @@ function parseUrlFlags(): Map<string, boolean> {
         if (name) result.set(name, true);
       }
     }
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   return result;
 }
 

@@ -39,6 +39,14 @@ registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
     if (!circle) return [];
     const center = points.get(circle.center);
     if (!center) return [];
-    return [{ kind: 'dimension', from: [center.x - circle.radius, center.y], to: [center.x + circle.radius, center.y], offset: 0, value: `⌀${c.value}` }];
+    return [
+      {
+        kind: 'dimension',
+        from: [center.x - circle.radius, center.y],
+        to: [center.x + circle.radius, center.y],
+        offset: 0,
+        value: `⌀${c.value}`,
+      },
+    ];
   },
 });

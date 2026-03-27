@@ -1,6 +1,6 @@
+import { profilePlanFromCrossSection } from '../compilePlan';
 import { difference2d, union2d } from './booleans';
 import { Sketch, setSketchCompileProfilePlan } from './core';
-import { profilePlanFromCrossSection } from '../compilePlan';
 import { stroke as strokePolyline } from './path';
 import { polygon } from './primitives';
 
@@ -122,7 +122,7 @@ interface RegionInfo {
 const MIN_POINT_DIST = 1e-7;
 const EPS = 1e-9;
 
-const IDENTITY: Mat2 = [1, 0, 0, 1, 0, 0];
+const _IDENTITY: Mat2 = [1, 0, 0, 1, 0, 0];
 
 const DEFAULT_STYLE: SvgStyle = {
   fill: 'black',
@@ -203,8 +203,7 @@ function pointInPolygon(point: Vec2, polygonPoints: Vec2[]): boolean {
   for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
     const [xi, yi] = polygonPoints[i];
     const [xj, yj] = polygonPoints[j];
-    const intersects = ((yi > py) !== (yj > py))
-      && (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-20) + xi);
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi || 1e-20) + xi;
     if (intersects) inside = !inside;
   }
   return inside;
@@ -218,14 +217,7 @@ function multiplyMatrix(a: Mat2, b: Mat2): Mat2 {
   // Composition: apply b first, then a.
   const [a1, b1, c1, d1, e1, f1] = a;
   const [a2, b2, c2, d2, e2, f2] = b;
-  return [
-    a1 * a2 + c1 * b2,
-    b1 * a2 + d1 * b2,
-    a1 * c2 + c1 * d2,
-    b1 * c2 + d1 * d2,
-    a1 * e2 + c1 * f2 + e1,
-    b1 * e2 + d1 * f2 + f1,
-  ];
+  return [a1 * a2 + c1 * b2, b1 * a2 + d1 * b2, a1 * c2 + c1 * d2, b1 * c2 + d1 * d2, a1 * e2 + c1 * f2 + e1, b1 * e2 + d1 * f2 + f1];
 }
 
 function applyMatrix(m: Mat2, p: Vec2): Vec2 {
@@ -259,7 +251,7 @@ function matrixSkewY(deg: number): Mat2 {
   return [1, Math.tan(rad), 0, 1, 0, 0];
 }
 
-function parseNumber(value: string | undefined): number {
+function _parseNumber(value: string | undefined): number {
   if (!value) return NaN;
   const n = Number(value);
   return Number.isFinite(n) ? n : NaN;
@@ -294,11 +286,16 @@ function parseNumberList(value: string | undefined): number[] {
 function decodeXmlEntities(value: string): string {
   return value.replace(/&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g, (_match, token: string) => {
     switch (token) {
-      case 'amp': return '&';
-      case 'lt': return '<';
-      case 'gt': return '>';
-      case 'quot': return '"';
-      case 'apos': return '\'';
+      case 'amp':
+        return '&';
+      case 'lt':
+        return '<';
+      case 'gt':
+        return '>';
+      case 'quot':
+        return '"';
+      case 'apos':
+        return "'";
       default:
         if (token.startsWith('#x') || token.startsWith('#X')) {
           const code = Number.parseInt(token.slice(2), 16);
@@ -409,10 +406,7 @@ function parseTransform(value: string | undefined): Mat2 {
       op = matrixScale(args[0], args.length >= 2 ? args[1] : args[0]);
     } else if (name === 'rotate' && args.length >= 1) {
       if (args.length >= 3) {
-        op = multiplyMatrix(
-          matrixTranslate(args[1], args[2]),
-          multiplyMatrix(matrixRotate(args[0]), matrixTranslate(-args[1], -args[2])),
-        );
+        op = multiplyMatrix(matrixTranslate(args[1], args[2]), multiplyMatrix(matrixRotate(args[0]), matrixTranslate(-args[1], -args[2])));
       } else {
         op = matrixRotate(args[0]);
       }
@@ -452,14 +446,8 @@ function sampleCubic(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, tolerance: number):
   for (let i = 1; i <= segments; i += 1) {
     const t = i / segments;
     const u = 1 - t;
-    const x = u * u * u * p0[0]
-      + 3 * u * u * t * p1[0]
-      + 3 * u * t * t * p2[0]
-      + t * t * t * p3[0];
-    const y = u * u * u * p0[1]
-      + 3 * u * u * t * p1[1]
-      + 3 * u * t * t * p2[1]
-      + t * t * t * p3[1];
+    const x = u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0];
+    const y = u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1];
     out.push([x, y]);
   }
   return out;
@@ -528,7 +516,7 @@ function sampleArc(
   let factorDen = rx2 * y1p2 + ry2 * x1p2;
   if (factorDen < EPS) factorDen = EPS;
   factorNum = Math.max(0, factorNum);
-  const factor = ((largeArcFlag === sweepFlag) ? -1 : 1) * Math.sqrt(factorNum / factorDen);
+  const factor = (largeArcFlag === sweepFlag ? -1 : 1) * Math.sqrt(factorNum / factorDen);
 
   const cxp = factor * ((rx * y1p) / ry);
   const cyp = factor * (-(ry * x1p) / rx);
@@ -541,16 +529,13 @@ function sampleArc(
   const vx = (-x1p - cxp) / rx;
   const vy = (-y1p - cyp) / ry;
 
-  let theta1 = vectorAngle(1, 0, ux, uy);
+  const theta1 = vectorAngle(1, 0, ux, uy);
   let deltaTheta = vectorAngle(ux, uy, vx, vy);
   if (!sweepFlag && deltaTheta > 0) deltaTheta -= Math.PI * 2;
   if (sweepFlag && deltaTheta < 0) deltaTheta += Math.PI * 2;
 
   const approxRadius = Math.max(rx, ry);
-  const segments = Math.max(
-    arcSegmentsMin,
-    Math.ceil((Math.abs(deltaTheta) * approxRadius) / Math.max(tolerance, 1e-4)),
-  );
+  const segments = Math.max(arcSegmentsMin, Math.ceil((Math.abs(deltaTheta) * approxRadius) / Math.max(tolerance, 1e-4)));
 
   const out: Vec2[] = [];
   for (let i = 1; i <= segments; i += 1) {
@@ -576,7 +561,7 @@ function transformSubpaths(subpaths: SvgSubpath[], transform: Mat2): SvgSubpath[
 }
 
 function parsePathData(d: string, tolerance: number, arcSegments: number): SvgSubpath[] {
-  const tokens = (d.match(/[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) ?? []);
+  const tokens = d.match(/[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) ?? [];
   const out: SvgSubpath[] = [];
 
   let i = 0;
@@ -704,11 +689,7 @@ function parsePathData(d: string, tolerance: number, arcSegments: number): SvgSu
           const y2Raw = readNum();
           const xRaw = readNum();
           const yRaw = readNum();
-          if (
-            x1Raw == null || y1Raw == null
-            || x2Raw == null || y2Raw == null
-            || xRaw == null || yRaw == null
-          ) break;
+          if (x1Raw == null || y1Raw == null || x2Raw == null || y2Raw == null || xRaw == null || yRaw == null) break;
           const p0: Vec2 = [cx, cy];
           const p1: Vec2 = [cmd === 'c' ? cx + x1Raw : x1Raw, cmd === 'c' ? cy + y1Raw : y1Raw];
           const p2: Vec2 = [cmd === 'c' ? cx + x2Raw : x2Raw, cmd === 'c' ? cy + y2Raw : y2Raw];
@@ -731,9 +712,7 @@ function parsePathData(d: string, tolerance: number, arcSegments: number): SvgSu
           const yRaw = readNum();
           if (x2Raw == null || y2Raw == null || xRaw == null || yRaw == null) break;
           const p0: Vec2 = [cx, cy];
-          const p1: Vec2 = prevCubicCtrl
-            ? [2 * cx - prevCubicCtrl[0], 2 * cy - prevCubicCtrl[1]]
-            : [cx, cy];
+          const p1: Vec2 = prevCubicCtrl ? [2 * cx - prevCubicCtrl[0], 2 * cy - prevCubicCtrl[1]] : [cx, cy];
           const p2: Vec2 = [cmd === 's' ? cx + x2Raw : x2Raw, cmd === 's' ? cy + y2Raw : y2Raw];
           const p3: Vec2 = [cmd === 's' ? cx + xRaw : xRaw, cmd === 's' ? cy + yRaw : yRaw];
           ensureCurrent();
@@ -772,9 +751,7 @@ function parsePathData(d: string, tolerance: number, arcSegments: number): SvgSu
           const yRaw = readNum();
           if (xRaw == null || yRaw == null) break;
           const p0: Vec2 = [cx, cy];
-          const p1: Vec2 = prevQuadCtrl
-            ? [2 * cx - prevQuadCtrl[0], 2 * cy - prevQuadCtrl[1]]
-            : [cx, cy];
+          const p1: Vec2 = prevQuadCtrl ? [2 * cx - prevQuadCtrl[0], 2 * cy - prevQuadCtrl[1]] : [cx, cy];
           const p2: Vec2 = [cmd === 't' ? cx + xRaw : xRaw, cmd === 't' ? cy + yRaw : yRaw];
           ensureCurrent();
           sampleQuadratic(p0, p1, p2, tolerance).forEach((pt) => pushPoint(current!.points, pt));
@@ -795,21 +772,13 @@ function parsePathData(d: string, tolerance: number, arcSegments: number): SvgSu
           const sfRaw = readNum();
           const xRaw = readNum();
           const yRaw = readNum();
-          if (
-            rxRaw == null || ryRaw == null || rotRaw == null
-            || lafRaw == null || sfRaw == null || xRaw == null || yRaw == null
-          ) break;
+          if (rxRaw == null || ryRaw == null || rotRaw == null || lafRaw == null || sfRaw == null || xRaw == null || yRaw == null) break;
           const x = cmd === 'a' ? cx + xRaw : xRaw;
           const y = cmd === 'a' ? cy + yRaw : yRaw;
           ensureCurrent();
-          sampleArc(
-            cx, cy, rxRaw, ryRaw, rotRaw,
-            Math.abs(lafRaw) >= 0.5,
-            Math.abs(sfRaw) >= 0.5,
-            x, y,
-            tolerance,
-            arcSegments,
-          ).forEach((pt) => pushPoint(current!.points, pt));
+          sampleArc(cx, cy, rxRaw, ryRaw, rotRaw, Math.abs(lafRaw) >= 0.5, Math.abs(sfRaw) >= 0.5, x, y, tolerance, arcSegments).forEach(
+            (pt) => pushPoint(current!.points, pt),
+          );
           cx = x;
           cy = y;
           prevCubicCtrl = null;
@@ -866,7 +835,7 @@ function appendArcSegment(
   const span = Math.abs(endAngle - startAngle);
   const segments = clamp(Math.ceil((span * Math.max(rx, ry)) / Math.max(tolerance, 1e-4)), 2, 180);
   for (let i = 1; i <= segments; i += 1) {
-    const t = startAngle + (span * i / segments) * Math.sign(endAngle - startAngle);
+    const t = startAngle + ((span * i) / segments) * Math.sign(endAngle - startAngle);
     pushPoint(points, [cx + rx * Math.cos(t), cy + ry * Math.sin(t)]);
   }
 }
@@ -887,15 +856,17 @@ function buildRoundedRectSubpath(
   const rx = clamp(rxInput, 0, w / 2);
   const ry = clamp(ryInput, 0, h / 2);
   if (rx < EPS || ry < EPS) {
-    return [{
-      points: [
-        [x, y],
-        [x + w, y],
-        [x + w, y + h],
-        [x, y + h],
-      ],
-      closed: true,
-    }];
+    return [
+      {
+        points: [
+          [x, y],
+          [x + w, y],
+          [x + w, y + h],
+          [x, y + h],
+        ],
+        closed: true,
+      },
+    ];
   }
 
   const points: Vec2[] = [];
@@ -920,12 +891,7 @@ function parsePointsAttribute(pointsAttr: string | undefined): Vec2[] {
   return removeDuplicateClosingPoint(points);
 }
 
-function geometryFromElement(
-  tag: string,
-  attrs: Record<string, string>,
-  tolerance: number,
-  arcSegments: number,
-): SvgSubpath[] {
+function geometryFromElement(tag: string, attrs: Record<string, string>, tolerance: number, arcSegments: number): SvgSubpath[] {
   const t = tag.toLowerCase();
   if (t === 'path') {
     const d = attrs.d ?? '';
@@ -966,7 +932,15 @@ function geometryFromElement(
     const y1 = parseLength(attrs.y1, 0);
     const x2 = parseLength(attrs.x2, 0);
     const y2 = parseLength(attrs.y2, 0);
-    return [{ points: [[x1, y1], [x2, y2]], closed: false }];
+    return [
+      {
+        points: [
+          [x1, y1],
+          [x2, y2],
+        ],
+        closed: false,
+      },
+    ];
   }
   if (t === 'polyline') {
     const points = parsePointsAttribute(attrs.points);
@@ -997,18 +971,13 @@ function sanitizeSubpaths(subpaths: SvgSubpath[]): SvgSubpath[] {
 }
 
 function styleHasFill(style: SvgStyle): boolean {
-  return style.fill !== 'none'
-    && style.fill !== 'transparent'
-    && style.opacity > EPS
-    && style.fillOpacity > EPS;
+  return style.fill !== 'none' && style.fill !== 'transparent' && style.opacity > EPS && style.fillOpacity > EPS;
 }
 
 function styleHasStroke(style: SvgStyle): boolean {
-  return style.stroke !== 'none'
-    && style.stroke !== 'transparent'
-    && style.strokeWidth > EPS
-    && style.opacity > EPS
-    && style.strokeOpacity > EPS;
+  return (
+    style.stroke !== 'none' && style.stroke !== 'transparent' && style.strokeWidth > EPS && style.opacity > EPS && style.strokeOpacity > EPS
+  );
 }
 
 function loopInfosFromClosedSubpaths(subpaths: SvgSubpath[]): LoopInfo[] {
@@ -1200,7 +1169,7 @@ function fitSketchToMaxDimensions(sketch: Sketch, options: NormalizedSvgImportOp
     fitScale = Math.min(fitScale, options.maxHeight / height);
   }
 
-  if (!Number.isFinite(fitScale) || fitScale <= 0 || fitScale >= (1 - EPS)) {
+  if (!Number.isFinite(fitScale) || fitScale <= 0 || fitScale >= 1 - EPS) {
     return sketch;
   }
   return sketch.scale(fitScale);
@@ -1217,17 +1186,12 @@ function centerSketchOnOrigin(sketch: Sketch, options: NormalizedSvgImportOption
   return sketch.translate(-cx, -cy);
 }
 
-function computeRootNormalizeMatrix(
-  attrs: Record<string, string>,
-  options: NormalizedSvgImportOptions,
-): Mat2 {
+function computeRootNormalizeMatrix(attrs: Record<string, string>, options: NormalizedSvgImportOptions): Mat2 {
   let matrix = identityMatrix();
   if (options.invertY) {
     const viewBox = parseNumberList(attrs.viewBox);
     const fallbackHeight = parseLength(attrs.height, NaN);
-    const flipY = viewBox.length >= 4
-      ? viewBox[1] + viewBox[3]
-      : (Number.isFinite(fallbackHeight) ? fallbackHeight : 0);
+    const flipY = viewBox.length >= 4 ? viewBox[1] + viewBox[3] : Number.isFinite(fallbackHeight) ? fallbackHeight : 0;
     matrix = multiplyMatrix(matrixTranslate(0, flipY), matrixScale(1, -1));
   }
   if (Math.abs(options.scale - 1) > EPS) {
@@ -1240,15 +1204,17 @@ const SHAPE_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyli
 
 function parseSvgGeometry(svgText: string, options: NormalizedSvgImportOptions): SvgGeometryEntry[] {
   const entries: SvgGeometryEntry[] = [];
-  const stack: Array<{ tag: string; ctx: SvgContext }> = [{
-    tag: '__root__',
-    ctx: {
-      transform: identityMatrix(),
-      style: { ...DEFAULT_STYLE },
-      hidden: false,
-      inDefs: false,
+  const stack: Array<{ tag: string; ctx: SvgContext }> = [
+    {
+      tag: '__root__',
+      ctx: {
+        transform: identityMatrix(),
+        style: { ...DEFAULT_STYLE },
+        hidden: false,
+        inDefs: false,
+      },
     },
-  }];
+  ];
 
   let topLevelSvgSeen = false;
   const tagRe = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/?[^>]+>/gi;
@@ -1288,10 +1254,7 @@ function parseSvgGeometry(svgText: string, options: NormalizedSvgImportOptions):
       combinedTransform = multiplyMatrix(computeRootNormalizeMatrix(attrs, options), combinedTransform);
     }
 
-    const hidden = parent.hidden
-      || mergedStyle.display === 'none'
-      || mergedStyle.visibility === 'hidden'
-      || mergedStyle.opacity <= EPS;
+    const hidden = parent.hidden || mergedStyle.display === 'none' || mergedStyle.visibility === 'hidden' || mergedStyle.opacity <= EPS;
 
     const inDefs = parent.inDefs || tag === 'defs' || tag === 'symbol' || tag === 'clipPath' || tag === 'mask' || tag === 'pattern';
 
@@ -1324,34 +1287,16 @@ function parseSvgGeometry(svgText: string, options: NormalizedSvgImportOptions):
 function normalizeSvgImportOptions(options: SvgImportOptions = {}): NormalizedSvgImportOptions {
   const include = options.include ?? 'auto';
   const regionSelection = options.regionSelection ?? 'all';
-  const flattenTolerance = Number.isFinite(options.flattenTolerance)
-    ? Math.max(0.01, options.flattenTolerance as number)
-    : 0.35;
-  const arcSegments = Number.isFinite(options.arcSegments)
-    ? Math.max(2, Math.floor(options.arcSegments as number))
-    : 12;
-  const maxRegions = Number.isFinite(options.maxRegions)
-    ? Math.max(1, Math.floor(options.maxRegions as number))
-    : Number.POSITIVE_INFINITY;
-  const minRegionArea = Number.isFinite(options.minRegionArea)
-    ? Math.max(0, options.minRegionArea as number)
-    : 0;
-  const minRegionAreaRatio = Number.isFinite(options.minRegionAreaRatio)
-    ? Math.max(0, options.minRegionAreaRatio as number)
-    : 0;
-  const scale = Number.isFinite(options.scale)
-    ? Math.max(1e-6, options.scale as number)
-    : 1;
-  const maxWidth = Number.isFinite(options.maxWidth)
-    ? Math.max(1e-6, options.maxWidth as number)
-    : Number.POSITIVE_INFINITY;
-  const maxHeight = Number.isFinite(options.maxHeight)
-    ? Math.max(1e-6, options.maxHeight as number)
-    : Number.POSITIVE_INFINITY;
+  const flattenTolerance = Number.isFinite(options.flattenTolerance) ? Math.max(0.01, options.flattenTolerance as number) : 0.35;
+  const arcSegments = Number.isFinite(options.arcSegments) ? Math.max(2, Math.floor(options.arcSegments as number)) : 12;
+  const maxRegions = Number.isFinite(options.maxRegions) ? Math.max(1, Math.floor(options.maxRegions as number)) : Number.POSITIVE_INFINITY;
+  const minRegionArea = Number.isFinite(options.minRegionArea) ? Math.max(0, options.minRegionArea as number) : 0;
+  const minRegionAreaRatio = Number.isFinite(options.minRegionAreaRatio) ? Math.max(0, options.minRegionAreaRatio as number) : 0;
+  const scale = Number.isFinite(options.scale) ? Math.max(1e-6, options.scale as number) : 1;
+  const maxWidth = Number.isFinite(options.maxWidth) ? Math.max(1e-6, options.maxWidth as number) : Number.POSITIVE_INFINITY;
+  const maxHeight = Number.isFinite(options.maxHeight) ? Math.max(1e-6, options.maxHeight as number) : Number.POSITIVE_INFINITY;
   const centerOnOrigin = options.centerOnOrigin ?? false;
-  const simplify = Number.isFinite(options.simplify)
-    ? Math.max(0, options.simplify as number)
-    : 0;
+  const simplify = Number.isFinite(options.simplify) ? Math.max(0, options.simplify as number) : 0;
   const invertY = options.invertY ?? true;
 
   return {
@@ -1405,11 +1350,7 @@ function validateSvgImportOptions(options: SvgImportOptions = {}): void {
   }
 }
 
-function pickChannels(
-  fillSketches: Sketch[],
-  strokeSketches: Sketch[],
-  mode: NormalizedSvgImportOptions['include'],
-): Sketch[] {
+function pickChannels(fillSketches: Sketch[], strokeSketches: Sketch[], mode: NormalizedSvgImportOptions['include']): Sketch[] {
   if (mode === 'fill') return fillSketches;
   if (mode === 'stroke') return strokeSketches;
   if (mode === 'fill-and-stroke') return [...fillSketches, ...strokeSketches];
@@ -1457,10 +1398,7 @@ export function sketchFromSvg(svgText: string, options: SvgImportOptions = {}): 
   if (normalized.simplify > 0) {
     // Use backend-level simplify for polygon cleanup (not a public Sketch API).
     const simplified = sketch.cross.simplify(normalized.simplify);
-    sketch = setSketchCompileProfilePlan(
-      new Sketch(simplified, sketch.colorHex),
-      profilePlanFromCrossSection(simplified),
-    );
+    sketch = setSketchCompileProfilePlan(new Sketch(simplified, sketch.colorHex), profilePlanFromCrossSection(simplified));
   }
   if (sketch.isEmpty()) {
     throw new Error('SVG import generated an empty sketch');

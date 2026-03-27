@@ -63,10 +63,7 @@ export interface ConstrainedRegularPolygon extends ConstrainedPolygon {
  * sk.length(hex.side(0), 30);  // changes all sides (equal constraint)
  * ```
  */
-export function addRegularPolygon(
-  sk: ConstrainedSketchBuilder,
-  options: RegularPolygonOptions,
-): ConstrainedRegularPolygon {
+export function addRegularPolygon(sk: ConstrainedSketchBuilder, options: RegularPolygonOptions): ConstrainedRegularPolygon {
   const { sides: n, radius = 10, cx = 0, cy = 0, startAngle = 0, blockRotation = false } = options;
   if (n < 3) throw new Error('addRegularPolygon: minimum 3 sides');
 
@@ -87,9 +84,7 @@ export function addRegularPolygon(
   const poly = addPolygon(sk, { points: coords, blockRotation });
 
   // Construction lines from center to each vertex — used for equal-radius constraints
-  const radialLines: LineId[] = poly.vertices.map((v) =>
-    sk.line(center, v, /* construction */ true),
-  );
+  const radialLines: LineId[] = poly.vertices.map((v) => sk.line(center, v, /* construction */ true));
 
   // Equal-radius constraints: all vertices equidistant from center (n-1 equations)
   for (let i = 0; i < n - 1; i++) {

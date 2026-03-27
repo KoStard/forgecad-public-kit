@@ -9,8 +9,8 @@
  *   [2]: (c2 - c1) · n1 - value — distance along normal
  */
 
-import type { Constraint3DDef, Constraint3D, Solver3DContext } from '../types';
-import { cross3, dot3, sub3, len3 } from '../rodrigues';
+import { cross3, dot3, len3, sub3 } from '../rodrigues';
+import type { Constraint3D, Constraint3DDef, Solver3DContext } from '../types';
 
 export const faceDistanceDef: Constraint3DDef<'faceDistance'> = {
   type: 'faceDistance',

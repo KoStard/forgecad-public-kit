@@ -22,8 +22,11 @@ export function ExportSketchPanel({ fileStem }: ExportSketchPanelProps) {
           <button
             key={format}
             onClick={() => {
-              try { exportSketchFromStore(format, fileStem); }
-              catch (err) { alert(`${label} export failed: ${err instanceof Error ? err.message : String(err)}`); }
+              try {
+                exportSketchFromStore(format, fileStem);
+              } catch (err) {
+                alert(`${label} export failed: ${err instanceof Error ? err.message : String(err)}`);
+              }
             }}
             style={{
               flex: 1,

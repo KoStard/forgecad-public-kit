@@ -1,24 +1,14 @@
 #!/usr/bin/env node
+import { runScript } from '../src/forge/headless';
 /**
  * Dimension propagation invariants.
  *
  * Ensures shape-bound dimensions survive through all key Shape APIs
  * and import/runtime paths.
  */
-import {
-  initKernel,
-  Shape,
-  box,
-  union,
-  difference,
-  intersection,
-  hull3d,
-  getShapeDimensions,
-  setShapeDimensions,
-} from '../src/forge/kernel';
-import { Transform } from '../src/forge/transform';
-import { runScript } from '../src/forge/headless';
+import { box, difference, getShapeDimensions, initKernel, intersection, Shape, setShapeDimensions, union } from '../src/forge/kernel';
 import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
+import { Transform } from '../src/forge/transform';
 
 type Dim = {
   id: string;
@@ -49,13 +39,15 @@ function expectVec(actual: [number, number, number], expected: [number, number, 
 
 function seedShape(name: string): Shape {
   const shape = box(20, 10, 6, true);
-  const dims: Dim[] = [{
-    id: `${name}-seed`,
-    from: [1, 2, 3],
-    to: [7, 2, 3],
-    offset: 11,
-    label: `${name}-dim`,
-  }];
+  const dims: Dim[] = [
+    {
+      id: `${name}-seed`,
+      from: [1, 2, 3],
+      to: [7, 2, 3],
+      offset: 11,
+      label: `${name}-dim`,
+    },
+  ];
   return setShapeDimensions(shape, dims);
 }
 
@@ -105,7 +97,6 @@ function checkCopyLikeOps(): void {
   expect(getShapeDimensions(source.setColor('#112233')).length === 1, 'setColor should preserve dimensions');
   expect(getShapeDimensions(source.clone()).length === 1, 'clone should preserve dimensions');
   expect(getShapeDimensions(source.trimByPlane([0, 0, 1], 0)).length === 1, 'trimByPlane should preserve dimensions');
-  expect(getShapeDimensions(source.hull()).length === 1, 'hull() should preserve dimensions');
 }
 
 function checkBooleanPropagation(): void {
@@ -119,8 +110,6 @@ function checkBooleanPropagation(): void {
   expect(getShapeDimensions(union(a, b)).length === 2, 'union() should merge dimensions');
   expect(getShapeDimensions(difference(a, b)).length === 1, 'difference() should keep base dimensions');
   expect(getShapeDimensions(intersection(a, b)).length === 2, 'intersection() should merge dimensions');
-  expect(getShapeDimensions(hull3d(a, b)).length === 2, 'hull3d() should merge dimensions from shape args');
-
   const split = a.splitByPlane([1, 0, 0], 0);
   expect(getShapeDimensions(split[0]).length === 1, 'splitByPlane[0] should keep base dimensions');
   expect(getShapeDimensions(split[1]).length === 1, 'splitByPlane[1] should keep base dimensions');
@@ -153,7 +142,7 @@ function checkGroupedExplicitOwnership(): void {
 const panel = group({ name: "Panel", shape: box(40, 20, 5) });
 dim([0, 0, 0], [40, 0, 0], { component: "Panel" });
 const asm = assembly("Case").addPart("Base Assembly", panel);
-return asm.solve().toScene();
+return asm.solve();
 `,
   };
 
@@ -184,7 +173,7 @@ dim([0, 0, 0], [40, 0, 0], { component: "Panel" });
 const asm = assembly("Case")
   .addPart("Base Assembly", panel())
   .addPart("Lid Assembly", panel().translate(0, 40, 0));
-return asm.solve().toScene();
+return asm.solve();
 `,
   };
 

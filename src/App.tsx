@@ -1,33 +1,44 @@
-import React, { useEffect } from 'react';
 import { initKernel } from '@forge/kernel';
 import { initSolverWasm } from '@forge/sketch/constraints/solver-wasm';
-import { useForgeStore } from './store/forgeStore';
-import { fileSystem } from './fs';
+import React, { useEffect } from 'react';
+import { AISkillDialog } from './components/AISkillDialog';
 import { CodeEditor } from './components/CodeEditor';
-import { NotebookEditor } from './components/NotebookEditor';
-import { Viewport } from './components/Viewport';
-import { ParamPanel } from './components/ParamPanel';
+import { CommandPalette } from './components/CommandPalette';
+import { ConsolePanel } from './components/ConsolePanel';
+import { EmbedViewer } from './components/EmbedViewer';
 import { ExportPanel } from './components/ExportPanel';
 import { FileExplorer } from './components/FileExplorer';
-import { ViewPanel } from './components/ViewPanel';
-import { CommandPalette } from './components/CommandPalette';
 import { FileSwitcher } from './components/FileSwitcher';
 import { KeyboardShortcutsOverlay } from './components/KeyboardShortcutsOverlay';
-import { ConsolePanel } from './components/ConsolePanel';
-import { VerificationsPanel } from './components/VerificationsPanel';
+import { NotebookEditor } from './components/NotebookEditor';
+import { ParamPanel } from './components/ParamPanel';
 import { ResizablePanel } from './components/ResizablePanel';
-import { isSaveShortcut, shouldBlockBrowserShortcut, type EditorSurface } from './editorShortcuts';
-import { isNotebookFile } from './notebook/model';
-import { buildShareUrl, buildEmbedUrl, buildBundleShareUrl, buildBundleEmbedUrl, buildEmbedSnippet, isEmbedMode } from './share';
-import { collectDependencies, hasImports } from './importAnalysis';
-import { EmbedViewer } from './components/EmbedViewer';
-import { AISkillDialog } from './components/AISkillDialog';
+import { StatusBar } from './components/StatusBar';
+import { showToast, ToastContainer } from './components/Toast';
+import { VerificationsPanel } from './components/VerificationsPanel';
+import { ViewPanel } from './components/ViewPanel';
+import { Viewport } from './components/Viewport';
 import { useDrawStore } from './draw/drawStore';
+import { type EditorSurface, isSaveShortcut, shouldBlockBrowserShortcut } from './editorShortcuts';
 import { useFeatureFlag } from './featureFlags';
+import { fileSystem } from './fs';
+import { collectDependencies, hasImports } from './importAnalysis';
 import { isMobile } from './mobile/isMobile';
 import { MobileApp } from './mobile/MobileApp';
-import { ToastContainer, showToast } from './components/Toast';
-import { StatusBar } from './components/StatusBar';
+import { isNotebookFile } from './notebook/model';
+import {
+  buildBundleEmbedUrl,
+  buildBundleShareUrl,
+  buildEmbedSnippet,
+  buildEmbedUrl,
+  buildShareUrl,
+  fetchGistModel,
+  fetchUrlModel,
+  getExternalUrl,
+  getGistId,
+  isEmbedMode,
+} from './share';
+import { useForgeStore } from './store/forgeStore';
 
 const GITHUB_REPO = 'KoStard/ForgeCAD';
 
@@ -40,7 +51,9 @@ function GitHubStarButton() {
       .then((data: { stargazers_count?: number }) => {
         if (typeof data.stargazers_count === 'number') setStars(data.stargazers_count);
       })
-      .catch(() => { /* fail silently — button still works as a plain link */ });
+      .catch(() => {
+        /* fail silently — button still works as a plain link */
+      });
   }, []);
 
   const label = stars === null ? null : stars >= 1000 ? `${(stars / 1000).toFixed(1)}k` : String(stars);
@@ -98,16 +111,12 @@ function ShareButton() {
 
       if (fileCount > 1) {
         const bundle = { entry: activeFile, files: deps.codeFiles };
-        return mode === 'share'
-          ? buildBundleShareUrl(bundle)
-          : buildBundleEmbedUrl(bundle);
+        return mode === 'share' ? buildBundleShareUrl(bundle) : buildBundleEmbedUrl(bundle);
       }
     }
 
     // Single file — use the original compact format
-    return mode === 'share'
-      ? buildShareUrl(activeFile, code)
-      : buildEmbedUrl(activeFile, code);
+    return mode === 'share' ? buildShareUrl(activeFile, code) : buildEmbedUrl(activeFile, code);
   };
 
   const confirmLargeUrl = (url: string, label: string): boolean => {
@@ -141,7 +150,12 @@ function ShareButton() {
         </svg>
         Share
       </button>
-      <button onClick={handleEmbed} title="Copy embed iframe snippet to clipboard" className="fc-btn" style={{ borderLeft: 'none', borderRadius: '0 4px 4px 0' }}>
+      <button
+        onClick={handleEmbed}
+        title="Copy embed iframe snippet to clipboard"
+        className="fc-btn"
+        style={{ borderLeft: 'none', borderRadius: '0 4px 4px 0' }}
+      >
         <svg height="12" width="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
           <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0114.25 16H1.75A1.75 1.75 0 010 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 00.25-.25V1.75a.25.25 0 00-.25-.25H1.75zM4.47 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L7.19 8 4.47 5.28a.75.75 0 010-1.06z" />
         </svg>
@@ -198,7 +212,7 @@ function Toolbar() {
   const drawEnabled = useFeatureFlag('drawMode');
   const drawModeActive = useDrawStore((s) => s.active);
   const enterDrawMode = useDrawStore((s) => s.enterDrawMode);
-  const exitDrawMode = useDrawStore((s) => s.exitDrawMode);
+  const requestDrawExit = useDrawStore((s) => s.requestExit);
   const [skillDialogOpen, setSkillDialogOpen] = React.useState(false);
 
   return (
@@ -206,7 +220,8 @@ function Toolbar() {
       <span style={{ fontSize: 16 }}>⚒</span>
       <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--fc-accent)' }}>ForgeCAD</span>
       <span style={{ color: 'var(--fc-textDim)', fontSize: 12, marginLeft: 4 }}>
-        {activeFile}{dirty ? ' •' : ''}
+        {activeFile}
+        {dirty ? ' •' : ''}
       </span>
       <button
         onClick={openCommandPalette}
@@ -219,30 +234,56 @@ function Toolbar() {
       </button>
 
       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
-        <button className={btn(fileExplorerOpen)} onClick={toggleFileExplorer} title="Toggle file explorer">📁 Files</button>
-        <button className={btn(viewPanelOpen)} onClick={toggleViewPanel} title="Toggle view panel">🧭 View</button>
+        <button className={btn(fileExplorerOpen)} onClick={toggleFileExplorer} title="Toggle file explorer">
+          📁 Files
+        </button>
+        <button className={btn(viewPanelOpen)} onClick={toggleViewPanel} title="Toggle view panel">
+          🧭 View
+        </button>
         <div className="fc-separator" />
-        <button className={btn()} onClick={newProject} title="New project">New Project</button>
-        <button className={btn()} onClick={saveFile} title="Save (⌘S)">Save</button>
-        <button className={btn()} onClick={saveFileAs} title="Save as new file">Save As</button>
+        <button className={btn()} onClick={newProject} title="New project">
+          New Project
+        </button>
+        <button className={btn()} onClick={saveFile} title="Save (⌘S)">
+          Save
+        </button>
+        <button className={btn()} onClick={saveFileAs} title="Save as new file">
+          Save As
+        </button>
         <div className="fc-separator" />
         {drawEnabled && (
           <button
             className={btn(drawModeActive)}
-            onClick={drawModeActive ? exitDrawMode : enterDrawMode}
-            title={drawModeActive ? 'Exit draw mode (Esc)' : 'Enter draw mode to sketch interactively'}
+            onClick={drawModeActive ? requestDrawExit : enterDrawMode}
+            title={drawModeActive ? 'Exit draw mode' : 'Enter draw mode to sketch interactively'}
           >
             ✏️ Draw
           </button>
         )}
-        <button className={btn(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool (M)">📏 Measure</button>
+        <button className={btn(measureMode)} onClick={toggleMeasure} title="Toggle measurement tool (M)">
+          📏 Measure
+        </button>
         {measureMode && measureSelections.length > 0 && (
-          <button className={btn()} onClick={clearMeasureSelections} title="Clear selections">Clear</button>
+          <button className={btn()} onClick={clearMeasureSelections} title="Clear selections">
+            Clear
+          </button>
         )}
         <div className="fc-separator" />
         <AutoBuildToggle />
         <div className="fc-separator" />
-        <button className={btn()} onClick={() => setSkillDialogOpen(true)} title="Get AI skill for writing ForgeCAD models">🤖 AI Skill</button>
+        <button className={btn()} onClick={() => setSkillDialogOpen(true)} title="Get AI skill for writing ForgeCAD models">
+          🤖 AI Skill
+        </button>
+        <a
+          className={btn()}
+          href={`${import.meta.env.BASE_URL}docs/`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open ForgeCAD documentation"
+          style={{ textDecoration: 'none' }}
+        >
+          📖 Docs
+        </a>
         <div className="fc-separator" />
         <ShareButton />
         {__FORGE_MODE__ === 'web' && <GitHubStarButton />}
@@ -292,6 +333,25 @@ function FullApp() {
     });
   }, []);
 
+  // Auto-load from ?url= or ?gist= query params when opening the full editor
+  useEffect(() => {
+    const externalUrl = getExternalUrl();
+    const gistId = getGistId();
+    const fetcher = externalUrl
+      ? fetchUrlModel(externalUrl)
+      : gistId
+        ? fetchGistModel(gistId)
+        : null;
+    if (!fetcher) return;
+    fetcher
+      .then((model) => {
+        useForgeStore.getState().loadFromText(model.code, model.filename);
+      })
+      .catch((err) => {
+        showToast(`Failed to load external model: ${err.message}`, 'error');
+      });
+  }, []);
+
   // Sync project files via the active FileSystemProvider
   useEffect(() => {
     return fileSystem.subscribe((event) => {
@@ -336,9 +396,7 @@ function FullApp() {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
 
-      const surfaceValue = target
-        .closest<HTMLElement>('[data-fc-editor-surface]')
-        ?.dataset.fcEditorSurface;
+      const surfaceValue = target.closest<HTMLElement>('[data-fc-editor-surface]')?.dataset.fcEditorSurface;
 
       if (surfaceValue !== 'monaco' && surfaceValue !== 'notebook') return;
 
@@ -361,52 +419,60 @@ function FullApp() {
 
   if (!kernelReady) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: 'var(--fc-textDim)',
-        animation: 'fc-fadein 0.3s ease-out',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          color: 'var(--fc-textDim)',
+          animation: 'fc-fadein 0.3s ease-out',
+        }}
+      >
         <div style={{ textAlign: 'center' }}>
           {/* Anvil icon with gentle pulse */}
-          <div style={{
-            fontSize: 48,
-            marginBottom: 16,
-            animation: 'fc-pulse 2s ease-in-out infinite',
-          }}>
+          <div
+            style={{
+              fontSize: 48,
+              marginBottom: 16,
+              animation: 'fc-pulse 2s ease-in-out infinite',
+            }}
+          >
             ⚒
           </div>
-          <div style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: 'var(--fc-accent)',
-            marginBottom: 6,
-            letterSpacing: 1,
-          }}>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: 'var(--fc-accent)',
+              marginBottom: 6,
+              letterSpacing: 1,
+            }}
+          >
             ForgeCAD
           </div>
-          <div style={{ fontSize: 13, color: 'var(--fc-textDim)', marginBottom: 20 }}>
-            Loading geometry kernel...
-          </div>
+          <div style={{ fontSize: 13, color: 'var(--fc-textDim)', marginBottom: 20 }}>Loading geometry kernel...</div>
           {/* Shimmer progress bar */}
-          <div style={{
-            width: 200,
-            height: 3,
-            borderRadius: 2,
-            background: 'var(--fc-border)',
-            overflow: 'hidden',
-            margin: '0 auto',
-          }}>
-            <div style={{
-              width: '100%',
-              height: '100%',
+          <div
+            style={{
+              width: 200,
+              height: 3,
               borderRadius: 2,
-              background: 'linear-gradient(90deg, transparent, var(--fc-accent), transparent)',
-              backgroundSize: '200% 100%',
-              animation: 'fc-shimmer 1.5s ease-in-out infinite',
-            }} />
+              background: 'var(--fc-border)',
+              overflow: 'hidden',
+              margin: '0 auto',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: 2,
+                background: 'linear-gradient(90deg, transparent, var(--fc-accent), transparent)',
+                backgroundSize: '200% 100%',
+                animation: 'fc-shimmer 1.5s ease-in-out infinite',
+              }}
+            />
           </div>
         </div>
       </div>
@@ -439,9 +505,7 @@ function FullApp() {
             handleLabel="Resize code editor panel"
             panelStyle={{ borderRight: '1px solid var(--fc-border)' }}
           >
-            <div style={{ flex: 1, minHeight: 0 }}>
-              {notebookMode ? <NotebookEditor /> : <CodeEditor />}
-            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>{notebookMode ? <NotebookEditor /> : <CodeEditor />}</div>
             <ParamPanel />
             <VerificationsPanel />
             <ConsolePanel />

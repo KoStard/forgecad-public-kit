@@ -255,8 +255,7 @@ export function sheetMetalRegionNames(model: SheetMetalModel): SheetMetalRegionN
 }
 
 export function sheetMetalPlanarRegionNames(model: SheetMetalModel): SheetMetalPlanarRegionName[] {
-  return sheetMetalRegionNames(model)
-    .filter((name): name is SheetMetalPlanarRegionName => name === 'panel' || name.startsWith('flange-'));
+  return sheetMetalRegionNames(model).filter((name): name is SheetMetalPlanarRegionName => name === 'panel' || name.startsWith('flange-'));
 }
 
 export function isSheetMetalPlanarRegionName(name: string): name is SheetMetalPlanarRegionName {
@@ -289,20 +288,9 @@ function translatePlan(plan: ShapeCompilePlan, x: number, y: number, z: number):
   })!;
 }
 
-function workplanePlacedPlan(
-  plan: ShapeCompilePlan,
-  origin: Vec3,
-  u: Vec3,
-  v: Vec3,
-  normal: Vec3,
-): ShapeCompilePlan {
+function workplanePlacedPlan(plan: ShapeCompilePlan, origin: Vec3, u: Vec3, v: Vec3, normal: Vec3): ShapeCompilePlan {
   const placement = transformPlacement(origin, u, v, normal);
-  const matrix: Mat4 = [
-    u[0], u[1], u[2], 0,
-    v[0], v[1], v[2], 0,
-    normal[0], normal[1], normal[2], 0,
-    origin[0], origin[1], origin[2], 1,
-  ];
+  const matrix: Mat4 = [u[0], u[1], u[2], 0, v[0], v[1], v[2], 0, normal[0], normal[1], normal[2], 0, origin[0], origin[1], origin[2], 1];
   return appendShapeCompileTransform(cloneShapeCompilePlan(plan)!, {
     kind: 'workplanePlacement',
     matrix,
@@ -320,10 +308,7 @@ function bendSectorProfile(radius: number, thickness: number): ProfileCompilePla
     { kind: 'circle', radius: outerRadius, transforms: [] },
     { kind: 'translate', x: 0, y: radius },
   );
-  const inner = appendProfileCompileTransform(
-    { kind: 'circle', radius, transforms: [] },
-    { kind: 'translate', x: 0, y: radius },
-  );
+  const inner = appendProfileCompileTransform({ kind: 'circle', radius, transforms: [] }, { kind: 'translate', x: 0, y: radius });
   const annulus = buildBooleanProfileCompilePlan('difference', [outer, inner]);
   const clip = appendProfileCompileTransform(
     { kind: 'rect', width: outerRadius, height: outerRadius, center: false, transforms: [] },
@@ -343,41 +328,13 @@ function foldedFlangePlan(derived: SheetMetalDerivedModel, flange: SheetMetalDer
 
   switch (flange.edge) {
     case 'top':
-      return centeredBox(
-        flange.span,
-        t,
-        length,
-        flange.centerAlongEdge,
-        derived.panelHeight / 2 + r + t / 2,
-        -t / 2 - r - length / 2,
-      );
+      return centeredBox(flange.span, t, length, flange.centerAlongEdge, derived.panelHeight / 2 + r + t / 2, -t / 2 - r - length / 2);
     case 'bottom':
-      return centeredBox(
-        flange.span,
-        t,
-        length,
-        flange.centerAlongEdge,
-        -derived.panelHeight / 2 - r - t / 2,
-        -t / 2 - r - length / 2,
-      );
+      return centeredBox(flange.span, t, length, flange.centerAlongEdge, -derived.panelHeight / 2 - r - t / 2, -t / 2 - r - length / 2);
     case 'right':
-      return centeredBox(
-        t,
-        flange.span,
-        length,
-        derived.panelWidth / 2 + r + t / 2,
-        flange.centerAlongEdge,
-        -t / 2 - r - length / 2,
-      );
+      return centeredBox(t, flange.span, length, derived.panelWidth / 2 + r + t / 2, flange.centerAlongEdge, -t / 2 - r - length / 2);
     case 'left':
-      return centeredBox(
-        t,
-        flange.span,
-        length,
-        -derived.panelWidth / 2 - r - t / 2,
-        flange.centerAlongEdge,
-        -t / 2 - r - length / 2,
-      );
+      return centeredBox(t, flange.span, length, -derived.panelWidth / 2 - r - t / 2, flange.centerAlongEdge, -t / 2 - r - length / 2);
   }
 }
 
@@ -458,10 +415,7 @@ function flatFlangePlan(derived: SheetMetalDerivedModel, flange: SheetMetalDeriv
   }
 }
 
-export function lowerSheetMetalBasePlan(
-  model: SheetMetalModel,
-  output: SheetMetalOutput,
-): ShapeCompilePlan {
+export function lowerSheetMetalBasePlan(model: SheetMetalModel, output: SheetMetalOutput): ShapeCompilePlan {
   const derived = deriveSheetMetalModel(model);
   const pieces: ShapeCompilePlan[] = [foldedPanelPlan(derived)];
 
@@ -563,21 +517,9 @@ function foldedBendDescriptor(derived: SheetMetalDerivedModel, flange: SheetMeta
   }
 }
 
-export function describeSheetMetalFaces(
-  model: SheetMetalModel,
-  output: SheetMetalOutput,
-): SheetMetalFaceDescriptor[] {
+export function describeSheetMetalFaces(model: SheetMetalModel, output: SheetMetalOutput): SheetMetalFaceDescriptor[] {
   const derived = deriveSheetMetalModel(model);
-  const faces: SheetMetalFaceDescriptor[] = [
-    descriptor(
-      'panel',
-      [0, 0, derived.thickness / 2],
-      [0, 0, 1],
-      true,
-      [1, 0, 0],
-      [0, 1, 0],
-    ),
-  ];
+  const faces: SheetMetalFaceDescriptor[] = [descriptor('panel', [0, 0, derived.thickness / 2], [0, 0, 1], true, [1, 0, 0], [0, 1, 0])];
 
   for (const edge of SHEET_METAL_EDGES) {
     const flange = derived.flanges.get(edge);
@@ -586,44 +528,68 @@ export function describeSheetMetalFaces(
       faces.push(foldedBendDescriptor(derived, flange));
       switch (edge) {
         case 'top':
-          faces.push(descriptor(
-            'flange-top',
-            [flange.centerAlongEdge, derived.panelHeight / 2 + derived.bendRadius + derived.thickness, -derived.thickness / 2 - derived.bendRadius - flange.length / 2],
-            [0, 1, 0],
-            true,
-            [1, 0, 0],
-            [0, 0, -1],
-          ));
+          faces.push(
+            descriptor(
+              'flange-top',
+              [
+                flange.centerAlongEdge,
+                derived.panelHeight / 2 + derived.bendRadius + derived.thickness,
+                -derived.thickness / 2 - derived.bendRadius - flange.length / 2,
+              ],
+              [0, 1, 0],
+              true,
+              [1, 0, 0],
+              [0, 0, -1],
+            ),
+          );
           break;
         case 'bottom':
-          faces.push(descriptor(
-            'flange-bottom',
-            [flange.centerAlongEdge, -derived.panelHeight / 2 - derived.bendRadius - derived.thickness, -derived.thickness / 2 - derived.bendRadius - flange.length / 2],
-            [0, -1, 0],
-            true,
-            [1, 0, 0],
-            [0, 0, 1],
-          ));
+          faces.push(
+            descriptor(
+              'flange-bottom',
+              [
+                flange.centerAlongEdge,
+                -derived.panelHeight / 2 - derived.bendRadius - derived.thickness,
+                -derived.thickness / 2 - derived.bendRadius - flange.length / 2,
+              ],
+              [0, -1, 0],
+              true,
+              [1, 0, 0],
+              [0, 0, 1],
+            ),
+          );
           break;
         case 'right':
-          faces.push(descriptor(
-            'flange-right',
-            [derived.panelWidth / 2 + derived.bendRadius + derived.thickness, flange.centerAlongEdge, -derived.thickness / 2 - derived.bendRadius - flange.length / 2],
-            [1, 0, 0],
-            true,
-            [0, 1, 0],
-            [0, 0, 1],
-          ));
+          faces.push(
+            descriptor(
+              'flange-right',
+              [
+                derived.panelWidth / 2 + derived.bendRadius + derived.thickness,
+                flange.centerAlongEdge,
+                -derived.thickness / 2 - derived.bendRadius - flange.length / 2,
+              ],
+              [1, 0, 0],
+              true,
+              [0, 1, 0],
+              [0, 0, 1],
+            ),
+          );
           break;
         case 'left':
-          faces.push(descriptor(
-            'flange-left',
-            [-derived.panelWidth / 2 - derived.bendRadius - derived.thickness, flange.centerAlongEdge, -derived.thickness / 2 - derived.bendRadius - flange.length / 2],
-            [-1, 0, 0],
-            true,
-            [0, -1, 0],
-            [0, 0, 1],
-          ));
+          faces.push(
+            descriptor(
+              'flange-left',
+              [
+                -derived.panelWidth / 2 - derived.bendRadius - derived.thickness,
+                flange.centerAlongEdge,
+                -derived.thickness / 2 - derived.bendRadius - flange.length / 2,
+              ],
+              [-1, 0, 0],
+              true,
+              [0, -1, 0],
+              [0, 0, 1],
+            ),
+          );
           break;
       }
       continue;
@@ -631,76 +597,92 @@ export function describeSheetMetalFaces(
 
     switch (edge) {
       case 'top':
-        faces.push(descriptor(
-          'bend-top',
-          [flange.centerAlongEdge, derived.panelHeight / 2 + flange.bendAllowance / 2, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [1, 0, 0],
-          [0, 1, 0],
-        ));
-        faces.push(descriptor(
-          'flange-top',
-          [flange.centerAlongEdge, derived.panelHeight / 2 + flange.bendAllowance + flange.length / 2, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [1, 0, 0],
-          [0, 1, 0],
-        ));
+        faces.push(
+          descriptor(
+            'bend-top',
+            [flange.centerAlongEdge, derived.panelHeight / 2 + flange.bendAllowance / 2, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [1, 0, 0],
+            [0, 1, 0],
+          ),
+        );
+        faces.push(
+          descriptor(
+            'flange-top',
+            [flange.centerAlongEdge, derived.panelHeight / 2 + flange.bendAllowance + flange.length / 2, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [1, 0, 0],
+            [0, 1, 0],
+          ),
+        );
         break;
       case 'bottom':
-        faces.push(descriptor(
-          'bend-bottom',
-          [flange.centerAlongEdge, -derived.panelHeight / 2 - flange.bendAllowance / 2, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [1, 0, 0],
-          [0, 1, 0],
-        ));
-        faces.push(descriptor(
-          'flange-bottom',
-          [flange.centerAlongEdge, -derived.panelHeight / 2 - flange.bendAllowance - flange.length / 2, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [1, 0, 0],
-          [0, 1, 0],
-        ));
+        faces.push(
+          descriptor(
+            'bend-bottom',
+            [flange.centerAlongEdge, -derived.panelHeight / 2 - flange.bendAllowance / 2, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [1, 0, 0],
+            [0, 1, 0],
+          ),
+        );
+        faces.push(
+          descriptor(
+            'flange-bottom',
+            [flange.centerAlongEdge, -derived.panelHeight / 2 - flange.bendAllowance - flange.length / 2, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [1, 0, 0],
+            [0, 1, 0],
+          ),
+        );
         break;
       case 'right':
-        faces.push(descriptor(
-          'bend-right',
-          [derived.panelWidth / 2 + flange.bendAllowance / 2, flange.centerAlongEdge, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [0, 1, 0],
-          [-1, 0, 0],
-        ));
-        faces.push(descriptor(
-          'flange-right',
-          [derived.panelWidth / 2 + flange.bendAllowance + flange.length / 2, flange.centerAlongEdge, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [0, 1, 0],
-          [-1, 0, 0],
-        ));
+        faces.push(
+          descriptor(
+            'bend-right',
+            [derived.panelWidth / 2 + flange.bendAllowance / 2, flange.centerAlongEdge, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [0, 1, 0],
+            [-1, 0, 0],
+          ),
+        );
+        faces.push(
+          descriptor(
+            'flange-right',
+            [derived.panelWidth / 2 + flange.bendAllowance + flange.length / 2, flange.centerAlongEdge, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [0, 1, 0],
+            [-1, 0, 0],
+          ),
+        );
         break;
       case 'left':
-        faces.push(descriptor(
-          'bend-left',
-          [-derived.panelWidth / 2 - flange.bendAllowance / 2, flange.centerAlongEdge, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [0, -1, 0],
-          [1, 0, 0],
-        ));
-        faces.push(descriptor(
-          'flange-left',
-          [-derived.panelWidth / 2 - flange.bendAllowance - flange.length / 2, flange.centerAlongEdge, derived.thickness / 2],
-          [0, 0, 1],
-          true,
-          [0, -1, 0],
-          [1, 0, 0],
-        ));
+        faces.push(
+          descriptor(
+            'bend-left',
+            [-derived.panelWidth / 2 - flange.bendAllowance / 2, flange.centerAlongEdge, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [0, -1, 0],
+            [1, 0, 0],
+          ),
+        );
+        faces.push(
+          descriptor(
+            'flange-left',
+            [-derived.panelWidth / 2 - flange.bendAllowance - flange.length / 2, flange.centerAlongEdge, derived.thickness / 2],
+            [0, 0, 1],
+            true,
+            [0, -1, 0],
+            [1, 0, 0],
+          ),
+        );
         break;
     }
   }

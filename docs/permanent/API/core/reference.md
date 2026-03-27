@@ -53,12 +53,12 @@ const blue = box(20, 20, 20).translate(30, 0, 0).color('#0066ff');
 
 // Return as named objects to preserve individual colors and materials
 return [
-  { "label": red },    // Each gets its own color, toggle, and controls
-  { "label": blue }
+  { name: "Red Box", shape: red, color: '#ff0000' },
+  { name: "Blue Box", shape: blue, color: '#0066ff' },
 ];
 ```
 
-Each object in the returned array stays independently colorable and selectable, which is the main alternative to booleaning everything into one solid.
+Each object in the returned array must have a `name` property (string) and a `shape` or `sketch` property. The optional `color` property sets the display color. This keeps each object independently colorable and selectable, which is the main alternative to booleaning everything into one solid.
 
 ### Coordinate System
 ForgeCAD uses **Z-up** right-handed coordinates:
@@ -385,8 +385,7 @@ const mech = assembly("Two-Link Arm")
     frame: Transform.identity().translate(120, 0, 0),
   });
 
-const solved = mech.solve();
-return solved.toScene();
+return mech; // auto-solved at defaults
 ```
 
 Linked joint example:
@@ -450,7 +449,8 @@ Key methods:
 - `sweepJoint(jointName, from, to, steps, baseState?, collisionOptions?)`
 
 Solved assembly helpers:
-- `solved.toScene()` for rendering
+- `solved.toGroup()` returns a `ShapeGroup` with named children — primary way to get positioned parts
+- `solved.toSceneObjects()` returns raw scene-graph array (advanced)
 - `solved.collisionReport()` for interference checks
 - `solved.minClearance(partA, partB, searchLength?)`
 - `solved.bom()` / `solved.bomCsv()`
@@ -741,41 +741,6 @@ const sideVent = box(2, 30, 40, true).color('#666')
 
 ## Advanced 3D Operations
 
-### `hull3d(...args)`
-Convex hull of multiple shapes and/or points.
-
-```javascript
-const hull = hull3d(
-  sphere(10),
-  sphere(10).translate(50, 0, 0),
-  [25, 0, 30],  // bare point
-);
-```
-
-### `levelSet(sdf, bounds, edgeLength, level?)`
-Create a shape from a signed distance function (SDF). Positive = inside.
-
-```javascript
-const gyroid = levelSet(
-  ([x, y, z]) => Math.sin(x) * Math.cos(y) + Math.sin(y) * Math.cos(z) + Math.sin(z) * Math.cos(x),
-  { min: [-10, -10, -10], max: [10, 10, 10] },
-  0.5,  // edge length (resolution)
-);
-```
-
-### Smoothing
-
-```javascript
-// Mark edges for smoothing, then subdivide
-const smooth = box(50, 50, 50, true)
-  .smoothOut(60)     // edges sharper than 60° get smoothed
-  .refine(4);        // subdivide 4 times
-
-// Or refine by edge length / tolerance
-shape.refineToLength(2);      // max edge length 2mm
-shape.refineToTolerance(0.1); // max deviation 0.1mm from smooth surface
-```
-
 ### Cutting
 
 ```javascript
@@ -804,7 +769,7 @@ Not supported yet:
 - tapered extrudes (`scaleTop`)
 - scale transforms before shelling
 - already-shelled results
-- general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, hull, and plane-trim bases
+- general boolean, `revolve()`, `loft()`, `sweep()`, `sphere()`, and plane-trim bases
 
 Forge keeps `shell` as semantic compiler intent, then lowers it into backend-supported boolean/extrude/cylinder plans for both Manifold and CadQuery/OCCT.
 
@@ -1029,8 +994,8 @@ Use these canonical files:
 - [sketch-primitives.md](sketch-primitives.md) - `rect`, `circle2d`, `roundedRect`, `polygon`, `ngon`, `ellipse`, `slot`, `star`
 - [sketch-path.md](sketch-path.md) - `path()` builder and `stroke(...)`
 - [sketch-transforms.md](sketch-transforms.md) - translate/rotate/scale/mirror for sketches
-- [sketch-booleans.md](sketch-booleans.md) - `union2d`/`difference2d`/`intersection2d`/`hull2d` and method forms
-- [sketch-operations.md](sketch-operations.md) - `offset`, `filletCorners`, `simplify`, `warp`, hull
+- [sketch-booleans.md](sketch-booleans.md) - `union2d`/`difference2d`/`intersection2d` and method forms
+- [sketch-operations.md](sketch-operations.md) - `offset`, `filletCorners`, `simplify`, `warp`
 - [sketch-on-face.md](sketch-on-face.md) - sketch placement on planar faces
 - [sketch-extrude.md](sketch-extrude.md) - `extrude` and `revolve`
 - [sketch-anchor.md](sketch-anchor.md) - 2D anchor-based positioning

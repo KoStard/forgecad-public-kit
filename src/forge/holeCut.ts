@@ -1,44 +1,37 @@
 import {
   type CutTaperCompilePlan,
+  createShapeQueryOwner,
   type FeatureCutExtent,
   type FeatureCutExtentSideCompilePlan,
-  type HoleCompilePlan,
   featureCutExtentForwardSide,
-  createShapeQueryOwner,
+  type HoleCompilePlan,
   type ShapeCompilePlan,
   wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
+import { buildCutShapeCompilePlan, buildHoleShapeCompilePlan } from './holeCutCompilePlan';
 import {
-  buildCutShapeCompilePlan,
-  buildHoleShapeCompilePlan,
-} from './holeCutCompilePlan';
-import {
-  Shape,
   buildShapeFromCompilePlan,
   getShapeCompilePlan,
   getShapeDimensions,
   getShapeGeometryInfo,
   getShapePlacementReferences,
   getShapeQueryOwners,
+  Shape,
   setShapeDimensions,
   setShapeGeometryInfo,
   setShapePlacementReferences,
 } from './kernel';
-import { shapeQueryOwnersEqual, type FaceQueryRef, type ShapeQueryOwner } from './queryModel';
+import { type FaceQueryRef, type ShapeQueryOwner, shapeQueryOwnersEqual } from './queryModel';
 import {
   attachTopologyRewritePropagation,
   buildCutTopologyRewritePropagation,
   buildHoleTopologyRewritePropagation,
-} from './queryPropagation';
-import { validateShapeFaceQuery } from './shapeFaces';
-import { Sketch, getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel } from './sketch/core';
-import { TrackedShape, type FaceRef } from './sketch/topology';
+} from './query/queryPropagation';
+import { validateShapeFaceQuery } from './face-tracking/shapeFaces';
+import { getSketchCompileProfilePlan, getSketchPlacement3D, getSketchPlacementModel, Sketch } from './sketch/core';
+import { type FaceRef, TrackedShape } from './sketch/topology';
 import { resolveSketchWorkplane, type SketchFaceTarget } from './sketch/workplane';
-import {
-  cloneSketchPlacementModel,
-  cloneSketchWorkplane,
-  type ShapeWorkplanePlacement,
-} from './sketch/workplaneModel';
+import { cloneSketchPlacementModel, cloneSketchWorkplane, type ShapeWorkplanePlacement } from './sketch/workplaneModel';
 
 export interface ShapeFeatureExtentSideOptions {
   depth?: number;
@@ -88,9 +81,7 @@ export interface ShapeCutoutOptions {
 function isFaceRef(value: unknown): value is FaceRef {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<FaceRef>;
-  return typeof candidate.name === 'string'
-    && Array.isArray(candidate.normal)
-    && Array.isArray(candidate.center);
+  return typeof candidate.name === 'string' && Array.isArray(candidate.normal) && Array.isArray(candidate.center);
 }
 
 function isFinitePositive(value: number): boolean {
@@ -118,10 +109,22 @@ function featurePlacementMatrix(placement: ShapeWorkplanePlacement['placement'])
   ];
 
   return [
-    workplane.u[0], workplane.u[1], workplane.u[2], 0,
-    workplane.v[0], workplane.v[1], workplane.v[2], 0,
-    workplane.normal[0], workplane.normal[1], workplane.normal[2], 0,
-    origin[0], origin[1], origin[2], 1,
+    workplane.u[0],
+    workplane.u[1],
+    workplane.u[2],
+    0,
+    workplane.v[0],
+    workplane.v[1],
+    workplane.v[2],
+    0,
+    workplane.normal[0],
+    workplane.normal[1],
+    workplane.normal[2],
+    0,
+    origin[0],
+    origin[1],
+    origin[2],
+    1,
   ] as ShapeWorkplanePlacement['matrix'];
 }
 
@@ -130,22 +133,12 @@ function targetRetainsQueryOwner(target: Shape, owner: ShapeQueryOwner | undefin
   return getShapeQueryOwners(target).some((current) => shapeQueryOwnersEqual(current, owner));
 }
 
-function requireCompatibleFeatureOwner(
-  target: Shape,
-  owner: ShapeQueryOwner | undefined,
-  label: string,
-): void {
+function requireCompatibleFeatureOwner(target: Shape, owner: ShapeQueryOwner | undefined, label: string): void {
   if (targetRetainsQueryOwner(target, owner)) return;
-  throw new Error(
-    `${label} requires a face/workplane owned by the target shape or one of its preserved query ancestors.`,
-  );
+  throw new Error(`${label} requires a face/workplane owned by the target shape or one of its preserved query ancestors.`);
 }
 
-function requireCompatibleFeatureFaceQuery(
-  target: Shape,
-  label: string,
-  query: FaceRef['query'],
-): void {
+function requireCompatibleFeatureFaceQuery(target: Shape, label: string, query: FaceRef['query']): void {
   const issue = validateShapeFaceQuery(getShapeCompilePlan(target), query);
   if (!issue) return;
   throw new Error(`${label} ${issue}`);
@@ -171,11 +164,7 @@ function computeThroughDepth(shape: Shape, origin: [number, number, number], dir
   const depthDirection = normalizeVec3(direction);
   let maxDepth = 0;
   for (const corner of bboxCorners(shape)) {
-    const offset: [number, number, number] = [
-      corner[0] - origin[0],
-      corner[1] - origin[1],
-      corner[2] - origin[2],
-    ];
+    const offset: [number, number, number] = [corner[0] - origin[0], corner[1] - origin[1], corner[2] - origin[2]];
     maxDepth = Math.max(maxDepth, dot3(offset, depthDirection));
   }
 
@@ -188,10 +177,7 @@ function computeThroughDepth(shape: Shape, origin: [number, number, number], dir
   return Math.max(Math.hypot(dx, dy, dz), 1);
 }
 
-function resolveFeatureFaceRef(
-  targetForResolution: Shape | TrackedShape,
-  faceOrRef: SketchFaceTarget | FaceRef,
-): FaceRef {
+function resolveFeatureFaceRef(targetForResolution: Shape | TrackedShape, faceOrRef: SketchFaceTarget | FaceRef): FaceRef {
   if (isFaceRef(faceOrRef)) return faceOrRef;
   return targetForResolution.face(faceOrRef);
 }
@@ -203,9 +189,7 @@ function resolveFeatureFaceTarget(
   label: string,
   opts: { requireDefendedQuery: boolean } = { requireDefendedQuery: true },
 ): { face: FaceRef; query: FaceQueryRef } {
-  const workplane = isFaceRef(faceOrRef)
-    ? resolveSketchWorkplane(faceOrRef)
-    : resolveSketchWorkplane(targetForResolution, faceOrRef);
+  const workplane = isFaceRef(faceOrRef) ? resolveSketchWorkplane(faceOrRef) : resolveSketchWorkplane(targetForResolution, faceOrRef);
 
   requireCompatibleFeatureOwner(targetForOwnership, workplane.source.owner, label);
   if (opts.requireDefendedQuery) {
@@ -218,12 +202,7 @@ function resolveFeatureFaceTarget(
   };
 }
 
-function computeUpToFaceDepth(
-  origin: [number, number, number],
-  direction: [number, number, number],
-  face: FaceRef,
-  label: string,
-): number {
+function computeUpToFaceDepth(origin: [number, number, number], direction: [number, number, number], face: FaceRef, label: string): number {
   if (face.planar === false || !face.uAxis || !face.vAxis) {
     throw new Error(`${label} upToFace currently requires a planar termination face.`);
   }
@@ -234,11 +213,7 @@ function computeUpToFaceDepth(
     throw new Error(`${label} upToFace currently requires a termination face parallel to the feature direction.`);
   }
 
-  const offset: [number, number, number] = [
-    face.center[0] - origin[0],
-    face.center[1] - origin[1],
-    face.center[2] - origin[2],
-  ];
+  const offset: [number, number, number] = [face.center[0] - origin[0], face.center[1] - origin[1], face.center[2] - origin[2]];
   const depth = dot3(offset, hostDirection);
   if (!(depth > 1e-6)) {
     throw new Error(`${label} upToFace requires the termination face to lie in the feature direction.`);
@@ -404,7 +379,7 @@ function resolveHoleCompilePlan(opts: ShapeHoleOptions): HoleCompilePlan {
     hole.countersink = {
       radius: opts.countersink.diameter / 2,
       angleDeg,
-      depth: ((opts.countersink.diameter - opts.diameter) / 2) / tangent,
+      depth: (opts.countersink.diameter - opts.diameter) / 2 / tangent,
     };
   }
 
@@ -424,15 +399,17 @@ function resolveHoleCompilePlan(opts: ShapeHoleOptions): HoleCompilePlan {
       throw new Error('Shape.hole() thread.depth must be a positive finite value when provided.');
     }
     if (opts.thread.modeled === true) {
-      throw new Error('Shape.hole() does not model helical threads yet; pass thread metadata with modeled omitted/false for deferred thread intent.');
+      throw new Error(
+        'Shape.hole() does not model helical threads yet; pass thread metadata with modeled omitted/false for deferred thread intent.',
+      );
     }
     if (
-      designation == null
-      && threadClass == null
-      && opts.thread.pitch == null
-      && opts.thread.depth == null
-      && opts.thread.handedness == null
-      && opts.thread.modeled == null
+      designation == null &&
+      threadClass == null &&
+      opts.thread.pitch == null &&
+      opts.thread.depth == null &&
+      opts.thread.handedness == null &&
+      opts.thread.modeled == null
     ) {
       throw new Error('Shape.hole() thread metadata requires at least one designation, pitch, class, handedness, or depth value.');
     }
@@ -481,14 +458,8 @@ function resolveCutTaperCompilePlan(
   if (profile.kind !== 'circle' && profile.kind !== 'rect' && profile.kind !== 'roundedRect') {
     throw new Error('Shape.cutout() taperScale currently supports circle, rect, and roundedRect sketch profiles only.');
   }
-  const scale = Array.isArray(opts.taperScale)
-    ? opts.taperScale
-    : [opts.taperScale, opts.taperScale] as [number, number];
-  if (
-    scale.length !== 2
-    || !isFinitePositive(scale[0])
-    || !isFinitePositive(scale[1])
-  ) {
+  const scale = Array.isArray(opts.taperScale) ? opts.taperScale : ([opts.taperScale, opts.taperScale] as [number, number]);
+  if (scale.length !== 2 || !isFinitePositive(scale[0]) || !isFinitePositive(scale[1])) {
     throw new Error('Shape.cutout() taperScale must be a positive finite number or [x, y] pair.');
   }
   if (profile.kind === 'circle' && Math.abs(scale[0] - scale[1]) > 1e-6) {
@@ -506,10 +477,7 @@ function createOwnedTopologyRewritePlan(
 ): ShapeCompilePlan | null {
   if (!plan) return null;
   const owner = createShapeQueryOwner(operation);
-  return wrapShapeCompilePlanWithQueryOwner(
-    attachTopologyRewritePropagation(plan, buildPropagation(owner)),
-    owner,
-  );
+  return wrapShapeCompilePlanWithQueryOwner(attachTopologyRewritePropagation(plan, buildPropagation(owner)), owner);
 }
 
 function buildFeatureResult(target: Shape, plan: ShapeCompilePlan | null): Shape {
@@ -543,9 +511,7 @@ function resolveHolePlacement(
   faceOrRef: SketchFaceTarget | FaceRef,
   opts: ShapeHoleOptions,
 ): { placement: ShapeWorkplanePlacement; extent: FeatureCutExtent } {
-  const workplane = isFaceRef(faceOrRef)
-    ? resolveSketchWorkplane(faceOrRef)
-    : resolveSketchWorkplane(targetForResolution, faceOrRef);
+  const workplane = isFaceRef(faceOrRef) ? resolveSketchWorkplane(faceOrRef) : resolveSketchWorkplane(targetForResolution, faceOrRef);
 
   requireCompatibleFeatureOwner(targetForOwnership, workplane.source.owner, 'Shape.hole()');
   requireCompatibleFeatureFaceQuery(targetForOwnership, 'Shape.hole()', workplane.source);
@@ -584,7 +550,12 @@ function resolveHolePlacement(
   };
 }
 
-function shapeHole(target: Shape, targetForResolution: Shape | TrackedShape, faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape {
+function shapeHole(
+  target: Shape,
+  targetForResolution: Shape | TrackedShape,
+  faceOrRef: SketchFaceTarget | FaceRef,
+  opts: ShapeHoleOptions,
+): Shape {
   if (!isFinitePositive(opts.diameter)) {
     throw new Error('Shape.hole() requires a positive finite diameter.');
   }
@@ -597,10 +568,8 @@ function shapeHole(target: Shape, targetForResolution: Shape | TrackedShape, fac
   const { placement, extent } = resolveHolePlacement(targetForResolution, target, faceOrRef, opts);
   const hole = resolveHoleCompilePlan(opts);
   validateHoleExtentCompatibility(hole, extent);
-  const plan = createOwnedTopologyRewritePlan(
-    buildHoleShapeCompilePlan(basePlan, placement, hole, extent),
-    'hole',
-    (owner) => buildHoleTopologyRewritePropagation(owner, basePlan, placement.placement, hole, extent),
+  const plan = createOwnedTopologyRewritePlan(buildHoleShapeCompilePlan(basePlan, placement, hole, extent), 'hole', (owner) =>
+    buildHoleTopologyRewritePropagation(owner, basePlan, placement.placement, hole, extent),
   );
   return buildFeatureResult(target, plan);
 }
@@ -651,14 +620,7 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
       taper,
     ),
     'cut',
-    (owner) => buildCutTopologyRewritePropagation(
-      owner,
-      basePlan,
-      placementModel,
-      profile,
-      extent,
-      taper,
-    ),
+    (owner) => buildCutTopologyRewritePropagation(owner, basePlan, placementModel, profile, extent, taper),
   );
   return buildFeatureResult(target, plan);
 }

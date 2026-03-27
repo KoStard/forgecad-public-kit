@@ -1,18 +1,10 @@
-import type { ProfileCompilePlan, ShapeCompilePlan } from './compilePlan';
 import { appendCadQueryProfileTransform, type CadQueryProfilePlan, type CadQueryShapePlan } from './cadqueryPlan';
-import {
-  lowerCutShapeCompilePlanToConcretePlan,
-  lowerHoleShapeCompilePlanToConcretePlan,
-} from './holeCutCompilePlan';
-import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
+import { assertExhaustive, type ProfileCompilePlan, type ShapeCompilePlan } from './compilePlan';
+import { type CompileLoweringResult, compilerDiagnostic, compilerFailure, compilerSuccess } from './compilerDiagnostics';
+import { resolveSupportedEdgeFeatureSelection, selectionToResolvedSelector } from './edge-features/edgeFeatureResolution';
+import { lowerCutShapeCompilePlanToConcretePlan, lowerHoleShapeCompilePlanToConcretePlan } from './holeCutCompilePlan';
 import { lowerSheetMetalBasePlan } from './sheetMetalModel';
-import {
-  compilerDiagnostic,
-  compilerFailure,
-  compilerSuccess,
-  type CompileLoweringResult,
-} from './compilerDiagnostics';
-import { resolveSupportedEdgeFeatureSelection, selectionToResolvedSelector } from './edgeFeatureResolution';
+import { lowerShellShapeCompilePlanToConcretePlan } from './shellCompilePlan';
 
 function segmentedProfileDiagnostic(kind: string, path: string) {
   return compilerDiagnostic(
@@ -149,30 +141,33 @@ function lowerProfileCompilePlanToCadQueryResultAtPath(
       if (profiles.length !== plan.profiles.length) {
         return compilerFailure(...diagnostics);
       }
-      return compilerSuccess({
-        kind: 'boolean',
-        op: plan.op,
-        profiles,
-        transforms: [...plan.transforms],
-      }, diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'boolean',
+          op: plan.op,
+          profiles,
+          transforms: [...plan.transforms],
+        },
+        diagnostics,
+      );
     }
     case 'offset': {
       const base = lowerProfileCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
       if (!base.ok) return compilerFailure(...base.diagnostics);
-      return compilerSuccess({
-        kind: 'offset',
-        base: base.value,
-        delta: plan.delta,
-        join: plan.join,
-        transforms: [...plan.transforms],
-      }, base.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'offset',
+          base: base.value,
+          delta: plan.delta,
+          join: plan.join,
+          transforms: [...plan.transforms],
+        },
+        base.diagnostics,
+      );
     }
     case 'project': {
       if (!plan.replayProfile) {
-        return compilerFailure(unsupportedProjectDiagnostic(
-          path,
-          plan.replayReason ?? 'projection replay metadata is missing.',
-        ));
+        return compilerFailure(unsupportedProjectDiagnostic(path, plan.replayReason ?? 'projection replay metadata is missing.'));
       }
 
       const replay = lowerProfileCompilePlanToCadQueryResultAtPath(plan.replayProfile, `${path}.replayProfile`);
@@ -184,8 +179,8 @@ function lowerProfileCompilePlanToCadQueryResultAtPath(
       }
       return compilerSuccess(lowered, replay.diagnostics);
     }
-    case 'hull':
-      return compilerFailure(unsupportedNodeDiagnostic('profile-hull', path));
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -214,25 +209,30 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         return compilerFailure(segmentedShapeDiagnostic('sphere', path));
       }
       return compilerSuccess({ kind: 'sphere', radius: plan.radius });
+    case 'torus':
+      if (plan.segments != null && plan.segments > 0) {
+        return compilerFailure(segmentedShapeDiagnostic('torus', path));
+      }
+      return compilerSuccess({ kind: 'torus', majorRadius: plan.majorRadius, minorRadius: plan.minorRadius });
     case 'extrude': {
       const profile = lowerProfileCompilePlanToCadQueryResultAtPath(plan.profile, `${path}.profile`);
       if (!profile.ok) return compilerFailure(...profile.diagnostics);
-      return compilerSuccess({
-        kind: 'extrude',
-        profile: profile.value,
-        height: plan.height,
-        center: plan.center,
-        scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
-      }, profile.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'extrude',
+          profile: profile.value,
+          height: plan.height,
+          center: plan.center,
+          scaleTop: plan.scaleTop ? [plan.scaleTop[0], plan.scaleTop[1]] : undefined,
+        },
+        profile.diagnostics,
+      );
     }
     case 'sheetMetal': {
       try {
         return lowerShapeCompilePlanToCadQueryResultAtPath(lowerSheetMetalBasePlan(plan.model, plan.output), path);
       } catch (error) {
-        return compilerFailure(unsupportedSheetMetalDiagnostic(
-          path,
-          error instanceof Error ? error.message : String(error),
-        ));
+        return compilerFailure(unsupportedSheetMetalDiagnostic(path, error instanceof Error ? error.message : String(error)));
       }
     }
     case 'shell': {
@@ -256,11 +256,14 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       }
       const profile = lowerProfileCompilePlanToCadQueryResultAtPath(plan.profile, `${path}.profile`);
       if (!profile.ok) return compilerFailure(...profile.diagnostics);
-      return compilerSuccess({
-        kind: 'revolve',
-        profile: profile.value,
-        degrees: plan.degrees,
-      }, profile.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'revolve',
+          profile: profile.value,
+          degrees: plan.degrees,
+        },
+        profile.diagnostics,
+      );
     }
     case 'loft': {
       const profiles: CadQueryProfilePlan[] = [];
@@ -277,28 +280,34 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       if (profiles.length !== plan.profiles.length) {
         return compilerFailure(...diagnostics);
       }
-      return compilerSuccess({
-        kind: 'loft',
-        profiles,
-        heights: [...plan.heights],
-        edgeLength: plan.edgeLength,
-        boundsPadding: plan.boundsPadding,
-      }, diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'loft',
+          profiles,
+          heights: [...plan.heights],
+          edgeLength: plan.edgeLength,
+          boundsPadding: plan.boundsPadding,
+        },
+        diagnostics,
+      );
     }
     case 'sweep': {
       const profile = lowerProfileCompilePlanToCadQueryResultAtPath(plan.profile, `${path}.profile`);
       if (!profile.ok) return compilerFailure(...profile.diagnostics);
-      return compilerSuccess({
-        kind: 'sweep',
-        profile: profile.value,
-        path: {
-          kind: plan.path.kind,
-          points: plan.path.points.map(([x, y, z]) => [x, y, z]),
+      return compilerSuccess(
+        {
+          kind: 'sweep',
+          profile: profile.value,
+          path: {
+            kind: plan.path.kind,
+            points: plan.path.points.map(([x, y, z]) => [x, y, z]),
+          },
+          edgeLength: plan.edgeLength,
+          boundsPadding: plan.boundsPadding,
+          up: [plan.up[0], plan.up[1], plan.up[2]],
         },
-        edgeLength: plan.edgeLength,
-        boundsPadding: plan.boundsPadding,
-        up: [plan.up[0], plan.up[1], plan.up[2]],
-      }, profile.diagnostics);
+        profile.diagnostics,
+      );
     }
     case 'boolean': {
       const shapes: CadQueryShapePlan[] = [];
@@ -315,20 +324,26 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       if (shapes.length !== plan.shapes.length) {
         return compilerFailure(...diagnostics);
       }
-      return compilerSuccess({
-        kind: 'boolean',
-        op: plan.op,
-        shapes,
-      }, diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'boolean',
+          op: plan.op,
+          shapes,
+        },
+        diagnostics,
+      );
     }
     case 'transform': {
       const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
       if (!base.ok) return compilerFailure(...base.diagnostics);
-      return compilerSuccess({
-        kind: 'transform',
-        base: base.value,
-        steps: [...plan.steps],
-      }, base.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'transform',
+          base: base.value,
+          steps: [...plan.steps],
+        },
+        base.diagnostics,
+      );
     }
     case 'queryOwner':
       return lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
@@ -339,25 +354,27 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       if (!selection.ok) {
         return compilerFailure(unsupportedEdgeFeatureDiagnostic('fillet', path, selection.issue.reason));
       }
-      if (
-        selection.selection.quadrant[0] !== plan.quadrant[0]
-        || selection.selection.quadrant[1] !== plan.quadrant[1]
-      ) {
-        return compilerFailure(unsupportedEdgeFeatureDiagnostic(
-          'fillet',
-          path,
-          `supported ${selection.selection.edgeName} queries currently require quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
-        ));
+      if (selection.selection.quadrant[0] !== plan.quadrant[0] || selection.selection.quadrant[1] !== plan.quadrant[1]) {
+        return compilerFailure(
+          unsupportedEdgeFeatureDiagnostic(
+            'fillet',
+            path,
+            `supported ${selection.selection.edgeName} queries currently require quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+          ),
+        );
       }
-      return compilerSuccess({
-        kind: 'fillet',
-        base: base.value,
-        edge: plan.edge,
-        radius: plan.radius,
-        quadrant: [plan.quadrant[0], plan.quadrant[1]],
-        segments: plan.segments,
-        resolvedEdge: selectionToResolvedSelector(selection.selection),
-      }, base.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'fillet',
+          base: base.value,
+          edge: plan.edge,
+          radius: plan.radius,
+          quadrant: [plan.quadrant[0], plan.quadrant[1]],
+          segments: plan.segments,
+          resolvedEdge: selectionToResolvedSelector(selection.selection),
+        },
+        base.diagnostics,
+      );
     }
     case 'chamfer': {
       const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
@@ -366,43 +383,56 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       if (!selection.ok) {
         return compilerFailure(unsupportedEdgeFeatureDiagnostic('chamfer', path, selection.issue.reason));
       }
-      if (
-        selection.selection.quadrant[0] !== plan.quadrant[0]
-        || selection.selection.quadrant[1] !== plan.quadrant[1]
-      ) {
-        return compilerFailure(unsupportedEdgeFeatureDiagnostic(
-          'chamfer',
-          path,
-          `supported ${selection.selection.edgeName} queries currently require quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
-        ));
+      if (selection.selection.quadrant[0] !== plan.quadrant[0] || selection.selection.quadrant[1] !== plan.quadrant[1]) {
+        return compilerFailure(
+          unsupportedEdgeFeatureDiagnostic(
+            'chamfer',
+            path,
+            `supported ${selection.selection.edgeName} queries currently require quadrant [${selection.selection.quadrant[0]}, ${selection.selection.quadrant[1]}].`,
+          ),
+        );
       }
-      return compilerSuccess({
-        kind: 'chamfer',
-        base: base.value,
-        edge: plan.edge,
-        size: plan.size,
-        quadrant: [plan.quadrant[0], plan.quadrant[1]],
-        resolvedEdge: selectionToResolvedSelector(selection.selection),
-      }, base.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'chamfer',
+          base: base.value,
+          edge: plan.edge,
+          size: plan.size,
+          quadrant: [plan.quadrant[0], plan.quadrant[1]],
+          resolvedEdge: selectionToResolvedSelector(selection.selection),
+        },
+        base.diagnostics,
+      );
     }
     case 'trimByPlane': {
       const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
       if (!base.ok) return compilerFailure(...base.diagnostics);
-      return compilerSuccess({
-        kind: 'trimByPlane',
-        base: base.value,
-        normalX: plan.normalX,
-        normalY: plan.normalY,
-        normalZ: plan.normalZ,
-        originOffset: plan.originOffset,
-      }, base.diagnostics);
+      return compilerSuccess(
+        {
+          kind: 'trimByPlane',
+          base: base.value,
+          normalX: plan.normalX,
+          normalY: plan.normalY,
+          normalZ: plan.normalZ,
+          originOffset: plan.originOffset,
+        },
+        base.diagnostics,
+      );
     }
-    case 'hull':
-      return compilerFailure(unsupportedNodeDiagnostic('shape-hull', path));
-    case 'opaque':
-      return compilerFailure(unsupportedNodeDiagnostic('shape-opaque', path));
+    case 'filletEdges':
+    case 'chamferEdges': {
+      const base = lowerShapeCompilePlanToCadQueryResultAtPath(plan.base, `${path}.base`);
+      if (!base.ok) return compilerFailure(...base.diagnostics);
+      return compilerSuccess(base.value, base.diagnostics);
+    }
+    case 'draft':
+      return compilerFailure(unsupportedNodeDiagnostic('shape-draft', path));
+    case 'offsetSolid':
+      return compilerFailure(unsupportedNodeDiagnostic('shape-offsetSolid', path));
     case 'importedMesh':
       return compilerFailure(unsupportedNodeDiagnostic('shape-importedMesh', path));
+    default:
+      assertExhaustive(plan);
   }
 }
 
@@ -410,15 +440,11 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
  * Explicit lowering boundary from Forge's canonical compile plan into the
  * CadQuery/OCCT exact subset.
  */
-export function lowerProfileCompilePlanToCadQueryResult(
-  plan: ProfileCompilePlan | null,
-): CompileLoweringResult<CadQueryProfilePlan> {
+export function lowerProfileCompilePlanToCadQueryResult(plan: ProfileCompilePlan | null): CompileLoweringResult<CadQueryProfilePlan> {
   return lowerProfileCompilePlanToCadQueryResultAtPath(plan, '$');
 }
 
-export function lowerShapeCompilePlanToCadQueryResult(
-  plan: ShapeCompilePlan | null,
-): CompileLoweringResult<CadQueryShapePlan> {
+export function lowerShapeCompilePlanToCadQueryResult(plan: ShapeCompilePlan | null): CompileLoweringResult<CadQueryShapePlan> {
   return lowerShapeCompilePlanToCadQueryResultAtPath(plan, '$');
 }
 

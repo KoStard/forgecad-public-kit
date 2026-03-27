@@ -1,4 +1,9 @@
-export { OCCTShapeBackend, wrapOCCTShapeBackend, isOCCTShapeBackend, requireOCCTShape } from './shapeBackend';
-export { OCCTProfileBackend, wrapOCCTProfileBackend, requireOCCTFace } from './profileBackend';
-export { lowerShapeCompilePlanToOCCT, lowerShapeCompilePlanToOCCTBackend, lowerProfileCompilePlanToOCCTProfileBackend, OCCTUnsupportedError } from './lower';
-export { initOCCT, getOCCT, isOCCTInitialized, type OCCTModule } from './init';
+export { getOCCT, initOCCT, isOCCTInitialized, type OCCTModule } from './init';
+export {
+  lowerProfileCompilePlanToOCCTProfileBackend,
+  lowerShapeCompilePlanToOCCT,
+  lowerShapeCompilePlanToOCCTBackend,
+  OCCTUnsupportedError,
+} from './lower';
+export { OCCTProfileBackend, requireOCCTFace, wrapOCCTProfileBackend } from './profileBackend';
+export { isOCCTShapeBackend, OCCTShapeBackend, requireOCCTShape, wrapOCCTShapeBackend } from './shapeBackend';

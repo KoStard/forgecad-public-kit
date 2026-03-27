@@ -22,12 +22,7 @@ export function describeCompilerTarget(target: CompilerTarget): string {
   }
 }
 
-export function compilerDiagnostic(
-  target: CompilerTarget,
-  code: string,
-  path: string,
-  message: string,
-): CompilerDiagnostic {
+export function compilerDiagnostic(target: CompilerTarget, code: string, path: string, message: string): CompilerDiagnostic {
   return { target, code, path, message };
 }
 
@@ -39,9 +34,6 @@ export function compilerFailure<T = never>(...diagnostics: CompilerDiagnostic[])
   return { ok: false, diagnostics };
 }
 
-export function primaryCompilerDiagnosticMessage(
-  diagnostics: CompilerDiagnostic[],
-  fallback: string,
-): string {
+export function primaryCompilerDiagnosticMessage(diagnostics: CompilerDiagnostic[], fallback: string): string {
   return diagnostics[0]?.message ?? fallback;
 }

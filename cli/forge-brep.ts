@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
-import { extname, join, resolve } from 'path';
-import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { extname, join, resolve } from 'path';
+import { buildBrepExportManifest } from '../src/forge/export/brepExport';
 import { init, runScript } from '../src/forge/headless';
-import { buildBrepExportManifest } from '../src/forge/brepExport';
 import { collectProjectFiles } from './collect-files';
 import { resolvePackagePath } from './package-runtime';
 
@@ -59,7 +59,9 @@ function parseArgs(argv: string[]) {
   }
 
   if (!scriptPath) {
-    throw new Error('Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] [--allow-faceted] <script.forge.js>');
+    throw new Error(
+      'Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] [--allow-faceted] <script.forge.js>',
+    );
   }
 
   return { format, outputPath, pythonPath, uvPath, scriptPath, allowFaceted };
@@ -135,11 +137,7 @@ export async function runBrepCli(argv: string[] = process.argv.slice(2)): Promis
     uvArgs.push('--python', pythonPath);
   }
   uvArgs.push(exporterScript, '--input', manifestPath, '--output', finalOutput, '--format', format);
-  const proc = spawnSync(
-    uv,
-    uvArgs,
-    { stdio: 'inherit' },
-  );
+  const proc = spawnSync(uv, uvArgs, { stdio: 'inherit' });
 
   rmSync(tempDir, { recursive: true, force: true });
 

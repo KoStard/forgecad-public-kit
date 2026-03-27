@@ -42,15 +42,11 @@ export function MobileFilePicker({ onClose }: Props) {
             <span style={{ opacity: 0.6, fontSize: 16 }}>
               {name.endsWith('.forge.js') || name.endsWith('.sketch.js') ? '\u{1F4C4}' : '\u{1F4C3}'}
             </span>
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {name}
-            </span>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
           </button>
         ))}
         {fileNames.length === 0 && (
-          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--fc-textMuted)', fontSize: 13 }}>
-            No files
-          </div>
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--fc-textMuted)', fontSize: 13 }}>No files</div>
         )}
       </div>
     </div>

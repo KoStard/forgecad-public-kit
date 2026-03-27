@@ -1,26 +1,14 @@
-import {
-  buildSketchFromCompileProfilePlan,
-  Sketch,
-  copySketchPlacement3D,
-  getSketchCompileProfilePlan,
-} from './core';
 import { appendProfileCompileTransform } from '../compilePlan';
-
+import { buildSketchFromCompileProfilePlan, copySketchPlacement3D, getSketchCompileProfilePlan, Sketch } from './core';
 
 export function sketchTranslate(sketch: Sketch, x: number, y = 0): Sketch {
   const nextPlan = appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'translate', x, y });
-  return copySketchPlacement3D(
-    sketch,
-    buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
-  );
+  return copySketchPlacement3D(sketch, buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex));
 }
 
 export function sketchRotate(sketch: Sketch, degrees: number): Sketch {
   const nextPlan = appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'rotate', degrees });
-  return copySketchPlacement3D(
-    sketch,
-    buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
-  );
+  return copySketchPlacement3D(sketch, buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex));
 }
 
 export function sketchRotateAround(sketch: Sketch, degrees: number, pivot: [number, number]): Sketch {
@@ -30,10 +18,7 @@ export function sketchRotateAround(sketch: Sketch, degrees: number, pivot: [numb
 export function sketchScale(sketch: Sketch, v: number | [number, number]): Sketch {
   const scale = typeof v === 'number' ? [v, v] : v;
   const nextPlan = appendProfileCompileTransform(getSketchCompileProfilePlan(sketch), { kind: 'scale', x: scale[0], y: scale[1] });
-  return copySketchPlacement3D(
-    sketch,
-    buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
-  );
+  return copySketchPlacement3D(sketch, buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex));
 }
 
 export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {
@@ -42,14 +27,21 @@ export function sketchMirror(sketch: Sketch, ax: [number, number]): Sketch {
     normalX: ax[0],
     normalY: ax[1],
   });
-  return copySketchPlacement3D(
-    sketch,
-    buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex),
-  );
+  return copySketchPlacement3D(sketch, buildSketchFromCompileProfilePlan(nextPlan, sketch.colorHex));
 }
 
-Sketch.prototype.translate = function (x: number, y = 0) { return sketchTranslate(this, x, y); };
-Sketch.prototype.rotate = function (degrees: number) { return sketchRotate(this, degrees); };
-Sketch.prototype.rotateAround = function (degrees: number, pivot: [number, number]) { return sketchRotateAround(this, degrees, pivot); };
-Sketch.prototype.scale = function (v: number | [number, number]) { return sketchScale(this, v); };
-Sketch.prototype.mirror = function (ax: [number, number]) { return sketchMirror(this, ax); };
+Sketch.prototype.translate = function (x: number, y = 0) {
+  return sketchTranslate(this, x, y);
+};
+Sketch.prototype.rotate = function (degrees: number) {
+  return sketchRotate(this, degrees);
+};
+Sketch.prototype.rotateAround = function (degrees: number, pivot: [number, number]) {
+  return sketchRotateAround(this, degrees, pivot);
+};
+Sketch.prototype.scale = function (v: number | [number, number]) {
+  return sketchScale(this, v);
+};
+Sketch.prototype.mirror = function (ax: [number, number]) {
+  return sketchMirror(this, ax);
+};

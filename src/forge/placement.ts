@@ -1,6 +1,6 @@
+import { type Anchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 import type { Mat4, Vec3 } from './transform';
 import { Transform } from './transform';
-import { type Anchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
 
 export type PlacementReferenceKind = 'points' | 'edges' | 'surfaces' | 'objects';
 
@@ -55,11 +55,7 @@ function cloneVec3(value: [number, number, number] | number[], label: string): V
 }
 
 function midpoint(start: Vec3, end: Vec3): Vec3 {
-  return [
-    (start[0] + end[0]) / 2,
-    (start[1] + end[1]) / 2,
-    (start[2] + end[2]) / 2,
-  ];
+  return [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
 }
 
 function normalizeVector(value: Vec3): Vec3 {
@@ -220,10 +216,7 @@ export function hasPlacementReferences(refs: PlacementReferences): boolean {
   return PLACEMENT_REFERENCE_KINDS.some((kind) => Object.keys(refs[kind]).length > 0);
 }
 
-export function applyPlacementReferenceInput(
-  base: PlacementReferences,
-  input: PlacementReferenceInput,
-): PlacementReferences {
+export function applyPlacementReferenceInput(base: PlacementReferences, input: PlacementReferenceInput): PlacementReferences {
   return mergePlacementReferences(base, normalizePlacementReferenceInput(input));
 }
 
@@ -307,10 +300,7 @@ function resolvePointFromKind(
   }
 }
 
-export function resolvePlacementReferencePoint(
-  refs: PlacementReferences,
-  ref: string,
-): Vec3 | null {
+export function resolvePlacementReferencePoint(refs: PlacementReferences, ref: string): Vec3 | null {
   const trimmed = ref.trim();
   if (!trimmed) return null;
 
@@ -322,9 +312,10 @@ export function resolvePlacementReferencePoint(
     return resolvePointFromKind(refs, kind, name, selector, trimmed);
   }
 
-  const matches = PLACEMENT_REFERENCE_KINDS
-    .map((kind) => ({ kind, point: resolvePointFromKind(refs, kind, trimmed, undefined, trimmed) }))
-    .filter((entry): entry is { kind: PlacementReferenceKind; point: Vec3 } => entry.point != null);
+  const matches = PLACEMENT_REFERENCE_KINDS.map((kind) => ({
+    kind,
+    point: resolvePointFromKind(refs, kind, trimmed, undefined, trimmed),
+  })).filter((entry): entry is { kind: PlacementReferenceKind; point: Vec3 } => entry.point != null);
 
   if (matches.length === 0) return null;
   if (matches.length > 1) {
@@ -335,39 +326,30 @@ export function resolvePlacementReferencePoint(
   return matches[0].point;
 }
 
-export function placementReferenceNames(
-  refs: PlacementReferences,
-  kind?: PlacementReferenceKind,
-): string[] {
+export function placementReferenceNames(refs: PlacementReferences, kind?: PlacementReferenceKind): string[] {
   if (kind) return Object.keys(refs[kind]).sort();
-  return PLACEMENT_REFERENCE_KINDS
-    .flatMap((entryKind) => Object.keys(refs[entryKind]).sort().map((name) => `${entryKind}.${name}`));
+  return PLACEMENT_REFERENCE_KINDS.flatMap((entryKind) =>
+    Object.keys(refs[entryKind])
+      .sort()
+      .map((name) => `${entryKind}.${name}`),
+  );
 }
 
-export function createSurfaceReference(
-  center: [number, number, number],
-  normal: [number, number, number],
-): PlacementSurfaceRef {
+export function createSurfaceReference(center: [number, number, number], normal: [number, number, number]): PlacementSurfaceRef {
   return {
     center: cloneVec3(center, 'surface.center'),
     normal: normalizeVector(cloneVec3(normal, 'surface.normal')),
   };
 }
 
-export function createEdgeReference(
-  start: [number, number, number],
-  end: [number, number, number],
-): PlacementEdgeRef {
+export function createEdgeReference(start: [number, number, number], end: [number, number, number]): PlacementEdgeRef {
   return {
     start: cloneVec3(start, 'edge.start'),
     end: cloneVec3(end, 'edge.end'),
   };
 }
 
-export function createObjectReference(
-  min: [number, number, number],
-  max: [number, number, number],
-): PlacementObjectRef {
+export function createObjectReference(min: [number, number, number], max: [number, number, number]): PlacementObjectRef {
   return {
     min: cloneVec3(min, 'object.min'),
     max: cloneVec3(max, 'object.max'),

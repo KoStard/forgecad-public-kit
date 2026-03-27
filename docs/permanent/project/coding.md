@@ -36,8 +36,8 @@ src/
 │       ├── core.ts       # Sketch class
 │       ├── primitives.ts # rect, circle2d, polygon, ngon, etc.
 │       ├── transforms.ts # translate, rotate, scale, mirror
-│       ├── booleans.ts   # add, subtract, intersect, union2d, hull2d
-│       ├── operations.ts # offset, hull, simplify, warp
+│       ├── booleans.ts   # add, subtract, intersect, union2d
+│       ├── operations.ts # offset, simplify, warp
 │       ├── extrude.ts    # extrude, revolve (2D → 3D)
 │       ├── path.ts       # PathBuilder, stroke
 │       ├── anchor.ts     # attachTo positioning

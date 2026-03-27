@@ -25,9 +25,202 @@ const mech = assembly("Arm")
     frame: Transform.identity().translate(0, 0, 20),
   });
 
-const solved = mech.solve();
+return mech; // auto-solved at defaults, renders all parts
+```
+
+Returning `mech` (unsolved Assembly) auto-solves at default joint values and renders all parts.  You can also return a `SolvedAssembly` for a specific pose:
+
+```javascript
+return mech.solve({ shoulder: 60 });
+```
+
+## Return types and imports — how they fit together
+
+| Return value | Standalone | `importPart` | `importGroup` | `importAssembly` |
+|---|---|---|---|---|
+| `Shape` | yes | yes | — | — |
+| `Sketch` | yes | — | — | — |
+| `ShapeGroup` | yes | — | yes | — |
+| `Assembly` (unsolved) | **yes** | — | — | yes |
+| `SolvedAssembly` | **yes** | — | — | — |
+
+**`Assembly` is the dual-use type**: a file that returns an unsolved `Assembly` works both as a standalone renderable script *and* as an import target for `importAssembly()`.
+
+Pattern for dual-use assembly files:
+
+```javascript
+// handle.forge.js — works standalone AND importable via importAssembly()
+const mech = assembly("Handle")
+  .addPart("Base", baseBracket)
+  .addPart("Arm", arm)
+  .addRevolute("Fold", "Base", "Arm", { axis: [0, 1, 0], min: 0, max: 90 });
+
+// Animation setup — runs when standalone, ignored on import
+mech.toJointsView({
+  animations: [{ name: "Fold", duration: 2, loop: true,
+    keyframes: [{ values: { Fold: 0 } }, { values: { Fold: 90 } }, { values: { Fold: 0 } }],
+  }],
+});
+
+return mech; // works standalone (auto-solved + animated) AND with importAssembly()
+```
+
+```javascript
+// case.forge.js — imports the handle as a positioned assembly
+const handle = importAssembly("./handle.forge.js");
+
+// Convenience transforms: solve at defaults, return ShapeGroup
+const handleGroup = handle.rotate(0, 0, -90).translate(0, -20, 50);
+
+return [
+  { name: "Case", shape: caseBody },
+  { name: "Handle", shape: handleGroup },
+];
+```
+
+## Port-based assembly
+
+Declare **ports** on parts and let `connect()` align them automatically — no manual `frame` or `axis` math.
+
+### When to use `connect()` vs `addRevolute()`
+
+| Pattern | Use | Example |
+|---------|-----|---------|
+| **Ports physically meet** | `connect()` | Flange-to-flange, bolt-to-hole, motor shaft into gear bore |
+| **Shared axis, offset position** | `addRevolute()` | Hinge with arm between two ear brackets, scissor linkage |
+
+`connect()` aligns port origins — child port lands exactly on parent port. Use it when the attachment points should coincide. For mechanisms where parts share a rotation axis but are deliberately spaced apart along it (e.g. a folding hinge arm that sits between bracket ears), use `addRevolute()` with pre-positioned parts and let the transform cancellation handle placement.
+
+### Declaring ports
+
+A port is an oriented attachment frame: origin + axis + up vector, in part-local coordinates.
+
+```javascript
+const base = box(80, 80, 20, true).withPorts({
+  top: port.revolute({
+    origin: [0, 0, 10],
+    axis: [0, 0, 1],      // joint rotation axis
+    up: [0, 1, 0],         // zero-angle reference (optional, auto-computed if omitted)
+  }),
+});
+
+const arm = box(120, 20, 20).translate(60, 0, 0).withPorts({
+  shoulder: port.revolute({ origin: [0, 0, 0], axis: [0, 0, 1] }),
+  elbow: port.revolute({ origin: [120, 0, 0], axis: [0, 0, 1] }),
+});
+```
+
+Port factories: `port.revolute(...)`, `port.prismatic(...)`, `port.fixed(...)`, or generic `port(...)`.
+
+**Alternative: define by physical extent** — use `start`/`end` instead of `origin`/`axis`:
+
+```javascript
+// Origin and axis auto-computed from start→end
+const arm = arm3D.withPorts({
+  bore: port.revolute({
+    start: [0, -armWidth/2, 0],   // bore entrance
+    end: [0, armWidth/2, 0],       // bore exit
+  }),
+});
+```
+
+This also stores the extent length for alignment (see below).
+
+Ports survive transforms — if you `translate()` or `rotate()` a shape, its ports move with it.
+
+### Connecting parts
+
+```javascript
+const mech = assembly("Arm")
+  .addPart("Base", base)
+  .addPart("Link", arm)
+  .connect("Base.top", "Link.shoulder", {
+    as: "J1",              // joint name (auto-generated if omitted)
+    min: -90, max: 90,     // optional limits
+    default: 0,            // optional default angle
+  });
+
+const solved = mech.solve({ J1: 45 });
 return solved.toScene();
 ```
+
+`connect()` computes the joint `frame` and `axis` from port alignment, then delegates to `addJoint()` internally. The kinematic solver is unchanged.
+
+**ConnectOptions:** `as`, `type` (override port kind), `min`, `max`, `default`, `unit`, `flip` (oppose axes for mirrored parts), `align` / `parentAlign` / `childAlign` (start/middle/end), `effort`, `velocity`, `damping`, `friction`.
+
+**Alignment along port extent:** When ports are defined with `start`/`end`, you can control which points align:
+
+```javascript
+.connect("Pin.shaft", "Arm.bore", { align: "middle" })  // default — midpoints meet
+.connect("Pin.shaft", "Arm.bore", { align: "start" })   // start points meet
+.connect("Pin.shaft", "Arm.bore", { align: "end" })     // end points meet
+.connect("Pin.shaft", "Arm.bore", {
+  parentAlign: "start", childAlign: "middle",            // independent control
+})
+```
+
+**Mirrored parts:** When a part is created with `.mirror()`, its port axis flips direction. Use `flip: true` on the connect call so the axes oppose rather than align:
+
+```javascript
+.connect("Right Base.hinge", "Right Arm.pivot", {
+  as: "Fold Right", flip: true,
+})
+```
+
+### Derived jointsView
+
+Instead of manually restating the kinematic chain for `jointsView()`, derive it from the assembly graph:
+
+```javascript
+mech.toJointsView({
+  defaults: { J1: 30 },
+  animations: [
+    {
+      name: "Swing",
+      duration: 2,
+      loop: true,
+      keyframes: [
+        { values: { J1: -45 } },
+        { values: { J1: 45 } },
+        { values: { J1: -45 } },
+      ],
+    },
+  ],
+});
+
+// IMPORTANT: solve at REST when using toJointsView — the viewport handles posing.
+return mech.solve().toScene();
+```
+
+`toJointsView()` solves the assembly at rest, computes world-space pivots and axes, and calls the existing `jointsView()` function. No manual pivot coordinates needed.
+
+**Fixed attachments are handled automatically.** Parts connected with `addFixed()` are emitted as zero-range revolute joints in the viewport chain, so they follow their parent during animation (e.g. a stick bolted to an arm will rotate with it).
+
+**Do not solve at a non-zero angle when using `toJointsView()`.** The viewport applies `toJointsView` transforms on top of the scene — solving at the same angle would double-rotate parts. Use `defaults` to set the initial pose instead:
+
+```javascript
+// BAD — double rotation
+mech.toJointsView({ defaults: { J1: 45 } });
+return mech.solve({ J1: 45 }).toScene();
+
+// GOOD — solve at rest, viewport poses via defaults
+mech.toJointsView({ defaults: { J1: 45 } });
+return mech.solve().toScene();
+```
+
+### Port API on shapes
+
+- `shape.withPorts({ name: port.revolute({...}) })` — attach ports (returns new shape)
+- `shape.portNames()` — list port names
+- Works on `Shape`, `TrackedShape`, and `ShapeGroup`
+
+### Port API on assemblies
+
+- `assembly.withPorts("PartName", { name: port.revolute({...}) })` — add ports to an existing part
+- `assembly.getPorts("PartName")` — get ports on a part
+- `assembly.getPort("Part.port")` — resolve a "Part.port" reference
+- Ports from imported parts are captured automatically in `addPart()`
+- Ports are forwarded through `mergeInto()` with the prefix
 
 ## Ergonomic helpers
 - `addFrame(name, { transform? })` adds a virtual reference frame (no geometry)
@@ -112,6 +305,27 @@ Forge chain form:
 
 This keeps kinematic chains declarative and avoids repeated manual pivot math.
 
+## SolvedAssembly
+
+`mech.solve(state?)` returns a `SolvedAssembly` with these methods:
+
+| Method | Returns | Use for |
+|--------|---------|---------|
+| `toGroup()` | `ShapeGroup` | Primary way to get positioned parts as a group — for `show()`, embedding, transforms |
+| `getPart(name)` | `AssemblyPart` | Extract a single part at its solved position |
+| `getTransform(name)` | `Transform` | Raw world transform for a part |
+| `bom()` / `bomCsv()` | `BomRow[]` / `string` | Bill of materials |
+| `collisionReport()` | `CollisionFinding[]` | Interference detection |
+| `minClearance(a, b)` | `number` | Minimum gap between two parts |
+| `toSceneObjects()` | `Array<{name, shape?, group?}>` | Advanced: raw scene-graph array for custom rendering |
+
+**`toGroup()`** is the preferred way to convert a solved assembly to a positionable group:
+
+```javascript
+const solved = mech.solve({ shoulder: 45 });
+show(solved.toGroup()); // in notebooks
+```
+
 ## Validation helpers
 - `solved.collisionReport()` returns overlapping part pairs and volume
 - `solved.minClearance("PartA", "PartB", 10)` computes minimum gap
@@ -126,49 +340,55 @@ console.log("Collisions", solved.collisionReport());
 const sweep = mech.sweepJoint("elbow", -10, 135, 12, { shoulder: 35 });
 console.log("Sweep collisions", sweep.filter((step) => step.collisions.length > 0).length);
 
-show(solved.toScene());
+show(solved);
 ```
 
 That keeps mechanism setup in earlier cells and collision/sweep investigation in the current preview cell.
 
-## Importing assemblies from other files
+## ImportedAssembly
 
-Use `importAssembly(fileName, paramOverrides?)` to import an assembly defined in another file. The source file must `return` the `Assembly` instance directly (not `.solve()`).
+`importAssembly()` returns an `ImportedAssembly` with these capabilities:
 
-```javascript
-// arm.forge.js — source file
-const mech = assembly("Arm")
-  .addPart("Base", box(80, 80, 20, true))
-  .addPart("Link", box(140, 24, 24).translate(0, -12, -12))
-  .addRevolute("shoulder", "Base", "Link", {
-    axis: [0, 1, 0],
-    min: -30,
-    max: 120,
-    default: 25,
-    frame: Transform.identity().translate(0, 0, 20),
-  });
-
-return mech; // return Assembly, not mech.solve()
-```
+### Kinematic access
 
 ```javascript
-// scene.forge.js — consumer
 const arm = importAssembly("arm.forge.js");
 
-// Access named parts by name (positioned at default or given joint state)
-const base = arm.part("Base");
-const link = arm.part("Link", { shoulder: 60 });
-
-// Convert to a ShapeGroup — children named after assembly part names
-const g = arm.toGroup({ shoulder: 45 });
-const baseChild = g.child("Base");
-
 // Full kinematic access
-arm.assembly.sweepJoint("shoulder", -30, 120, 24);
 const solved = arm.solve({ shoulder: 45 });
 console.log(solved.bom());
+arm.assembly.sweepJoint("shoulder", -30, 120, 24);
+```
 
-return arm.toGroup({ shoulder: 45 });
+### Extracting parts
+
+```javascript
+const base = arm.part("Base");                   // at default state
+const link = arm.part("Link", { shoulder: 60 }); // at specific state
+```
+
+### Converting to group
+
+```javascript
+const g = arm.toGroup({ shoulder: 45 }); // ShapeGroup with named children
+const baseChild = g.child("Base");
+```
+
+### Convenience transforms
+
+`ImportedAssembly` has `.rotate()`, `.translate()`, `.scale()`, `.mirror()`, `.color()`, and `.child()` that auto-solve at defaults and return a `ShapeGroup`:
+
+```javascript
+const handle = importAssembly("./handle.forge.js");
+const positioned = handle.rotate(0, 0, -90).translate(0, -20, 50);
+// positioned is a ShapeGroup — use directly in named arrays or group()
+```
+
+### Placement references
+
+```javascript
+const arm = importAssembly("arm.forge.js");
+const placed = arm.placeReference("mountHole", [100, 0, 50]);
 ```
 
 ## Merging sub-assemblies into a parent
@@ -201,11 +421,10 @@ importAssembly("arm.forge.js")
   });
 
 // Drive sub-assembly joints from the parent using prefixed names
-const solved = robot.solve({
+return robot.solve({
   "Left Arm.shoulder": 45,
   "Right Arm.shoulder": -20,
 });
-return solved.toScene();
 ```
 
 **`mergeInto(parent, options)` options:**
@@ -228,7 +447,6 @@ return solved.toScene();
 - **Animating assemblies with `jointsView`**: If you use [`jointsView()`](../runtime/viewport.md) to animate an assembly, solve the assembly at rest pose (all animated joints = 0) and let `jointsView` control posing via `default` values and animation keyframes. Solving at non-zero angles and then animating will double-rotate parts. See the [viewport docs](../runtime/viewport.md#using-jointsview-with-assemblies) for the full pattern.
 - If parts vanish in the viewport, check whether a cut plane is active before debugging kinematics. The viewer-side APIs live in [../runtime/viewport.md](../runtime/viewport.md).
 - If a returned object is empty, Forge logs a warning in script output.
-- `importAssembly()` requires the source file to return the `Assembly` object before calling `.solve()`. If you call `.solve()` in the source file and return a `SolvedAssembly`, use `importGroup()` instead (convert with `.toScene()` → group).
 
 ## Metadata
 - `addPart(..., { metadata })` attaches per-part metadata to an assembly part.
@@ -294,7 +512,35 @@ robotExport({
 });
 ```
 
-Notes:
-- Revolute joint `velocity` values are expressed in degrees/second in Forge; the SDF exporter converts them to radians/second.
+### Export formats
+
+```bash
+# SDF package (Gazebo/Ignition) — generates model.sdf + world + STL meshes
+forgecad export sdf model.forge.js
+
+# URDF package (ROS/PyBullet/MuJoCo) — generates .urdf + STL meshes
+forgecad export urdf model.forge.js
+```
+
+Both exporters produce:
+- **Mesh-based inertia tensors** — computed from actual triangle geometry via divergence theorem (not bounding-box approximation). Includes full 6-component tensor (Ixx, Iyy, Izz, Ixy, Ixz, Iyz) and center of mass.
+- **Separate collision meshes** — controlled per-link via `collision` option.
+- **Joint mimic elements** — joint couplings (`addJointCoupling`, `addGearCoupling`) are exported as `<mimic>` elements in both SDF and URDF.
+
+### Collision mesh modes
+
+Set per-link in `robotExport({ links: { "PartName": { collision: mode } } })`:
+
+| Mode | Description | Default |
+|------|-------------|---------|
+| `'convex'` | Convex hull of visual geometry (separate `_collision.stl`). Typically 50-80% smaller. | **Yes** |
+| `'box'` | Axis-aligned bounding box primitive. Fastest physics but least accurate. | |
+| `'visual'` | Same mesh as visual. Exact but slow for simulation. | |
+| `'none'` | No collision geometry. Link passes through other objects. | |
+
+### Notes
+
+- Revolute joint `velocity` values are expressed in degrees/second in Forge; the exporters convert them to radians/second.
 - Prismatic distances are authored in millimeters and exported in meters.
 - `massKg` is preferred for demo robots; `densityKgM3` is a decent fallback when mass is unknown.
+- Joint couplings with multiple terms use the primary term (largest ratio) for `<mimic>` since SDF/URDF only support single-leader mimic. A warning is emitted for dropped terms.

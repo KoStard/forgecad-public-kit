@@ -589,6 +589,20 @@ function forgeTypesPlugin() {
           console.log('✓ forge-api.d.ts regenerated');
         } catch (e: any) {
           console.error('✗ gen:types failed:', e.stderr?.toString() ?? e.message);
+          return;
+        }
+        // Chain: docs and skill depend on the freshly generated .d.ts
+        try {
+          execSync('node scripts/gen-api-docs.mjs', { cwd: __dirname, stdio: 'pipe' });
+          console.log('✓ api-reference.md regenerated');
+        } catch (e: any) {
+          console.error('✗ gen:docs failed:', e.stderr?.toString() ?? e.message);
+        }
+        try {
+          execSync('node scripts/build-forgecad-skill.mjs', { cwd: __dirname, stdio: 'pipe' });
+          console.log('✓ SKILL.md rebuilt');
+        } catch (e: any) {
+          console.error('✗ build:skill failed:', e.stderr?.toString() ?? e.message);
         }
       };
 
@@ -627,6 +641,22 @@ function stripBrokenManifoldSourceMaps() {
 const forgeMode = process.env.FORGE_MODE === 'web' ? 'web' : 'studio';
 
 /**
+ * Ensures dist-skill/CONTEXT.md exists during dev so the ?raw import in
+ * AISkillDialog.tsx doesn't break Vite.  If the real file is missing (e.g.
+ * fresh clone, npm install only), writes a placeholder stub.
+ */
+function ensureSkillContextStub() {
+  const contextPath = path.resolve(__dirname, 'dist-skill/CONTEXT.md');
+  if (!fs.existsSync(contextPath)) {
+    fs.mkdirSync(path.resolve(__dirname, 'dist-skill'), { recursive: true });
+    fs.writeFileSync(
+      contextPath,
+      '<!-- stub: run `npm run build:skill:forgecad` to generate the real file -->\n',
+    );
+  }
+}
+
+/**
  * Copies dist-skill/ into dist/skill/ during web builds so the AI skill files
  * are served as static assets on GitHub Pages (e.g. /ForgeCAD/skill/CONTEXT.md).
  */
@@ -643,7 +673,44 @@ function forgeSkillStaticPlugin() {
   };
 }
 
-export default defineConfig(({ command }) => ({
+/**
+ * Serves docs-web/ at /docs/ during dev and copies it into dist/docs/ for
+ * production builds, so the docs site is available at /ForgeCAD/docs/ on
+ * GitHub Pages and at /docs/ during local development.
+ */
+function forgeDocsPlugin() {
+  const docsDir = path.resolve(__dirname, 'docs-web');
+  return {
+    name: 'forge-docs',
+    configureServer(server: any) {
+      // Serve docs-web/ at /docs/ during dev
+      server.middlewares.use((req: any, res: any, next: any) => {
+        if (req.url === '/docs' || req.url === '/docs/') {
+          const indexPath = path.join(docsDir, 'index.html');
+          if (fs.existsSync(indexPath)) {
+            res.setHeader('Content-Type', 'text/html');
+            res.end(fs.readFileSync(indexPath, 'utf-8'));
+            return;
+          }
+        }
+        next();
+      });
+    },
+    closeBundle() {
+      // Copy docs-web/ into dist/docs/ for production builds
+      if (!fs.existsSync(docsDir)) return;
+      const dest = path.resolve(__dirname, 'dist/docs');
+      fs.cpSync(docsDir, dest, { recursive: true });
+      console.log('✓ Docs site copied to dist/docs/');
+    },
+  };
+}
+
+export default defineConfig(({ command }) => {
+  // Ensure the CONTEXT.md stub exists so the ?raw import doesn't break dev server
+  if (command === 'serve') ensureSkillContextStub();
+
+  return {
   plugins: [
     // Auto-build & watch the Rust solver (dev server only)
     ...(command === 'serve' ? [forgeSolverPlugin()] : []),
@@ -654,6 +721,8 @@ export default defineConfig(({ command }) => ({
     react(),
     // Copy skill files into the web build output for static serving
     ...(forgeMode === 'web' && command === 'build' ? [forgeSkillStaticPlugin()] : []),
+    // Serve docs at /docs/ in dev and copy into dist/docs/ for production
+    forgeDocsPlugin(),
   ],
   // GitHub Pages serves at /ForgeCAD/; local dev serves at /
   base: forgeMode === 'web' ? '/ForgeCAD/' : '/',
@@ -691,4 +760,5 @@ export default defineConfig(({ command }) => ({
     },
   },
   assetsInclude: ['**/*.wasm'],
-}));
+};
+});

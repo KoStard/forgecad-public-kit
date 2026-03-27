@@ -11,11 +11,7 @@ type Vec3 = [number, number, number];
  * - profiles.length >= 2
  * - all profiles[k] have the same number of loops
  */
-export function loftStitched(
-  profiles: Vec2[][][],
-  heights: number[],
-  wasm: ManifoldToplevel,
-): Manifold | null {
+export function loftStitched(profiles: Vec2[][][], heights: number[], wasm: ManifoldToplevel): Manifold | null {
   if (profiles.length < 2) return null;
   const loopCount = profiles[0].length;
   if (loopCount === 0) return null;
@@ -52,16 +48,12 @@ function signedArea(loop: Vec2[]): number {
   for (let i = 0; i < loop.length; i++) {
     const p1 = loop[i];
     const p2 = loop[(i + 1) % loop.length];
-    area += (p1[0] * p2[1] - p2[0] * p1[1]);
+    area += p1[0] * p2[1] - p2[0] * p1[1];
   }
   return area * 0.5;
 }
 
-function stitchSingleLoopLoft(
-  loops: Vec2[][],
-  heights: number[],
-  wasm: ManifoldToplevel,
-): Manifold | null {
+function stitchSingleLoopLoft(loops: Vec2[][], heights: number[], wasm: ManifoldToplevel): Manifold | null {
   // Ensure all loops are CCW
   const normalizedLoops = loops.map((loop) => {
     const area = signedArea(loop);
@@ -142,7 +134,7 @@ function stitchSingleLoopLoft(
   try {
     const manifold = new wasm.Manifold(mesh);
     return manifold;
-  } catch (e) {
+  } catch (_e) {
     // Fallback if not manifold (e.g. self-intersections)
     return null;
   }

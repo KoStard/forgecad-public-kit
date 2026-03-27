@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useForgeStore } from '../store/forgeStore';
-import { themes, applyTheme, type ThemeName } from '../theme';
+import { applyTheme, type ThemeName, themes } from '../theme';
 
 const THEME_NAMES = Object.keys(themes) as ThemeName[];
 
@@ -20,10 +20,7 @@ export function StatusBar() {
   const objectCount = result?.objects?.length ?? 0;
   const evalTime = result?.timeMs ?? null;
   const errorCount = result?.error ? 1 : 0;
-  const verificationFails = useMemo(
-    () => result?.verifications?.filter((v) => v.status === 'fail').length ?? 0,
-    [result?.verifications],
-  );
+  const verificationFails = useMemo(() => result?.verifications?.filter((v) => v.status === 'fail').length ?? 0, [result?.verifications]);
 
   const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const name = e.target.value as ThemeName;
@@ -32,23 +29,23 @@ export function StatusBar() {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      padding: '2px 12px',
-      background: 'var(--fc-bgPanel)',
-      borderTop: '1px solid var(--fc-border)',
-      fontSize: 11,
-      color: 'var(--fc-textDim)',
-      userSelect: 'none',
-      flexShrink: 0,
-      height: 24,
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '2px 12px',
+        background: 'var(--fc-bgPanel)',
+        borderTop: '1px solid var(--fc-border)',
+        fontSize: 11,
+        color: 'var(--fc-textDim)',
+        userSelect: 'none',
+        flexShrink: 0,
+        height: 24,
+      }}
+    >
       {/* File name */}
-      <span style={{ fontWeight: 500, color: 'var(--fc-textMuted)' }}>
-        {activeFile || 'No file'}
-      </span>
+      <span style={{ fontWeight: 500, color: 'var(--fc-textMuted)' }}>{activeFile || 'No file'}</span>
 
       <span style={{ flex: 1 }} />
 
@@ -70,21 +67,17 @@ export function StatusBar() {
       )}
 
       {/* Eval time */}
-      {evalTime !== null && (
-        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-          {formatMs(evalTime)}
-        </span>
-      )}
+      {evalTime !== null && <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatMs(evalTime)}</span>}
 
       {/* Object count */}
       {objectCount > 0 && (
-        <span>{objectCount} object{objectCount !== 1 ? 's' : ''}</span>
+        <span>
+          {objectCount} object{objectCount !== 1 ? 's' : ''}
+        </span>
       )}
 
       {/* Backend */}
-      <span style={{ textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>
-        {activeBackend}
-      </span>
+      <span style={{ textTransform: 'uppercase', fontSize: 10, letterSpacing: 0.5 }}>{activeBackend}</span>
 
       {/* Theme switcher */}
       <select
@@ -103,7 +96,9 @@ export function StatusBar() {
         }}
       >
         {THEME_NAMES.map((t) => (
-          <option key={t} value={t}>{t}</option>
+          <option key={t} value={t}>
+            {t}
+          </option>
         ))}
       </select>
     </div>

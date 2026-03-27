@@ -4,9 +4,9 @@
  * Rust owns solving; this file only declares the public payload shape, equation count,
  * and UI/display metadata used by the builder and viewer.
  */
-import type { LineId, ConstraintTypeMap, AnnotationElement } from '../types';
+import type { LineId, ConstraintTypeMap } from '../types';
 import { registerConstraint } from '../registry';
-import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
+import { midpointPerp } from '../helpers';
 
 declare module '../types' {
   interface ConstraintTypeMap {
@@ -30,7 +30,8 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
   displayPosition(c, { lines, points }) {
     const lineA = lines.get(c.a);
     if (lineA) {
-      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      const a1 = points.get(lineA.a);
+      const a2 = points.get(lineA.b);
       if (a1 && a2) return midpointPerp(a1, a2, 3);
     }
     return [0, 0];
@@ -41,7 +42,7 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
     const lineB = lines.get(c.b);
     if (!lineA || !lineB) return [];
     // Find shared endpoint
-    const shared = [lineA.a, lineA.b].find(p => p === lineB.a || p === lineB.b);
+    const shared = [lineA.a, lineA.b].find((p) => p === lineB.a || p === lineB.b);
     if (shared) {
       const pt = points.get(shared);
       if (pt) {
@@ -51,7 +52,8 @@ registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
       }
     }
     // Fallback: midpoint of line A
-    const a1 = points.get(lineA.a), a2 = points.get(lineA.b);
+    const a1 = points.get(lineA.a),
+      a2 = points.get(lineA.b);
     if (a1 && a2) return [{ kind: 'symbol', position: midpointPerp(a1, a2, 3), symbol: 'perpendicular' as const }];
     return [];
   },

@@ -42,6 +42,8 @@ import './angleBetween';
 import './sameDirection';
 import './oppositeDirection';
 import './blockRotation';
+import './arcTangentArc';
+import './bezierTangentArc';
 
 // Re-export named types that external code imports directly
 export type { LineDistanceConstraint } from './lineDistance';

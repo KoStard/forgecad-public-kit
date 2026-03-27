@@ -1,12 +1,12 @@
 import type { Manifold } from 'manifold-3d';
-import type { Mat4 } from '../../transform';
 import {
   SHAPE_BACKEND_MARKER,
   type ShapeBackend,
   type ShapeRuntimeBounds,
-  type ShapeRuntimeMesh,
   type ShapeRuntimeCrossSection,
+  type ShapeRuntimeMesh,
 } from '../../shapeBackend';
+import type { Mat4 } from '../../transform';
 import { getWasm } from './wasm';
 
 /**
@@ -51,22 +51,6 @@ export class ManifoldShapeBackend implements ManifoldCapableBackend {
     return new ManifoldShapeBackend(this.manifold.mirror(normal));
   }
 
-  smoothOut(minSharpAngle: number, minSmoothness: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.smoothOut(minSharpAngle, minSmoothness));
-  }
-
-  refine(steps: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refine(steps));
-  }
-
-  refineToLength(length: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refineToLength(length));
-  }
-
-  refineToTolerance(tolerance: number): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.refineToTolerance(tolerance));
-  }
-
   warp(fn: (vert: [number, number, number]) => void): ShapeBackend {
     return new ManifoldShapeBackend(this.manifold.warp(fn as any));
   }
@@ -83,10 +67,6 @@ export class ManifoldShapeBackend implements ManifoldCapableBackend {
 
   trimByPlane(normal: [number, number, number], originOffset: number): ShapeBackend {
     return new ManifoldShapeBackend(this.manifold.trimByPlane(normal, originOffset));
-  }
-
-  hull(): ShapeBackend {
-    return new ManifoldShapeBackend(this.manifold.hull());
   }
 
   simplify(tolerance?: number): ShapeBackend {

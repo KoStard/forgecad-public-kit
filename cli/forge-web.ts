@@ -1,5 +1,5 @@
-import { packageRootFrom, spawnPackageVite } from './package-runtime';
 import { type ChildProcess } from 'child_process';
+import { packageRootFrom, spawnPackageVite } from './package-runtime';
 
 interface WebOptions {
   open: boolean;
@@ -10,7 +10,10 @@ function parseWebArgs(argv: string[]): WebOptions {
   const options: WebOptions = { open: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--open') { options.open = true; continue; }
+    if (arg === '--open') {
+      options.open = true;
+      continue;
+    }
     if (arg === '--port') {
       const raw = argv[i + 1];
       if (!raw) throw new Error('--port requires a value');

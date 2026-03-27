@@ -35,4 +35,4 @@ const solved = robot.solve({
 });
 
 console.log("BOM:", solved.bom().map(r => r.part));
-return solved.toScene();
+return solved;

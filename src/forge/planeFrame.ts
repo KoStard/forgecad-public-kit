@@ -1,10 +1,7 @@
-import { Transform, type Mat4, type Vec3 } from './transform';
 import type { FaceRef } from './sketch/topology';
+import { type Mat4, Transform, type Vec3 } from './transform';
 
-export type PlaneSpec =
-  | { origin: Vec3; normal: Vec3 }
-  | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number }
-  | { face: FaceRef };
+export type PlaneSpec = { origin: Vec3; normal: Vec3 } | { plane: 'XY' | 'XZ' | 'YZ'; offset?: number } | { face: FaceRef };
 
 export interface PlaneFrame {
   origin: Vec3;
@@ -46,12 +43,7 @@ export function rotationToPlaneSpace(normal: Vec3): Mat4 {
   const n = normalize(normal);
   const dot = n[2];
   if (dot > 1 - EPS) {
-    return [
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1,
-    ];
+    return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   }
 
   let axis: Vec3;
@@ -82,21 +74,14 @@ export function rotationToPlaneSpace(normal: Vec3): Mat4 {
   const r21 = z * y * t + x * s;
   const r22 = c + z * z * t;
 
-  return [
-    r00, r10, r20, 0,
-    r01, r11, r21, 0,
-    r02, r12, r22, 0,
-    0, 0, 0, 1,
-  ];
+  return [r00, r10, r20, 0, r01, r11, r21, 0, r02, r12, r22, 0, 0, 0, 0, 1];
 }
 
 export function resolvePlaneFrame(plane: PlaneSpec): PlaneFrame {
   if ('face' in plane) {
     const face = plane.face;
     if (face.planar === false || !face.uAxis || !face.vAxis) {
-      throw new Error(
-        `Face "${face.name}" is not planar and cannot be used as a projection plane.`,
-      );
+      throw new Error(`Face "${face.name}" is not planar and cannot be used as a projection plane.`);
     }
     return {
       origin: [face.center[0], face.center[1], face.center[2]],
@@ -117,7 +102,5 @@ export function resolvePlaneFrame(plane: PlaneSpec): PlaneFrame {
 
 export function planeFrameToWorldToPlaneMatrix(frame: PlaneFrame): Mat4 {
   const rotation = rotationToPlaneSpace(frame.normal);
-  return Transform.translation(-frame.origin[0], -frame.origin[1], -frame.origin[2])
-    .mul(rotation)
-    .toArray();
+  return Transform.translation(-frame.origin[0], -frame.origin[1], -frame.origin[2]).mul(rotation).toArray();
 }

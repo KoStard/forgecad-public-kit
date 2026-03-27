@@ -85,23 +85,20 @@ export interface ConstrainedRect {
  * sk.length(rect.bottom, 120);
  * ```
  */
-export function addRect(
-  sk: ConstrainedSketchBuilder,
-  options: RectOptions = {},
-): ConstrainedRect {
+export function addRect(sk: ConstrainedSketchBuilder, options: RectOptions = {}): ConstrainedRect {
   const { x = 0, y = 0, width = 10, height = 10, blockRotation = false } = options;
 
   // Vertices in CCW order: bl → br → tr → tl
-  const bl = sk.point(x,         y);
+  const bl = sk.point(x, y);
   const br = sk.point(x + width, y);
   const tr = sk.point(x + width, y + height);
-  const tl = sk.point(x,         y + height);
+  const tl = sk.point(x, y + height);
 
   // Sides in CCW traversal direction
   const bottom = sk.line(bl, br);
-  const right  = sk.line(br, tr);
-  const top    = sk.line(tr, tl);
-  const left   = sk.line(tl, bl);
+  const right = sk.line(br, tr);
+  const top = sk.line(tr, tl);
+  const left = sk.line(tl, bl);
 
   // Structural constraints: axis-aligned rectangle
   // 4 independent equations → 4 DOF left (x, y, width, height)
@@ -144,18 +141,26 @@ export function addRect(
     sides: [bottom, right, top, left],
     vertex(name: RectVertexName): PointId {
       switch (name) {
-        case 'bottomLeft':  return bl;
-        case 'bottomRight': return br;
-        case 'topRight':    return tr;
-        case 'topLeft':     return tl;
+        case 'bottomLeft':
+          return bl;
+        case 'bottomRight':
+          return br;
+        case 'topRight':
+          return tr;
+        case 'topLeft':
+          return tl;
       }
     },
     side(name: RectSideName): LineId {
       switch (name) {
-        case 'bottom': return bottom;
-        case 'right':  return right;
-        case 'top':    return top;
-        case 'left':   return left;
+        case 'bottom':
+          return bottom;
+        case 'right':
+          return right;
+        case 'top':
+          return top;
+        case 'left':
+          return left;
       }
     },
   };
@@ -173,9 +178,6 @@ declare module '../builder' {
   }
 }
 
-(ConstrainedSketchBuilder.prototype as any).rect = function (
-  this: ConstrainedSketchBuilder,
-  options?: RectOptions,
-): ConstrainedRect {
+(ConstrainedSketchBuilder.prototype as any).rect = function (this: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect {
   return addRect(this, options);
 };

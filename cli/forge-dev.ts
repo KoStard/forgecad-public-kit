@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { resolve } from 'path';
 import { type ChildProcess } from 'child_process';
+import { resolve } from 'path';
 import { packageRootFrom, resolvePackagePath, spawnPackageVite } from './package-runtime';
 
 interface DevOptions {
@@ -52,9 +52,18 @@ function parseDevArgs(argv: string[]): DevOptions {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--blank') { options.blank = true; continue; }
-    if (arg === '--open') { options.open = true; continue; }
-    if (arg === '--strict-port') { options.strictPort = true; continue; }
+    if (arg === '--blank') {
+      options.blank = true;
+      continue;
+    }
+    if (arg === '--open') {
+      options.open = true;
+      continue;
+    }
+    if (arg === '--strict-port') {
+      options.strictPort = true;
+      continue;
+    }
     if (arg === '--port') {
       const raw = argv[i + 1];
       if (!raw) throw new Error('--port requires a value');
@@ -100,9 +109,7 @@ function waitForExit(child: ChildProcess): Promise<number> {
 
 export async function runDevCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const options = parseDevArgs(argv);
-  const projectDir = options.blank
-    ? null
-    : options.projectPath ?? resolvePackagePath(import.meta.url, 'examples');
+  const projectDir = options.blank ? null : (options.projectPath ?? resolvePackagePath(import.meta.url, 'examples'));
 
   const child = spawnPackageVite(import.meta.url, toViteArgs(options), {
     cwd: packageRootFrom(import.meta.url),
