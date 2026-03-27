@@ -20,6 +20,7 @@
 export type {
   AssemblyPart,
   BomRow,
+  ConnectOptions,
   GearCouplingOptions,
   GearRatioLike,
   JointCouplingOptions as AssemblyJointCouplingOptions,
@@ -29,30 +30,30 @@ export type {
   JointType as AssemblyJointType,
   PartMetadata as AssemblyPartMetadata,
   PartOptions as AssemblyPartOptions,
-  ConnectOptions,
   ToJointsViewOptions,
 } from './assembly/assembly';
 export { Assembly, assembly, bomToCsv, ImportedAssembly, SolvedAssembly } from './assembly/assembly';
-export { port } from './port';
-export type { PortInput, PortDef, PortMap, PortAlign } from './port';
+export { explodeView } from './assembly/explodeView';
+export { joint } from './assembly/joint';
+export { jointsView } from './assembly/jointsView';
 export { bom } from './bom';
 export { cutPlane } from './cutPlane';
-export type { BoundingRegion, EdgeQuery, EdgeSegment } from './query/edgeQuery';
-export { coalesceEdges, selectEdge, selectEdges } from './query/edgeQuery';
 export { chamferEdgeSegment, filletEdgeSegment } from './edge-features/edgeSegmentFeatures';
-export { explodeView } from './assembly/explodeView';
+export { robotExport } from './export/robotExport';
+export type { BossOptions, PocketOptions } from './faceOps';
 export type { EdgeSelector } from './fillet';
 export { chamfer, draft, fillet, offsetSolid } from './fillet';
 export { group, ShapeGroup } from './group';
-export { joint } from './assembly/joint';
-export { jointsView } from './assembly/jointsView';
 export type { GeometryBackend, GeometryFidelity, GeometryInfo, GeometryRepresentation, GeometrySource, GeometryTopology } from './kernel';
 export { Shape } from './kernel';
 // `lib` — re-export the partLibrary object as `lib` so its full inferred type
 // (all the gear/pipe/extrusion helpers) is always in sync with library.ts.
 export { partLibrary as lib } from './library';
 export { boolParam, param } from './params';
-export { robotExport } from './export/robotExport';
+export type { PortAlign, PortDef, PortInput, PortMap } from './port';
+export { port } from './port';
+export type { BoundingRegion, EdgeQuery, EdgeSegment } from './query/edgeQuery';
+export { coalesceEdges, selectEdge, selectEdges } from './query/edgeQuery';
 export type {
   SceneBackgroundGradient,
   SceneBloomConfig,
@@ -68,7 +69,8 @@ export type {
   SceneVignetteConfig,
 } from './scene';
 export { scene } from './scene';
-export { intersectWithPlane, projectToPlane } from './section';
+export { viewConfig } from './scene/viewConfig';
+export { faceProfile, intersectWithPlane, projectToPlane } from './section';
 export { SheetMetalPart, sheetMetal } from './sheetMetal';
 export type {
   Anchor,
@@ -155,7 +157,6 @@ export { ConstrainedSketchBuilder } from './sketch/constraints';
 export type { HighlightOptions } from './sketch/highlights';
 export { composeChain, Transform } from './transform';
 export { verify } from './verification';
-export { viewConfig } from './scene/viewConfig';
 
 // ─── Wrapper functions: differ from their kernel/sketch source signatures ─────
 //

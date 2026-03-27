@@ -25,6 +25,9 @@ import {
   wrapShapeCompilePlanWithQueryOwner,
 } from './compilePlan';
 import { type FaceTransformationHistory, traceFaceTransformationHistory } from './face-tracking/faceHistory';
+import { detectFaceByName } from './face-tracking/meshFaceDetect';
+import { wrapRepeatedShapeCompilePlan } from './face-tracking/repetitionOwnership';
+import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './face-tracking/shapeFaces';
 import {
   applyPlacementReferenceInput,
   clonePlacementReferences,
@@ -39,7 +42,8 @@ import {
   resolvePlacementReferencePoint,
   transformPlacementReferences,
 } from './placement';
-import type { ShapeQueryOwner, TopologyRewritePropagation } from './queryModel';
+import type { PortInput, PortMap } from './port';
+import { clonePortMap, hasAnyPorts, mergePortMaps, normalizePortMapInput, transformPortMap } from './port';
 import {
   attachTopologyRewritePropagation,
   buildBooleanTopologyRewritePropagation,
@@ -48,14 +52,11 @@ import {
   collectShapeTopologyRewritePropagations,
   findShapeTopologyRewritePropagation,
 } from './query/queryPropagation';
-import { wrapRepeatedShapeCompilePlan } from './face-tracking/repetitionOwnership';
+import type { ShapeQueryOwner, TopologyRewritePropagation } from './queryModel';
 import { isShapeBackend, type ShapeBackend } from './shapeBackend';
-import { explainMissingShapeFace, listShapeFaceNames, resolveShapeFace } from './face-tracking/shapeFaces';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { type Mat4, type RotateAroundToOptions, solveRotateAroundAngle, Transform, type Vec3 } from './transform';
-import type { PortInput, PortMap } from './port';
-import { normalizePortMapInput, clonePortMap, hasAnyPorts, mergePortMaps, transformPortMap } from './port';
 
 export type { Anchor3D } from './anchors';
 export { isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from './anchors';
@@ -775,11 +776,15 @@ export class Shape {
     return resolveAnchorLikePoint(this, ref);
   }
 
-  /** Resolve a defended semantic face by name on compile-covered shapes. */
+  /** Resolve a semantic face by name.  Works on compile-covered shapes and, as a
+   *  fallback, on any planar-faced mesh (e.g. the result of boolean ops) via
+   *  coplanar triangle clustering. */
   face(name: string) {
     const plan = getShapeCompilePlanInternal(this);
     const face = resolveShapeFace(plan, name);
     if (face) return face;
+    const detected = detectFaceByName(this, name);
+    if (detected) return detected;
     throw new Error(explainMissingShapeFace(plan, name));
   }
 

@@ -44,7 +44,8 @@ import { boolParam, createTrackedScope, getCollectedParams, type ParamDef, param
 import { type ForgeQualityPreset, resolveForgeQualityPreset, runWithForgeQuality } from './quality';
 import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './export/robotExport';
 import { getCollectedScene, resetScene, type SceneConfig, scene } from './scene';
-import { intersectWithPlane, projectToPlane } from './section';
+import { faceProfile, intersectWithPlane, projectToPlane } from './section';
+import './faceOps';
 import { SheetMetalPart, sheetMetal } from './sheetMetal';
 import { getCollectedSheetStock, resetSheetStock, type SheetStockDef, sheetStock } from './export/sheetStock';
 import {
@@ -600,6 +601,7 @@ function executeFile(
       port,
       SolvedAssembly,
       bomToCsv,
+      faceProfile,
       intersectWithPlane,
       projectToPlane,
       selectEdge,
