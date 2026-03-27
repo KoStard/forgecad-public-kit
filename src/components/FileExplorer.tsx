@@ -145,6 +145,15 @@ export function FileExplorer() {
     setExpandedFolders((prev) => Array.from(new Set([...prev, ...parents])));
   }, [activeFile, meshPreviewFile]);
 
+  // Scroll the keyboard-focused item into view when selection changes via keyboard
+  useEffect(() => {
+    if (selection.size !== 1) return;
+    const path = lastClickedPath.current;
+    if (!path) return;
+    const el = treeContainerRef.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [selection]);
+
   const handleCreate = () => {
     const name = normalizePath(newName.trim());
     if (!name) return;
@@ -219,12 +228,12 @@ export function FileExplorer() {
     setExpandedFolders((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
   };
 
-  // Flat list of visible paths for shift-click range selection
-  const flatVisiblePaths = useMemo(() => {
-    const result: string[] = [];
+  // Flat list of visible nodes (DFS order) — used for keyboard nav and shift-click range selection
+  const flatVisibleNodes = useMemo(() => {
+    const result: { path: string; type: 'file' | 'folder'; hasChildren: boolean }[] = [];
     const walk = (nodes: TreeNode[]) => {
       for (const node of nodes) {
-        result.push(node.path);
+        result.push({ path: node.path, type: node.type, hasChildren: (node.children?.length ?? 0) > 0 });
         if (node.type === 'folder' && expandedFolders.includes(node.path) && node.children) {
           walk(node.children);
         }
@@ -233,6 +242,8 @@ export function FileExplorer() {
     walk(tree);
     return result;
   }, [tree, expandedFolders]);
+
+  const flatVisiblePaths = useMemo(() => flatVisibleNodes.map((n) => n.path), [flatVisibleNodes]);
 
   const handleDeleteSelection = useCallback(() => {
     if (selection.size === 0) return;
@@ -320,6 +331,7 @@ export function FileExplorer() {
         }
       >
         <div
+          data-path={node.path}
           draggable
           onDragStart={(e) => {
             // If dragging a selected item, drag all selected; otherwise drag just this one
@@ -444,11 +456,81 @@ export function FileExplorer() {
         }
       }}
       onKeyDown={(e) => {
+        if (renamingPath || creating) return;
+
         if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (selection.size > 0 && !renamingPath && !creating) {
+          if (selection.size > 0) {
             e.preventDefault();
             handleDeleteSelection();
           }
+          return;
+        }
+
+        const currentPath = selection.size >= 1 ? (lastClickedPath.current ?? Array.from(selection)[0]) : null;
+        const idx = currentPath ? flatVisibleNodes.findIndex((n) => n.path === currentPath) : -1;
+
+        const moveTo = (path: string) => {
+          setSelection(new Set([path]));
+          lastClickedPath.current = path;
+        };
+
+        switch (e.key) {
+          case 'ArrowDown': {
+            e.preventDefault();
+            const next = flatVisibleNodes[idx >= 0 ? idx + 1 : 0];
+            if (next) moveTo(next.path);
+            break;
+          }
+          case 'ArrowUp': {
+            e.preventDefault();
+            if (idx > 0) moveTo(flatVisibleNodes[idx - 1].path);
+            break;
+          }
+          case 'ArrowRight': {
+            e.preventDefault();
+            if (idx < 0) break;
+            const node = flatVisibleNodes[idx];
+            if (node.type === 'folder' && node.hasChildren) {
+              if (!expandedFolders.includes(currentPath!)) {
+                setExpandedFolders((prev) => [...prev, currentPath!]);
+              } else {
+                const firstChild = flatVisibleNodes[idx + 1];
+                if (firstChild) moveTo(firstChild.path);
+              }
+            }
+            break;
+          }
+          case 'ArrowLeft': {
+            e.preventDefault();
+            if (idx < 0) break;
+            const node = flatVisibleNodes[idx];
+            if (node.type === 'folder' && expandedFolders.includes(currentPath!)) {
+              setExpandedFolders((prev) => prev.filter((p) => p !== currentPath));
+            } else {
+              const parentPath = getParentPath(currentPath!);
+              if (parentPath) moveTo(parentPath);
+            }
+            break;
+          }
+          case 'Enter': {
+            e.preventDefault();
+            if (idx < 0) break;
+            const node = flatVisibleNodes[idx];
+            if (node.type === 'file') {
+              if (isMeshFile(currentPath!)) {
+                setMeshPreview(currentPath!);
+              } else {
+                setActiveFile(currentPath!);
+              }
+              // Restore focus so arrow navigation can continue immediately
+              treeContainerRef.current?.focus();
+            } else {
+              toggleFolder(currentPath!);
+            }
+            break;
+          }
+          default:
+            break;
         }
       }}
     >
