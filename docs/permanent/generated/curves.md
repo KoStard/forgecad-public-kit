@@ -123,5 +123,8 @@ A quintic Hermite curve in 3D space. Interpolates between two endpoints matching
 - `lineH()` — lineH(dx: number): this
 - `lineV()` — lineV(dy: number): this
 - `lineAngled()` — lineAngled(length: number, degrees: number): this
+- `arcTo()` — Draw a circular arc from the current position to (x, y) with the given radius. `clockwise=true`  → arc curves to the right of the start→end direction. `clockwise=false` → arc curves to the left  of the start→end direction. Center is determined by the midpoint formula (not tangent-aware). For a G1-continuous arc chain use `tangentArcTo` instead.
+- `tangentArcTo()` — Draw a circular arc from the current position to (x, y) that is tangent to the current path direction at the start. Unlike `arcTo`, the radius is not specified — it is derived from the departure direction and the endpoint, guaranteeing G1 continuity with the previous segment. Chaining multiple `tangentArcTo` calls produces a fully smooth, kink-free curve. Throws if the endpoint lies exactly along the current direction (use lineTo).
+- `smoothCapTo()` — Smooth three-arc end cap from the current position to (endX, endY). Inserts: small corner arc → large cap arc → small corner arc, all G1- continuous with each other and with the preceding/following segments. Geometry is computed automatically — no need to know junction points. Example — slot with a bumped end cap: ```js path() .moveTo(0, 0).lineTo(40, 0) .smoothCapTo(40, 20, 4, 12) .lineTo(0, 20).close().extrude(5) ```
 - `close()` — close(): Sketch
 - `stroke()` — stroke(width: number, join?: "Round" | "Square"): Sketch

@@ -117,6 +117,11 @@ if (libBlockMatch) {
   }
 }
 
+// ── Alias `lib` → `partLibrary` ─────────────────────────────────────────────
+// The bundler loses the `export { partLibrary as lib }` rename. Add an
+// explicit alias so Monaco autocompletes `lib.*` in user scripts.
+content += '\n/** All library parts. Access via `lib.xxx()` in scripts. */\ndeclare const lib: typeof partLibrary;\n';
+
 // Prepend header and stubs for external types
 const header = '// AUTO-GENERATED — do not edit by hand.\n// Regenerate: npm run gen:types  (source: src/forge/forge-public-api.ts)\n';
 if (importStubs.length > 0) {

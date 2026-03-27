@@ -2922,14 +2922,60 @@ declare class QuinticHermiteCurve3D {
  */
 declare function hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoint): QuinticHermiteCurve3D;
 declare class PathBuilder {
-	private points;
+	private segs;
 	private x;
 	private y;
+	/** Current departure tangent unit vector. Updated by lineTo / arcTo / tangentArcTo. */
+	private dirX;
+	private dirY;
 	moveTo(x: number, y: number): this;
 	lineTo(x: number, y: number): this;
 	lineH(dx: number): this;
 	lineV(dy: number): this;
 	lineAngled(length: number, degrees: number): this;
+	/**
+	 * Draw a circular arc from the current position to (x, y) with the given radius.
+	 * `clockwise=true`  → arc curves to the right of the start→end direction.
+	 * `clockwise=false` → arc curves to the left  of the start→end direction.
+	 * Center is determined by the midpoint formula (not tangent-aware).
+	 * For a G1-continuous arc chain use `tangentArcTo` instead.
+	 */
+	arcTo(x: number, y: number, radius: number, clockwise?: boolean): this;
+	/**
+	 * Draw a circular arc from the current position to (x, y) that is tangent
+	 * to the current path direction at the start.
+	 *
+	 * Unlike `arcTo`, the radius is not specified — it is derived from the
+	 * departure direction and the endpoint, guaranteeing G1 continuity with the
+	 * previous segment. Chaining multiple `tangentArcTo` calls produces a fully
+	 * smooth, kink-free curve.
+	 *
+	 * Throws if the endpoint lies exactly along the current direction (use lineTo).
+	 */
+	tangentArcTo(x: number, y: number): this;
+	/**
+	 * Smooth three-arc end cap from the current position to (endX, endY).
+	 *
+	 * Inserts: small corner arc → large cap arc → small corner arc, all G1-
+	 * continuous with each other and with the preceding/following segments.
+	 *
+	 * Geometry is computed automatically — no need to know junction points.
+	 *
+	 * @param endX / endY  — target position (end of the cap sequence)
+	 * @param cornerRadius — radius of the two small corner arcs
+	 * @param capRadius    — radius of the large outward-bulging arc
+	 *
+	 * Example — slot with a bumped end cap:
+	 * ```js
+	 * path()
+	 *   .moveTo(0, 0).lineTo(40, 0)
+	 *   .smoothCapTo(40, 20, 4, 12)
+	 *   .lineTo(0, 20).close().extrude(5)
+	 * ```
+	 */
+	smoothCapTo(endX: number, endY: number, cornerRadius: number, capRadius: number): this;
+	/** Expand all segments into a flat tessellated polyline. */
+	private tessellate;
 	close(): Sketch;
 	stroke(width: number, join?: "Round" | "Square"): Sketch;
 }
@@ -5640,3 +5686,6 @@ declare function highlight(plane: {
 declare function highlight(shape: Shape | TrackedShape, opts?: HighlightOptions): void;
 declare function highlight(face: FaceRef, opts?: HighlightOptions): void;
 declare function highlight(edge: EdgeRef, opts?: HighlightOptions): void;
+/** All library parts. Access via `lib.xxx()` in scripts. */
+declare const lib: typeof partLibrary;
+
