@@ -523,10 +523,10 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `project()` — Orthographically project the runtime solid onto the local XY plane.
 - `attachTo()` — Position this shape relative to another using named 3D anchor points. Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...), edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...). Anchor word order is flexible: 'front-left' and 'left-front' are equivalent. Named placement references (from withReferences) can also be used as anchors.
 - `onFace()` — Place this shape on a face of a parent shape. Think of it like sticking a label on a box surface: - `face` picks which surface ('front', 'back', 'top', etc.) - `u, v` position within that face's 2D plane (from center) - front/back: u = left/right (X), v = up/down (Z) - left/right: u = forward/back (Y), v = up/down (Z) - top/bottom: u = left/right (X), v = forward/back (Y) - `protrude` = how far the child sticks out (positive = outward from face)
-- `pocket()` — pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape
-- `boss()` — boss(face: FaceSelector, height: number, opts?: BossOptions): Shape
-- `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
-- `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
+- `pocket()` — Cut a pocket (cavity) into this solid through the named face. box(100, 100, 20).pocket('top', 8) box(100, 100, 20).pocket('top', 8, { inset: 5 }) box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
+- `boss()` — Add a boss (protrusion) from the named face. box(100, 100, 20).boss('top', 5) box(100, 100, 20).boss('top', 10, { scale: 0.6 })
+- `hole()` — Drill a hole into this solid at a face. box(50, 50, 20).hole('top', { diameter: 8, depth: 10 }) box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
+- `cutout()` — Cut a profile-shaped pocket through a face using a placed sketch. The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile. const profile = circle2d(10).onFace(body, 'top'); body.cutout(profile, { depth: 5 })
 
 ### `TrackedShape`
 
@@ -580,10 +580,10 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `shell()` — Shelling returns a plain Shape because tracked topology is not preserved.
 - `boundingBox()` — boundingBox(): ShapeRuntimeBounds
 - `get volume()` — get volume(): number
-- `pocket()` — pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape
-- `boss()` — boss(face: FaceSelector, height: number, opts?: BossOptions): Shape
-- `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
-- `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
+- `pocket()` — Cut a pocket (cavity) into this solid through the named face. box(100, 100, 20).pocket('top', 8) box(100, 100, 20).pocket('top', 8, { inset: 5 }) box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
+- `boss()` — Add a boss (protrusion) from the named face. box(100, 100, 20).boss('top', 5) box(100, 100, 20).boss('top', 10, { scale: 0.6 })
+- `hole()` — Drill a hole into this solid at a face. box(50, 50, 20).hole('top', { diameter: 8, depth: 10 }) box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
+- `cutout()` — Cut a profile-shaped pocket through a face using a placed sketch. The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile. const profile = circle2d(10).onFace(body, 'top'); body.cutout(profile, { depth: 5 })
 
 ### `Transform`
 

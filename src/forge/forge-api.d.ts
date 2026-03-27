@@ -3572,11 +3572,57 @@ interface PocketOptions {
 }
 type BossOptions = PocketOptions;
 interface Shape {
+	/**
+	 * Cut a pocket (cavity) into this solid through the named face.
+	 *
+	 * @param face  Which face to cut into — e.g. `'top'`, `'front'`, or a face query.
+	 * @param depth How deep the pocket goes into the solid (mm).
+	 * @param opts  Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+	 *
+	 * @example
+	 * box(100, 100, 20).pocket('top', 8)
+	 * box(100, 100, 20).pocket('top', 8, { inset: 5 })
+	 * box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
+	 */
 	pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+	/**
+	 * Add a boss (protrusion) from the named face.
+	 *
+	 * @param face   Which face to protrude from — e.g. `'top'`, `'front'`, or a face query.
+	 * @param height Height of the protrusion above the face (mm).
+	 * @param opts   Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+	 *
+	 * @example
+	 * box(100, 100, 20).boss('top', 5)
+	 * box(100, 100, 20).boss('top', 10, { scale: 0.6 })
+	 */
 	boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
 }
 interface TrackedShape {
+	/**
+	 * Cut a pocket (cavity) into this solid through the named face.
+	 *
+	 * @param face  Which face to cut into — e.g. `'top'`, `'front'`, or a face query.
+	 * @param depth How deep the pocket goes into the solid (mm).
+	 * @param opts  Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+	 *
+	 * @example
+	 * box(100, 100, 20).pocket('top', 8)
+	 * box(100, 100, 20).pocket('top', 8, { inset: 5 })
+	 * box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
+	 */
 	pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+	/**
+	 * Add a boss (protrusion) from the named face.
+	 *
+	 * @param face   Which face to protrude from — e.g. `'top'`, `'front'`, or a face query.
+	 * @param height Height of the protrusion above the face (mm).
+	 * @param opts   Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+	 *
+	 * @example
+	 * box(100, 100, 20).boss('top', 5)
+	 * box(100, 100, 20).boss('top', 10, { scale: 0.6 })
+	 */
 	boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
 }
 interface BoundingRegion {
@@ -4465,11 +4511,55 @@ interface ShapeCutoutOptions {
 	];
 }
 interface Shape {
+	/**
+	 * Drill a hole into this solid at a face.
+	 *
+	 * @param faceOrRef Target face — a face selector string (e.g. `'top'`), a placed sketch, or a `FaceRef`.
+	 * @param opts  Hole parameters: `diameter` (required), optional `depth`, `counterbore`, `countersink`, `thread`, `u`/`v` offset, `upToFace`, `extent`.
+	 *
+	 * @example
+	 * box(50, 50, 20).hole('top', { diameter: 8, depth: 10 })
+	 * box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
+	 */
 	hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape;
+	/**
+	 * Cut a profile-shaped pocket through a face using a placed sketch.
+	 *
+	 * The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile.
+	 *
+	 * @param sketch Sketch placed on a face via `.onFace()`.
+	 * @param opts   Optional `depth`, `upToFace`, `extent`, `taperScale`.
+	 *
+	 * @example
+	 * const profile = circle2d(10).onFace(body, 'top');
+	 * body.cutout(profile, { depth: 5 })
+	 */
 	cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape;
 }
 interface TrackedShape {
+	/**
+	 * Drill a hole into this solid at a face.
+	 *
+	 * @param faceOrRef Target face — a face selector string (e.g. `'top'`), a placed sketch, or a `FaceRef`.
+	 * @param opts  Hole parameters: `diameter` (required), optional `depth`, `counterbore`, `countersink`, `thread`, `u`/`v` offset, `upToFace`, `extent`.
+	 *
+	 * @example
+	 * box(50, 50, 20).hole('top', { diameter: 8, depth: 10 })
+	 * box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
+	 */
 	hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape;
+	/**
+	 * Cut a profile-shaped pocket through a face using a placed sketch.
+	 *
+	 * The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile.
+	 *
+	 * @param sketch Sketch placed on a face via `.onFace()`.
+	 * @param opts   Optional `depth`, `upToFace`, `extent`, `taperScale`.
+	 *
+	 * @example
+	 * const profile = circle2d(10).onFace(body, 'top');
+	 * body.cutout(profile, { depth: 5 })
+	 */
 	cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape;
 }
 type Vec3$1 = [

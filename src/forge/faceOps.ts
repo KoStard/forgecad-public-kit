@@ -135,14 +135,60 @@ function shapeBoss(rawShape: Shape, face: FaceSelector, height: number, opts?: B
 
 declare module './kernel' {
   interface Shape {
+    /**
+     * Cut a pocket (cavity) into this solid through the named face.
+     *
+     * @param face  Which face to cut into — e.g. `'top'`, `'front'`, or a face query.
+     * @param depth How deep the pocket goes into the solid (mm).
+     * @param opts  Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+     *
+     * @example
+     * box(100, 100, 20).pocket('top', 8)
+     * box(100, 100, 20).pocket('top', 8, { inset: 5 })
+     * box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
+     */
     pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+    /**
+     * Add a boss (protrusion) from the named face.
+     *
+     * @param face   Which face to protrude from — e.g. `'top'`, `'front'`, or a face query.
+     * @param height Height of the protrusion above the face (mm).
+     * @param opts   Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+     *
+     * @example
+     * box(100, 100, 20).boss('top', 5)
+     * box(100, 100, 20).boss('top', 10, { scale: 0.6 })
+     */
     boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
   }
 }
 
 declare module './sketch/topology' {
   interface TrackedShape {
+    /**
+     * Cut a pocket (cavity) into this solid through the named face.
+     *
+     * @param face  Which face to cut into — e.g. `'top'`, `'front'`, or a face query.
+     * @param depth How deep the pocket goes into the solid (mm).
+     * @param opts  Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+     *
+     * @example
+     * box(100, 100, 20).pocket('top', 8)
+     * box(100, 100, 20).pocket('top', 8, { inset: 5 })
+     * box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
+     */
     pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape;
+    /**
+     * Add a boss (protrusion) from the named face.
+     *
+     * @param face   Which face to protrude from — e.g. `'top'`, `'front'`, or a face query.
+     * @param height Height of the protrusion above the face (mm).
+     * @param opts   Optional `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+     *
+     * @example
+     * box(100, 100, 20).boss('top', 5)
+     * box(100, 100, 20).boss('top', 10, { scale: 0.6 })
+     */
     boss(face: FaceSelector, height: number, opts?: BossOptions): Shape;
   }
 }

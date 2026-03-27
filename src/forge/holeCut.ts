@@ -627,14 +627,58 @@ function shapeCutout(target: Shape, sketch: Sketch, opts: ShapeCutoutOptions = {
 
 declare module './kernel' {
   interface Shape {
+    /**
+     * Drill a hole into this solid at a face.
+     *
+     * @param faceOrRef Target face — a face selector string (e.g. `'top'`), a placed sketch, or a `FaceRef`.
+     * @param opts  Hole parameters: `diameter` (required), optional `depth`, `counterbore`, `countersink`, `thread`, `u`/`v` offset, `upToFace`, `extent`.
+     *
+     * @example
+     * box(50, 50, 20).hole('top', { diameter: 8, depth: 10 })
+     * box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
+     */
     hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape;
+    /**
+     * Cut a profile-shaped pocket through a face using a placed sketch.
+     *
+     * The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile.
+     *
+     * @param sketch Sketch placed on a face via `.onFace()`.
+     * @param opts   Optional `depth`, `upToFace`, `extent`, `taperScale`.
+     *
+     * @example
+     * const profile = circle2d(10).onFace(body, 'top');
+     * body.cutout(profile, { depth: 5 })
+     */
     cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape;
   }
 }
 
 declare module './sketch/topology' {
   interface TrackedShape {
+    /**
+     * Drill a hole into this solid at a face.
+     *
+     * @param faceOrRef Target face — a face selector string (e.g. `'top'`), a placed sketch, or a `FaceRef`.
+     * @param opts  Hole parameters: `diameter` (required), optional `depth`, `counterbore`, `countersink`, `thread`, `u`/`v` offset, `upToFace`, `extent`.
+     *
+     * @example
+     * box(50, 50, 20).hole('top', { diameter: 8, depth: 10 })
+     * box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
+     */
     hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape;
+    /**
+     * Cut a profile-shaped pocket through a face using a placed sketch.
+     *
+     * The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile.
+     *
+     * @param sketch Sketch placed on a face via `.onFace()`.
+     * @param opts   Optional `depth`, `upToFace`, `extent`, `taperScale`.
+     *
+     * @example
+     * const profile = circle2d(10).onFace(body, 'top');
+     * body.cutout(profile, { depth: 5 })
+     */
     cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape;
   }
 }

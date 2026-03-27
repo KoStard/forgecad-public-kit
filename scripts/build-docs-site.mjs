@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSy
 import { join, relative, basename, dirname, extname } from 'path';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
+import { indexMarkdownFile } from './docs-search-index.mjs';
 
 // Configure marked to use highlight.js for code blocks via custom renderer
 const renderer = new marked.Renderer();
@@ -50,15 +51,6 @@ function collectMdFiles(dir, files = []) {
 // 2. Parse a markdown file into doc + search entries
 // ---------------------------------------------------------------------------
 
-/** Slugify a heading for anchor links */
-function slugify(text) {
-  return text
-    .toLowerCase()
-    .replace(/[`()\[\]{}]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
 /** Derive a human-readable category from the file path */
 function categoryFromPath(relPath) {
   const parts = relPath.replace(/\.md$/, '').split('/');
@@ -84,7 +76,6 @@ function sortKey(relPath) {
 function parseMdFile(fullPath) {
   const relPath = relative(DOCS_DIR, fullPath);
   const raw = readFileSync(fullPath, 'utf-8');
-  const category = categoryFromPath(relPath);
   const docId = relPath.replace(/\.md$/, '');
 
   // Extract title from first heading
@@ -94,59 +85,10 @@ function parseMdFile(fullPath) {
   // Convert to HTML
   const html = marked.parse(raw, { gfm: true, breaks: false });
 
-  // Extract search entries per heading
-  const searchEntries = [];
-  const lines = raw.split('\n');
-  let currentHeading = title;
-  let currentAnchor = slugify(title);
-  let currentContent = [];
-  let currentSignature = '';
+  // Search index is built by the shared module
+  const searchEntries = indexMarkdownFile(fullPath, DOCS_DIR);
 
-  function flush() {
-    if (currentContent.length > 0) {
-      const content = currentContent.join(' ').replace(/\s+/g, ' ').trim();
-      if (content.length > 10) {
-        searchEntries.push({
-          id: `${docId}#${currentAnchor}`,
-          title: currentHeading,
-          category,
-          signature: currentSignature,
-          content: content.slice(0, 300),
-          docId,
-          anchor: currentAnchor,
-        });
-      }
-    }
-    currentContent = [];
-    currentSignature = '';
-  }
-
-  for (const line of lines) {
-    const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
-    if (headingMatch) {
-      flush();
-      currentHeading = headingMatch[2].replace(/`/g, '');
-      currentAnchor = slugify(headingMatch[2]);
-    } else if (line.startsWith('```')) {
-      // skip code fences but capture signatures
-      if (line.startsWith('```ts') || line.startsWith('```typescript')) {
-        // next few lines might be a signature
-      }
-    } else if (line.match(/^\w+.*\(.*\)/) && !currentSignature) {
-      currentSignature = line.trim();
-      currentContent.push(line);
-    } else {
-      // strip markdown formatting for search content
-      const clean = line
-        .replace(/[#*_`\[\]]/g, '')
-        .replace(/\(.*?\)/g, '')
-        .trim();
-      if (clean) currentContent.push(clean);
-    }
-  }
-  flush();
-
-  return { docId, relPath, title, category, html, searchEntries, sortKey: sortKey(relPath) };
+  return { docId, relPath, title, category: categoryFromPath(relPath), html, searchEntries, sortKey: sortKey(relPath) };
 }
 
 // ---------------------------------------------------------------------------
