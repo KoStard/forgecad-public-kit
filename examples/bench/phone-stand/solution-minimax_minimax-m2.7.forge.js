@@ -1,21 +1,22 @@
-// Base: flat bottom piece (landscape orientation for stability)
-const base = box(120, 80, 10, true)
-  .translate(0, 0, 5)
-  .color("#4a4a4a");
+// Phone Stand Assembly
 
-// Support: angled piece holding the phone
-// Positioned at back of base, tilted 70 degrees
-// Dimensions: 100 wide, 8 thick, 80 tall
-// When rotated 70°, reaches well above 70mm height requirement
-const support = box(100, 8, 80, true)
+// Base: flat bottom piece, wider than tall (landscape), sits on table (Z_min ≈ 0)
+const base = box(120, 80, 12, false)
+  .translate(0, 0, 0);
+
+// Support: angled piece that holds the phone
+// 100mm wide, 80mm long, 6mm thick
+// Center positioned above base, rotated 20° to lean backward
+const support = box(100, 80, 6, false)
   .translate(0, 40, 50)
-  .rotate(0, 70, 0)
-  .color("#6b6b6b");
+  .rotate(0, 0, 20);
 
-// Create assembly with fixed mount joint
-return assembly("PhoneStand")
+// Create assembly with base and support
+const phoneStand = assembly("PhoneStand")
   .addPart("Base", base)
   .addPart("Support", support)
   .addFixed("mount", "Base", "Support", {
-    frame: Transform.identity().translate(0, 40, 10)
+    frame: Transform.identity().translate(0, 40, 6)
   });
+
+return phoneStand;

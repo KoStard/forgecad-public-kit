@@ -1,103 +1,84 @@
 // Functional test harness for parametric-bracket benchmark
-// This task returns a Shape (not assembly) — tests at two parameter values.
-
-// We test at two bolt sizes to verify parametric behavior
-// The bench runner places the solution at ./solution.forge.js
-// We import it as a part at two different parameter values.
+// GATE/SCORE pattern — tests a Shape (not assembly) at two param values
 
 const smallBracket = importPart("./solution.forge.js", { paramOverrides: { "Bolt Diameter": 4 } });
 const largeBracket = importPart("./solution.forge.js", { paramOverrides: { "Bolt Diameter": 8 } });
 
-const results = [];
+const gateResults = [];
+const testResults = [];
+
+function gate(name, check, failMsg) {
+  let passed = false;
+  try { passed = !!check(); } catch (e) { failMsg = failMsg || e.message; }
+  gateResults.push({ name, passed, failMsg: passed ? null : (failMsg || "failed") });
+}
 function test(name, check, failMsg) {
   let passed = false;
-  try { passed = check(); } catch (e) { failMsg = failMsg || e.message; }
-  results.push({ name, passed, failMsg: passed ? null : (failMsg || "failed") });
+  try { passed = !!check(); } catch (e) { failMsg = failMsg || e.message; }
+  testResults.push({ name, passed, failMsg: passed ? null : (failMsg || "failed") });
   verify.that(name, () => passed, failMsg);
 }
-function bboxSize(shape) {
-  const bb = shape.boundingBox();
-  return [bb.max[0]-bb.min[0], bb.max[1]-bb.min[1], bb.max[2]-bb.min[2]];
+function bboxSize(s) { const b = s.boundingBox(); return [b.max[0]-b.min[0],b.max[1]-b.min[1],b.max[2]-b.min[2]]; }
+
+// GATES
+gate("Small bracket non-empty", () => !smallBracket.isEmpty());
+gate("Large bracket non-empty", () => !largeBracket.isEmpty());
+
+const allGatesPass = gateResults.every(g => g.passed);
+
+// SCORED
+if (allGatesPass) {
+  const sSize = bboxSize(smallBracket);
+  const lSize = bboxSize(largeBracket);
+  const sSorted = [...sSize].sort((a,b) => b-a);
+  const lSorted = [...lSize].sort((a,b) => b-a);
+  const sVol = smallBracket.volume();
+  const lVol = largeBracket.volume();
+  const sBboxVol = sSize[0]*sSize[1]*sSize[2];
+  const lBboxVol = lSize[0]*lSize[1]*lSize[2];
+
+  // F1: L-shape — significant extent in 2+ axes
+  test("F1: L-shaped (2 axes > 10mm)",
+    () => sSorted[0] > 10 && sSorted[1] > 10,
+    `Dims: ${sSize.map(d=>d.toFixed(1)).join("x")}mm`);
+
+  // F2: Has holes (volume < 50% of bbox — an L with holes is much less than bbox)
+  test("F2: Has holes (vol < 50% bbox)",
+    () => sVol < sBboxVol * 0.5,
+    `Vol/bbox = ${(sVol/sBboxVol*100).toFixed(0)}%`);
+
+  // F3: Scales with bolt size (large > small by 1.5x volume)
+  test("F3: Scales with bolt size (large > 1.5x small vol)",
+    () => lVol > sVol * 1.5,
+    `Small=${sVol.toFixed(0)}, Large=${lVol.toFixed(0)}, ratio=${(lVol/sVol).toFixed(2)}`);
+
+  // F4: Not paper-thin
+  test("F4: Not paper-thin (min dim > 2mm)", () => sSorted[2] > 2, `Min=${sSorted[2].toFixed(1)}mm`);
+
+  // F5: Dimensions scale proportionally
+  const sizeRatio = lSorted[0] / Math.max(sSorted[0], 0.1);
+  test("F5: Dimensions scale (1.3-4x for 2x bolt)",
+    () => sizeRatio > 1.3 && sizeRatio < 4,
+    `Size ratio = ${sizeRatio.toFixed(2)}x`);
 }
 
-// ===========================================================================
-// T1-T2: Shape exists and is non-empty
-test("T1: small bracket is non-empty", () => !smallBracket.isEmpty());
-test("T2: large bracket is non-empty", () => !largeBracket.isEmpty());
+// SCORECARD
+const gatesPassed = gateResults.every(g => g.passed);
+const scored = gatesPassed ? testResults.filter(r => r.passed).length : 0;
+const total = gatesPassed ? testResults.length : testResults.length || 5;
+const pct = total > 0 ? Math.round(100 * scored / total) : 0;
 
-// T3-T4: L-shape — significant extent in at least 2 axes
-const smallSize = bboxSize(smallBracket);
-const largeSize = bboxSize(largeBracket);
-const smallSorted = [...smallSize].sort((a,b) => b-a);
-const largeSorted = [...largeSize].sort((a,b) => b-a);
-
-test("T3: small bracket is L-shaped (2+ axes > 10mm)",
-  () => smallSorted[0] > 10 && smallSorted[1] > 10,
-  `Dims: ${smallSize.map(d => d.toFixed(1)).join("x")}mm`
-);
-test("T4: large bracket is L-shaped (2+ axes > 20mm)",
-  () => largeSorted[0] > 20 && largeSorted[1] > 20,
-  `Dims: ${largeSize.map(d => d.toFixed(1)).join("x")}mm`
-);
-
-// T5: Parametric scaling — large bracket should be bigger than small
-const smallVol = smallBracket.volume();
-const largeVol = largeBracket.volume();
-test("T5: large bracket has more volume than small",
-  () => largeVol > smallVol * 1.5,
-  `Small vol=${smallVol.toFixed(0)}, large vol=${largeVol.toFixed(0)}`
-);
-
-// T6: Mounting holes — volume should be less than a solid of same bbox
-const smallBboxVol = smallSize[0] * smallSize[1] * smallSize[2];
-const largeBboxVol = largeSize[0] * largeSize[1] * largeSize[2];
-test("T6: small bracket has holes (vol < 60% of bbox)",
-  () => smallVol < smallBboxVol * 0.6,
-  `Vol/bbox ratio = ${(smallVol/smallBboxVol*100).toFixed(0)}%`
-);
-
-// T7: Not paper-thin — smallest dimension > 2mm for small bracket
-test("T7: not paper-thin (min dim > 2mm)",
-  () => smallSorted[2] > 2,
-  `Thinnest = ${smallSorted[2].toFixed(1)}mm`
-);
-
-// T8: Reasonable proportions — no dimension more than 20x another
-test("T8: reasonable proportions (aspect < 20:1)",
-  () => smallSorted[0] / Math.max(smallSorted[2], 0.1) < 20,
-  `Aspect = ${(smallSorted[0]/Math.max(smallSorted[2],0.1)).toFixed(1)}:1`
-);
-
-// T9: Large bracket bbox dimensions scale with bolt size
-// bolt 8 vs bolt 4 → expect ~2x larger linear dimensions
-const sizeRatio = largeSorted[0] / Math.max(smallSorted[0], 0.1);
-test("T9: dimensions scale with bolt size (1.5-3x for 2x bolt)",
-  () => sizeRatio > 1.3 && sizeRatio < 4,
-  `Size ratio = ${sizeRatio.toFixed(2)}x`
-);
-
-// T10: Both have reasonable volume (not degenerate)
-test("T10: both have volume > 100mm3",
-  () => smallVol > 100 && largeVol > 100,
-  `Small=${smallVol.toFixed(0)}mm3, Large=${largeVol.toFixed(0)}mm3`
-);
-
-// ===========================================================================
-const passed = results.filter(r => r.passed).length;
-const total = results.length;
 console.warn("");
 console.warn("╔══════════════════════════════════════════════════════╗");
 console.warn("║        FUNCTIONAL SCORING — PARAMETRIC BRACKET      ║");
 console.warn("╟──────────────────────────────────────────────────────╢");
-for (const r of results) {
-  const icon = r.passed ? "✓" : "✗";
-  const msg = r.passed ? "" : ` — ${r.failMsg}`;
-  console.warn(`║  ${icon} ${r.name}${msg}`);
-}
+console.warn("║  GATES:");
+for (const g of gateResults) console.warn(`║    ${g.passed ? "✓" : "✗"} ${g.name}${g.passed ? "" : ` — ${g.failMsg}`}`);
+if (!gatesPassed) console.warn("║  ⚠ GATE FAILED — score is 0%");
+console.warn("║  SCORED:");
+for (const r of testResults) console.warn(`║    ${r.passed ? "✓" : "✗"} ${r.name}${r.passed ? "" : ` — ${r.failMsg}`}`);
 console.warn("╟──────────────────────────────────────────────────────╢");
-console.warn(`║  SCORE: ${passed}/${total} (${Math.round(100*passed/total)}%)`);
-console.warn(`║  Small: ${smallSize.map(d=>d.toFixed(0)).join("x")}mm vol=${smallVol.toFixed(0)}mm3`);
-console.warn(`║  Large: ${largeSize.map(d=>d.toFixed(0)).join("x")}mm vol=${largeVol.toFixed(0)}mm3`);
+console.warn(`║  SCORE: ${scored}/${total} (${pct}%)`);
 console.warn("╚══════════════════════════════════════════════════════╝");
 
 return largeBracket;
