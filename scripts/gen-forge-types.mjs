@@ -33,7 +33,26 @@ let content = readFileSync(tmp, 'utf-8');
 // Monaco's addExtraLib() cannot resolve node_modules imports.
 // Collect all top-level import statements, extract the named bindings, and
 // replace them with `type X = unknown` stubs so references compile in Monaco.
+// A single remaining `import` turns the file into a TS module (not ambient),
+// making all declarations invisible to Monaco — so we must catch every form.
 const importStubs = [];
+// Default imports: `import Foo from 'pkg'` → `type Foo = unknown`
+content = content.replace(
+  /^import ([A-Za-z_$][A-Za-z0-9_$]*) from '[^']+';?\s*\n?/gm,
+  (_, name) => {
+    importStubs.push(`type ${name} = unknown;`);
+    return '';
+  },
+);
+// Namespace imports: `import * as Foo from 'pkg'` → `type Foo = unknown`
+content = content.replace(
+  /^import \* as ([A-Za-z_$][A-Za-z0-9_$]*) from '[^']+';?\s*\n?/gm,
+  (_, name) => {
+    importStubs.push(`type ${name} = unknown;`);
+    return '';
+  },
+);
+// Named imports: `import { Foo, Bar } from 'pkg'` → `type Foo = unknown; type Bar = unknown`
 content = content.replace(
   /^import \{([^}]+)\} from '[^']+';?\s*\n?/gm,
   (_, names) => {
