@@ -6,44 +6,51 @@ const weight = param("Weight A", 1.0, { min: 0.1, max: 5.0, step: 0.1 });
 const weightB = param("Weight B", 1.0, { min: 0.1, max: 5.0, step: 0.1 });
 const radius = param("Tube Radius", 1.5, { min: 0.3, max: 5, unit: "mm" });
 
-// ── 1. Line-to-line transition (L-shaped pipe) ─────────────────────
-const lineToLine = transitionSurface(
-  { point: [0, 0, 0], tangent: [1, 0, 0] },
-  { point: [30, 20, 0], tangent: [0, 1, 0] },
+// Small anchor block at a point (visual reference for where the tube connects)
+function anchor(pos) {
+  const s = 3;
+  return box(s, s, s, true).translate(pos[0], pos[1], pos[2]);
+}
+
+// ── 1. L-bend: 90-degree pipe turn ──────────────────────────────
+const pA1 = [0, 0, 0], pB1 = [30, 20, 0];
+const lBend = transitionSurface(
+  { point: pA1, tangent: [1, 0, 0] },
+  { point: pB1, tangent: [0, 1, 0] },
   { radius, weightA: weight, weightB: weightB },
 );
 
-// ── 2. S-curve (opposing tangents) ──────────────────────────────────
+// ── 2. S-curve: opposing tangents ────────────────────────────────
+const pA2 = [0, 40, 0], pB2 = [30, 60, 0];
 const sCurve = transitionSurface(
-  { point: [0, 0, 15], tangent: [1, 0, 0] },
-  { point: [30, 20, 15], tangent: [-1, 0, 0] },
+  { point: pA2, tangent: [1, 0, 0] },
+  { point: pB2, tangent: [-1, 0, 0] },
   { radius, weightA: weight, weightB: weightB },
 );
 
-// ── 3. 3D transition (going up and around) ──────────────────────────
+// ── 3. 3D transition: going up and around ────────────────────────
+const pA3 = [0, 0, 30], pB3 = [25, 15, 45];
 const transition3D = transitionSurface(
-  { point: [0, 0, 35], tangent: [1, 0, 0] },
-  { point: [25, 15, 50], tangent: [0, 0, 1] },
+  { point: pA3, tangent: [1, 0, 0] },
+  { point: pB3, tangent: [0, 0, 1] },
   { radius, weightA: weight, weightB: weightB, up: [0, 1, 0] },
 );
 
-// ── 4. Asymmetric weight (3:0.5) ────────────────────────────────────
+// ── 4. Asymmetric weight (3:0.5) ────────────────────────────────
+const pA4 = [55, 0, 0], pB4 = [85, 20, 0];
 const weighted = transitionSurface(
-  { point: [50, 0, 0], tangent: [1, 0, 0] },
-  { point: [80, 20, 0], tangent: [0, 1, 0] },
+  { point: pA4, tangent: [1, 0, 0] },
+  { point: pB4, tangent: [0, 1, 0] },
   { radius, weightA: 3.0, weightB: 0.5 },
 );
 
-// ── 5. Edge selection UX: connect edges of real shapes ──────────────
-// Create two boxes and connect their edges using selectEdge + pickEdgeSegment
-const boxA = box(10, 10, 10).translate(-5, -5, -5);
-const boxB = box(10, 10, 10).translate(35, 15, 10);
+// ── 5. Edge selection: connect edges of real shapes ──────────────
+const boxA = box(10, 10, 10).translate(-5, -5, -35);
+const boxB = box(10, 10, 10).translate(35, 15, -20);
 
-// Select a top edge from box A (at Z=5) and a bottom edge from box B (at Z=10)
-const topEdgeA = selectEdge(boxA, { atZ: 5, parallel: [1, 0, 0] });
-const bottomEdgeB = selectEdge(boxB, { atZ: 10, parallel: [1, 0, 0] });
+const topEdgeA = selectEdge(boxA, { atZ: -25, parallel: [1, 0, 0] });
+const bottomEdgeB = selectEdge(boxB, { atZ: -20, parallel: [1, 0, 0] });
 
-// Pick connection points with tangent pointing outward from surface
 const pickA = pickEdgeSegment(topEdgeA, { end: 'mid', tangentMode: 'outward' });
 const pickB = pickEdgeSegment(bottomEdgeB, { end: 'mid', tangentMode: 'outward' });
 
@@ -53,10 +60,9 @@ const edgeConnector = transitionSurface(pickA, pickB, {
   weightB: weightB,
 });
 
-// ── 6. connectEdges shortcut (one-liner) ────────────────────────────
-// Same workflow as #5 but using the convenience function
-const sideEdgeA = selectEdge(boxA, { near: [5, 0, 0], parallel: [0, 0, 1] });
-const sideEdgeB = selectEdge(boxB, { near: [30, 15, 15], parallel: [0, 0, 1] });
+// ── 6. connectEdges shortcut ─────────────────────────────────────
+const sideEdgeA = selectEdge(boxA, { near: [5, 0, -30], parallel: [0, 0, 1] });
+const sideEdgeB = selectEdge(boxB, { near: [30, 15, -15], parallel: [0, 0, 1] });
 
 const shortcutConnector = connectEdges(sideEdgeA, sideEdgeB, {
   endA: 'mid',
@@ -68,28 +74,37 @@ const shortcutConnector = connectEdges(sideEdgeA, sideEdgeB, {
   weightB: weightB,
 });
 
-// ── 7. Curved edge: cylinder-to-box transition ─────────────────────
-// Connect the top of a cylinder to a box using explicit tangents
-// (Curved mesh edges have many small segments, so manual tangent is cleaner)
-const cyl = cylinder(8, 25).translate(0, -30, 0);
-const box2 = box(12, 12, 12).translate(25, -30, 20);
+// ── 7. Cylinder-to-box: connect with explicit tangents ───────────
+// Cylinder: h=20, r=8, base at Z=0, shifted to Y=-55
+const cyl = cylinder(20, 8).translate(0, -55, 0);
+// Box: 12x12x12, corner at (25,-55,25)
+const box2 = box(12, 12, 12).translate(25, -55, 25);
 
+// Connect from cylinder rim (top, +X side) to box left face (mid-height)
 const cylToBox = transitionSurface(
-  { point: [8, -30, 25], tangent: [1, 0, 0.3], normal: [0, 0, 1] },
-  { point: [19, -30, 20], tangent: [-1, 0, 0], normal: [0, 0, -1] },
+  { point: [8, -49, 20], tangent: [1, 0, 1], normal: [0, 0, 1] },
+  { point: [25, -49, 31], tangent: [-1, 0, 0], normal: [-1, 0, 0] },
   { radius: 1.5, weightA: weight, weightB: weightB },
 );
 
 return [
-  { name: "L-bend", shape: lineToLine.color('#4a90d9') },
+  { name: "Anchor A1", shape: anchor(pA1).color('#555') },
+  { name: "Anchor B1", shape: anchor(pB1).color('#555') },
+  { name: "L-bend", shape: lBend.color('#4a90d9') },
+  { name: "Anchor A2", shape: anchor(pA2).color('#555') },
+  { name: "Anchor B2", shape: anchor(pB2).color('#555') },
   { name: "S-curve", shape: sCurve.color('#d94a4a') },
+  { name: "Anchor A3", shape: anchor(pA3).color('#555') },
+  { name: "Anchor B3", shape: anchor(pB3).color('#555') },
   { name: "3D transition", shape: transition3D.color('#4ad97a') },
+  { name: "Anchor A4", shape: anchor(pA4).color('#555') },
+  { name: "Anchor B4", shape: anchor(pB4).color('#555') },
   { name: "Weighted (3:0.5)", shape: weighted.color('#d9a64a') },
-  { name: "Box A", shape: boxA.color('#888888') },
-  { name: "Box B", shape: boxB.color('#888888') },
+  { name: "Box A", shape: boxA.color('#888') },
+  { name: "Box B", shape: boxB.color('#888') },
   { name: "Edge Connector", shape: edgeConnector.color('#4ad9d9') },
   { name: "Shortcut Connector", shape: shortcutConnector.color('#d94ad9') },
-  { name: "Cylinder", shape: cyl.color('#aaaaaa') },
-  { name: "Box 2", shape: box2.color('#aaaaaa') },
+  { name: "Cylinder", shape: cyl.color('#aaa') },
+  { name: "Box 2", shape: box2.color('#aaa') },
   { name: "Cyl-to-Box", shape: cylToBox.color('#d9d94a') },
 ];
