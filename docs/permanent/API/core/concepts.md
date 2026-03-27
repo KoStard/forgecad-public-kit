@@ -76,3 +76,47 @@ ForgeCAD uses **Z-up** right-handed coordinates:
 - **Z** = up/down
 
 See [coordinate-system.md](../guides/coordinate-system.md) for view mapping details.
+
+## Face Operations
+
+Pocket, boss, and profile operations work on any planar face — identified by string name or geometric query.
+
+### Face Selection
+
+```javascript
+// Canonical names (primitives and tracked shapes)
+shape.face('top')       // topmost upward face
+shape.face('front')     // front face (-Y normal)
+
+// Geometric queries (any shape — booleans, imports, complex bodies)
+shape.face({ normal: [0, 0, 1], pick: 'largest' })   // largest upward face
+shape.face({ normal: [0, 0, 1], nearest: [50, 50] }) // nearest to XY point
+shape.faces({ normal: [0, 0, 1] })                    // all upward faces (FaceRef[])
+```
+
+Query properties: `normal`, `nearest`, `at`, `pick` (`'largest'`/`'smallest'`/`'max-z'`/...), `area` (`{ min?, max? }`).
+
+### Pocket and Boss
+
+```javascript
+// Cut a pocket into the top face
+box(100, 100, 20).pocket('top', 8, { inset: 5 })
+
+// Add a boss from the top face
+box(100, 100, 20).boss('top', 5, { scale: 0.6 })
+
+// Target a specific face on a complex body with a query
+const body = box(100, 100, 20).pocket('top', 10, { inset: 5 });
+body.boss({ normal: [0, 0, 1], pick: 'smallest' }, 5)  // boss from pocket floor
+```
+
+Options: `inset` (shrink boundary, mm), `scale` (uniform scale, e.g. 0.8), `join` (`'Round'`/`'Square'`/`'Miter'`).
+
+### Face Profile
+
+Extract a face's 2D boundary as a `Sketch` for manual workflows:
+
+```javascript
+const profile = faceProfile(box(100, 100, 20), 'top');
+const tool = profile.offset(-5).extrude(8);  // shrink + extrude manually
+```
