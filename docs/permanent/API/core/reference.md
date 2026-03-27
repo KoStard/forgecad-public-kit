@@ -1468,7 +1468,7 @@ Hollow cylinder.
 Hex nut via intersection of 3 rotated slabs, with center bore.
 
 ### `lib.roundedBox(x, y, z, radius)`
-Approximate rounded box via union of axis-aligned slabs.
+Box with all 12 edges filleted to the given radius.
 
 ### `lib.bracket(width, height, depth, thick, holeDia?)`
 L-shaped mounting bracket with optional holes.

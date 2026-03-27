@@ -4,6 +4,7 @@
  */
 
 import { box, cylinder, Shape, union } from '../kernel';
+import { fillet } from '../fillet';
 
 export type MetricSize = 'M2' | 'M2.5' | 'M3' | 'M4' | 'M5' | 'M6' | 'M8' | 'M10';
 export type FastenerFit = 'close' | 'normal' | 'loose' | 'tap';
@@ -110,13 +111,9 @@ export function hexNut(acrossFlats: number, height: number, holeDia: number): Sh
   return hex.subtract(hole);
 }
 
-/** Approximate rounded box via union of axis-aligned slabs. Corner radius is applied by inset. */
+/** Box with all 12 edges filleted. */
 export function roundedBox(x: number, y: number, z: number, radius: number): Shape {
-  // Intersect 3 axis-aligned rounded slabs
-  const sx = box(x - radius * 2, y, z, true);
-  const sy = box(x, y - radius * 2, z, true);
-  const sz = box(x, y, z - radius * 2, true);
-  return union(sx, sy, sz).translate(x / 2, y / 2, z / 2);
+  return fillet(box(x, y, z), radius);
 }
 
 /** L-shaped mounting bracket with optional through-holes in both the base and wall. */
