@@ -15,7 +15,7 @@ import { circle2d, rect } from './primitives';
 import type { Sketch } from './core';
 import type { Shape } from '../kernel';
 import type { EdgeRef } from './topology';
-import type { EdgeSegment } from '../meshEdgeExtraction';
+import type { EdgeSegment } from '../mesh/meshEdgeExtraction';
 
 type Vec3 = [number, number, number];
 
@@ -365,13 +365,13 @@ export function pickEdgeSegment(
   let point: Vec3;
   switch (which) {
     case 'start':
-      point = [...edge.start];
+      point = [edge.start[0], edge.start[1], edge.start[2]];
       break;
     case 'end':
-      point = [...edge.end];
+      point = [edge.end[0], edge.end[1], edge.end[2]];
       break;
     case 'mid':
-      point = [...edge.midpoint];
+      point = [edge.midpoint[0], edge.midpoint[1], edge.midpoint[2]];
       break;
   }
 
@@ -386,9 +386,9 @@ export function pickEdgeSegment(
     // 'along' mode: use edge direction
     const dir = edge.direction;
     if (which === 'end') {
-      tangent = flip ? [...dir] : v3Scale(dir, -1) as Vec3;
+      tangent = flip ? [dir[0], dir[1], dir[2]] : v3Scale(dir, -1) as Vec3;
     } else {
-      tangent = flip ? v3Scale(dir, -1) as Vec3 : [...dir];
+      tangent = flip ? v3Scale(dir, -1) as Vec3 : [dir[0], dir[1], dir[2]];
     }
   }
 
