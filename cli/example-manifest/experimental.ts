@@ -71,6 +71,21 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'G-code toolpath demo: returns GCodeBuilder, needs dedicated gcode validator.',
     'gcode-export-mvp',
   ),
+  experimentalExample(
+    'examples/api/benchy-style-hull.forge.js',
+    'Uses loft/sweep hull geometry outside the current exact-export subset. Needs validation once loft is in the exact route.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/api/sketch-on-face-demo.forge.js',
+    'Demo of .onFace() workflow; needs manifest classification once onFace API is part of the maintained surface.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/face-ops-test.forge.js',
+    'Integration test for pocket/boss/faceProfile — temporary test model, not a maintained architecture example.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
   ...Array.from({ length: 13 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     const names = [
