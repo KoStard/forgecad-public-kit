@@ -156,6 +156,7 @@ export type { CircleId, LineDistanceConstraint, LineId, PointId } from './sketch
 // automatically from the source class — addLoop, fix, horizontal, etc.
 export { ConstrainedSketchBuilder } from './sketch/constraints';
 export type { HighlightOptions } from './sketch/highlights';
+export type { EdgeRef, FaceRef } from './sketch/topology';
 export { composeChain, Transform } from './transform';
 export { verify } from './verification';
 

@@ -58,6 +58,7 @@ import {
 import type { ShapeQueryOwner, TopologyRewritePropagation } from './queryModel';
 import { isShapeBackend, type ShapeBackend } from './shapeBackend';
 import { buildShellShapeCompilePlan } from './shellCompilePlan';
+import type { FaceRef } from './sketch/topology';
 import type { ShapeWorkplanePlacement } from './sketch/workplaneModel';
 import { type Mat4, type RotateAroundToOptions, solveRotateAroundAngle, Transform, type Vec3 } from './transform';
 
