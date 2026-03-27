@@ -8,7 +8,7 @@ type PathSeg =
   | { kind: 'line'; x: number; y: number }
   | { kind: 'arc'; x: number; y: number; cx: number; cy: number; clockwise: boolean }
   | { kind: 'bezier'; x: number; y: number; cp1x: number; cp1y: number; cp2x: number; cp2y: number }
-  | { kind: 'spline'; points: [number, number][]; tension: number };
+  | { kind: 'spline'; x: number; y: number; points: [number, number][]; tension: number };
 
 // ── Tessellation tolerance ───────────────────────────────────────────────────
 
@@ -473,8 +473,8 @@ export class PathBuilder {
   smoothThrough(waypoints: [number, number][], tension = 0.5): this {
     if (waypoints.length === 0) throw new Error('smoothThrough requires at least 1 waypoint');
     const allPts: [number, number][] = [[this.x, this.y], ...waypoints];
-    this.segs.push({ kind: 'spline', points: allPts, tension });
     const last = waypoints[waypoints.length - 1];
+    this.segs.push({ kind: 'spline', x: last[0], y: last[1], points: allPts, tension });
     // Departure tangent: direction of last segment
     if (allPts.length >= 2) {
       const prev = allPts[allPts.length - 2];

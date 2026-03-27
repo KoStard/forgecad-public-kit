@@ -2925,7 +2925,7 @@ declare class PathBuilder {
 	private segs;
 	private x;
 	private y;
-	/** Current departure tangent unit vector. Updated by lineTo / arcTo / tangentArcTo. */
+	/** Current departure tangent unit vector. */
 	private dirX;
 	private dirY;
 	moveTo(x: number, y: number): this;
@@ -2933,55 +2933,117 @@ declare class PathBuilder {
 	lineH(dx: number): this;
 	lineV(dy: number): this;
 	lineAngled(length: number, degrees: number): this;
+	lineBy(dx: number, dy: number): this;
+	arcBy(dx: number, dy: number, radius: number, clockwise?: boolean): this;
+	bezierBy(dcp1x: number, dcp1y: number, dcp2x: number, dcp2y: number, dx: number, dy: number): this;
 	/**
 	 * Draw a circular arc from the current position to (x, y) with the given radius.
 	 * `clockwise=true`  → arc curves to the right of the start→end direction.
 	 * `clockwise=false` → arc curves to the left  of the start→end direction.
-	 * Center is determined by the midpoint formula (not tangent-aware).
-	 * For a G1-continuous arc chain use `tangentArcTo` instead.
 	 */
 	arcTo(x: number, y: number, radius: number, clockwise?: boolean): this;
 	/**
-	 * Draw a circular arc from the current position to (x, y) that is tangent
-	 * to the current path direction at the start.
-	 *
-	 * Unlike `arcTo`, the radius is not specified — it is derived from the
-	 * departure direction and the endpoint, guaranteeing G1 continuity with the
-	 * previous segment. Chaining multiple `tangentArcTo` calls produces a fully
-	 * smooth, kink-free curve.
-	 *
-	 * Throws if the endpoint lies exactly along the current direction (use lineTo).
+	 * G1-continuous arc — radius derived from current tangent + endpoint.
+	 * Throws if endpoint is collinear with current direction.
 	 */
 	tangentArcTo(x: number, y: number): this;
 	/**
 	 * Smooth three-arc end cap from the current position to (endX, endY).
-	 *
-	 * Inserts: small corner arc → large cap arc → small corner arc, all G1-
-	 * continuous with each other and with the preceding/following segments.
-	 *
-	 * Geometry is computed automatically — no need to know junction points.
-	 *
-	 * @param endX / endY  — target position (end of the cap sequence)
-	 * @param cornerRadius — radius of the two small corner arcs
-	 * @param capRadius    — radius of the large outward-bulging arc
-	 *
-	 * Example — slot with a bumped end cap:
-	 * ```js
-	 * path()
-	 *   .moveTo(0, 0).lineTo(40, 0)
-	 *   .smoothCapTo(40, 20, 4, 12)
-	 *   .lineTo(0, 20).close().extrude(5)
-	 * ```
+	 * Inserts: small corner arc → large cap arc → small corner arc, all G1-continuous.
 	 */
 	smoothCapTo(endX: number, endY: number, cornerRadius: number, capRadius: number): this;
+	/**
+	 * Cubic bezier from current position to (x, y) via two control points.
+	 */
+	bezierTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): this;
+	/**
+	 * G1-continuous cubic bezier — first control point is auto-derived from
+	 * the current tangent direction. `weight` controls how far the auto-placed
+	 * control point extends along the tangent (default: 1/3 of the chord).
+	 *
+	 * The second control point `(cp2x, cp2y)` must be provided — it controls
+	 * the arrival curvature. For a fully automatic smooth curve, see `smoothThrough`.
+	 */
+	tangentBezierTo(cp2x: number, cp2y: number, x: number, y: number, weight?: number): this;
+	/**
+	 * Catmull-Rom spline through a list of waypoints from the current position.
+	 * The current position is included as the first point. The last waypoint
+	 * becomes the new cursor position.
+	 *
+	 * @param waypoints — intermediate + final points (at least 1)
+	 * @param tension — 0 = very round, 1 = linear (default 0.5)
+	 */
+	smoothThrough(waypoints: [
+		number,
+		number
+	][], tension?: number): this;
+	/**
+	 * Round the last corner (the junction between the previous two segments)
+	 * with a tangent arc of the given radius.
+	 *
+	 * Must be called after at least two line/arc segments that form a corner.
+	 * The fillet trims back both segments and inserts a tangent arc.
+	 *
+	 * ```js
+	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,10).fillet(2).lineTo(0,10).close()
+	 * ```
+	 */
+	fillet(radius: number): this;
+	/**
+	 * Chamfer the last corner with a straight cut of the given distance.
+	 *
+	 * ```js
+	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,10).chamfer(2).lineTo(0,10).close()
+	 * ```
+	 */
+	chamfer(distance: number): this;
+	private computeFilletGeom;
+	private computeChamferGeom;
+	private getSegEnd;
+	private getSegDirAt;
+	private trimLastSegEnd;
+	/**
+	 * Mirror all existing segments across an axis and append the mirrored copy
+	 * in reverse order, creating a symmetric path. The axis passes through the
+	 * current cursor position.
+	 *
+	 * @param axis — 'x' mirrors across the local X-axis (flips Y),
+	 *               'y' mirrors across the local Y-axis (flips X),
+	 *               or `[nx, ny]` for an arbitrary axis direction.
+	 *
+	 * ```js
+	 * // Build right half, mirror to get full symmetric profile
+	 * path().moveTo(0,0).lineTo(10,0).lineTo(10,5).mirror('x').close()
+	 * ```
+	 */
+	mirror(axis: "x" | "y" | [
+		number,
+		number
+	]): this;
 	/** Expand all segments into a flat tessellated polyline. */
 	private tessellate;
+	/**
+	 * Close the path and return a filled Sketch.
+	 *
+	 * If the path contains multiple sub-paths (multiple moveTo calls), the
+	 * first sub-path is the outer contour and subsequent sub-paths are holes
+	 * (subtracted from the outer contour).
+	 */
 	close(): Sketch;
+	/**
+	 * Close the path and return an offset version of the filled Sketch.
+	 * Positive delta expands outward, negative shrinks inward.
+	 */
+	closeOffset(delta: number, join?: "Round" | "Square" | "Miter"): Sketch;
 	stroke(width: number, join?: "Round" | "Square"): Sketch;
+	/** Split segments into sub-paths at each moveTo. */
+	private splitSubPaths;
+	/** Tessellate a sub-path (sequence of segments). */
+	private tessellateSegs;
 }
-/** Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/close/stroke. */
+/** Create a path builder for constructing 2D outlines. */
 declare function path(): PathBuilder;
-/** Create a stroked polyline sketch from an array of 2D points with the given width and corner join style. */
+/** Create a stroked polyline sketch from an array of 2D points. */
 declare function stroke(points: [
 	number,
 	number
@@ -3457,7 +3519,9 @@ declare class Shape {
 		number,
 		number
 	];
-	/** Resolve a defended semantic face by name on compile-covered shapes. */
+	/** Resolve a semantic face by name.  Works on compile-covered shapes and, as a
+	 *  fallback, on any planar-faced mesh (e.g. the result of boolean ops) via
+	 *  coplanar triangle clustering. */
 	face(name: string): FaceRef;
 	/** List defended semantic face names currently available on this shape. */
 	faceNames(): string[];
@@ -4299,6 +4363,82 @@ declare class ImportedAssembly {
 	 */
 	mergeInto(parent: Assembly, options: MergeIntoOptions): Assembly;
 }
+type ExplodeAxis = "x" | "y" | "z";
+type ExplodeDirection = "radial" | ExplodeAxis | [
+	number,
+	number,
+	number
+];
+interface ExplodeDirective {
+	/** Multiplier applied to `amount` for this node */
+	stage?: number;
+	/** Direction mode for this node */
+	direction?: ExplodeDirection;
+	/** Optional axis lock after direction is resolved */
+	axisLock?: ExplodeAxis;
+}
+interface ExplodeConfigOptions {
+	amount?: number;
+	stages?: number[];
+	mode?: ExplodeDirection;
+	axisLock?: ExplodeAxis;
+	byName?: Record<string, ExplodeDirective>;
+	byPath?: Record<string, ExplodeDirective>;
+}
+type ExplodeViewDirection = ExplodeDirection;
+interface ExplodeViewDirective extends ExplodeDirective {
+}
+interface ExplodeViewOptions {
+	/** Set false to disable viewport explode offsets for this script output. */
+	enabled?: boolean;
+	/** Scales the UI explode amount. Default: 1 */
+	amountScale?: number;
+	/**
+	 * Per-depth stage multipliers (depth 1 = first level).
+	 * If depth exceeds this array, the last value is reused.
+	 * Default when omitted: reciprocal depth (1, 1/2, 1/3, ...)
+	 */
+	stages?: number[];
+	/** Global direction mode fallback. Default: 'radial' */
+	mode?: ExplodeViewDirection;
+	/** Global axis lock fallback. */
+	axisLock?: ExplodeAxis;
+	/** Per-object overrides by final object name. */
+	byName?: Record<string, ExplodeViewDirective>;
+	/** Per-tree-path overrides using slash-separated object tree segments. */
+	byPath?: Record<string, ExplodeViewDirective>;
+}
+/**
+ * Configure viewport exploded-view behavior for the current script execution.
+ * Multiple calls merge; later values override earlier ones.
+ */
+declare function explodeView(options?: ExplodeViewOptions): void;
+interface RevoluteJointOpts {
+	axis?: [
+		number,
+		number,
+		number
+	];
+	min?: number;
+	max?: number;
+	default?: number;
+	unit?: string;
+	reverse?: boolean;
+}
+/**
+ * Create a revolute (hinge) joint. Auto-creates a param slider and rotates the shape.
+ *
+ * @param name - Display name for the angle parameter
+ * @param shape - The shape to rotate
+ * @param pivot - The pivot point [x, y, z]
+ * @param opts - Joint options (axis, min/max angle, default)
+ * @returns The rotated shape
+ */
+declare function joint(name: string, shape: Shape, pivot: [
+	number,
+	number,
+	number
+], opts?: RevoluteJointOpts): Shape;
 interface BomOpts {
 	/**
 	 * Quantity unit label, e.g. "mm", "pieces", "kg".
@@ -4344,6 +4484,139 @@ declare function cutPlane(name: string, normal: [
 	number,
 	number
 ], options?: CutPlaneOptions): void;
+type ShapeArg$2 = Shape | TrackedShape;
+/**
+ * Apply a fillet (rounded edge) to a mesh-selected edge.
+ *
+ * Works on any straight edge of any shape — not limited to tracked box edges.
+ * The edge must have been obtained from selectEdge() / selectEdges().
+ *
+ * @param shape - The solid to modify
+ * @param segment - Edge segment from selectEdge() / selectEdges()
+ * @param radius - Fillet radius
+ * @param segments - Number of arc segments (default: 16)
+ */
+declare function filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape;
+/**
+ * Apply a chamfer (beveled edge) to a mesh-selected edge.
+ *
+ * Works on any straight edge of any shape — not limited to tracked box edges.
+ *
+ * @param shape - The solid to modify
+ * @param segment - Edge segment from selectEdge() / selectEdges()
+ * @param size - Chamfer size (distance from edge)
+ */
+declare function chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape;
+interface RobotLinkExportOptions {
+	massKg?: number;
+	densityKgM3?: number;
+	collision?: "visual" | "convex" | "box" | "none";
+}
+interface RobotJointExportOptions {
+	effort?: number;
+	velocity?: number;
+	damping?: number;
+	friction?: number;
+}
+interface RobotDiffDrivePluginOptions {
+	leftJoints: string[];
+	rightJoints: string[];
+	wheelSeparationMm: number;
+	wheelRadiusMm: number;
+	topic?: string;
+	odomTopic?: string;
+	tfTopic?: string;
+	frameId?: string;
+	odomFrameId?: string;
+	maxLinearVelocity?: number;
+	maxAngularVelocity?: number;
+	linearAcceleration?: number;
+	angularAcceleration?: number;
+}
+interface RobotJointStatePublisherOptions {
+	enabled?: boolean;
+	joints?: string[];
+	topic?: string;
+	updateRate?: number;
+}
+type RobotPose6 = [
+	number,
+	number,
+	number,
+	number,
+	number,
+	number
+];
+interface RobotWorldKeyboardTeleopOptions {
+	enabled?: boolean;
+	linearStep?: number;
+	angularStep?: number;
+}
+interface RobotWorldOptions {
+	name?: string;
+	generateDemoWorld?: boolean;
+	spawnPose?: RobotPose6;
+	keyboardTeleop?: RobotWorldKeyboardTeleopOptions;
+}
+interface RobotExportOptions {
+	assembly: Assembly;
+	modelName?: string;
+	state?: JointState;
+	static?: boolean;
+	selfCollide?: boolean;
+	allowAutoDisable?: boolean;
+	links?: Record<string, RobotLinkExportOptions>;
+	joints?: Record<string, RobotJointExportOptions>;
+	plugins?: {
+		diffDrive?: RobotDiffDrivePluginOptions;
+		jointStatePublisher?: RobotJointStatePublisherOptions;
+	};
+	world?: RobotWorldOptions;
+}
+interface CollectedRobotExport {
+	modelName: string;
+	assembly: AssemblyDefinition;
+	state: JointState;
+	static: boolean;
+	selfCollide: boolean;
+	allowAutoDisable: boolean;
+	links: Record<string, RobotLinkExportOptions>;
+	joints: Record<string, RobotJointExportOptions>;
+	plugins: {
+		diffDrive?: RobotDiffDrivePluginOptions;
+		jointStatePublisher?: RobotJointStatePublisherOptions;
+	};
+	world: RobotWorldOptions | null;
+}
+/**
+ * Declare that the current script should export an assembly as a robot package for the SDF CLI.
+ *
+ * Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
+ */
+declare function robotExport(options: RobotExportOptions): CollectedRobotExport;
+interface PocketOptions {
+	/**
+	 * Shrink the face boundary inward by this many mm before extruding.
+	 * Produces angled walls when combined with depth.  Default: 0 (full face).
+	 */
+	inset?: number;
+	/**
+	 * Scale the face profile uniformly (e.g. 0.8 = 80% of the face area).
+	 * Mutually exclusive with `inset`; `inset` takes precedence if both are set.
+	 */
+	scale?: number;
+	/** Corner join style when using `inset`.  Default: 'Round'. */
+	join?: "Square" | "Round" | "Miter";
+}
+type BossOptions = PocketOptions;
+interface Shape {
+	pocket(faceName: string, depth: number, opts?: PocketOptions): Shape;
+	boss(faceName: string, height: number, opts?: BossOptions): Shape;
+}
+interface TrackedShape {
+	pocket(faceName: string, depth: number, opts?: PocketOptions): Shape;
+	boss(faceName: string, height: number, opts?: BossOptions): Shape;
+}
 interface BoundingRegion {
 	xMin?: number;
 	xMax?: number;
@@ -4403,79 +4676,6 @@ declare function selectEdge(shape: Shape | TrackedShape, query?: EdgeQuery): Edg
  * The `tolerance` controls how far endpoints can deviate from collinearity.
  */
 declare function coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[];
-type ShapeArg$2 = Shape | TrackedShape;
-/**
- * Apply a fillet (rounded edge) to a mesh-selected edge.
- *
- * Works on any straight edge of any shape — not limited to tracked box edges.
- * The edge must have been obtained from selectEdge() / selectEdges().
- *
- * @param shape - The solid to modify
- * @param segment - Edge segment from selectEdge() / selectEdges()
- * @param radius - Fillet radius
- * @param segments - Number of arc segments (default: 16)
- */
-declare function filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape;
-/**
- * Apply a chamfer (beveled edge) to a mesh-selected edge.
- *
- * Works on any straight edge of any shape — not limited to tracked box edges.
- *
- * @param shape - The solid to modify
- * @param segment - Edge segment from selectEdge() / selectEdges()
- * @param size - Chamfer size (distance from edge)
- */
-declare function chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape;
-type ExplodeAxis = "x" | "y" | "z";
-type ExplodeDirection = "radial" | ExplodeAxis | [
-	number,
-	number,
-	number
-];
-interface ExplodeDirective {
-	/** Multiplier applied to `amount` for this node */
-	stage?: number;
-	/** Direction mode for this node */
-	direction?: ExplodeDirection;
-	/** Optional axis lock after direction is resolved */
-	axisLock?: ExplodeAxis;
-}
-interface ExplodeConfigOptions {
-	amount?: number;
-	stages?: number[];
-	mode?: ExplodeDirection;
-	axisLock?: ExplodeAxis;
-	byName?: Record<string, ExplodeDirective>;
-	byPath?: Record<string, ExplodeDirective>;
-}
-type ExplodeViewDirection = ExplodeDirection;
-interface ExplodeViewDirective extends ExplodeDirective {
-}
-interface ExplodeViewOptions {
-	/** Set false to disable viewport explode offsets for this script output. */
-	enabled?: boolean;
-	/** Scales the UI explode amount. Default: 1 */
-	amountScale?: number;
-	/**
-	 * Per-depth stage multipliers (depth 1 = first level).
-	 * If depth exceeds this array, the last value is reused.
-	 * Default when omitted: reciprocal depth (1, 1/2, 1/3, ...)
-	 */
-	stages?: number[];
-	/** Global direction mode fallback. Default: 'radial' */
-	mode?: ExplodeViewDirection;
-	/** Global axis lock fallback. */
-	axisLock?: ExplodeAxis;
-	/** Per-object overrides by final object name. */
-	byName?: Record<string, ExplodeViewDirective>;
-	/** Per-tree-path overrides using slash-separated object tree segments. */
-	byPath?: Record<string, ExplodeViewDirective>;
-}
-/**
- * Configure viewport exploded-view behavior for the current script execution.
- * Multiple calls merge; later values override earlier ones.
- */
-declare function explodeView(options?: ExplodeViewOptions): void;
 /**
  * Edge selector: what to fillet.
  * - EdgeSegment: a single edge from selectEdge()
@@ -4576,32 +4776,6 @@ declare function draft(shape: ShapeArg$3, angleDeg: number, pullDirection?: [
  * offsetSolid(myShape, -0.5)
  */
 declare function offsetSolid(shape: ShapeArg$3, thickness: number): Shape;
-interface RevoluteJointOpts {
-	axis?: [
-		number,
-		number,
-		number
-	];
-	min?: number;
-	max?: number;
-	default?: number;
-	unit?: string;
-	reverse?: boolean;
-}
-/**
- * Create a revolute (hinge) joint. Auto-creates a param slider and rotates the shape.
- *
- * @param name - Display name for the angle parameter
- * @param shape - The shape to rotate
- * @param pivot - The pivot point [x, y, z]
- * @param opts - Joint options (axis, min/max angle, default)
- * @returns The rotated shape
- */
-declare function joint(name: string, shape: Shape, pivot: [
-	number,
-	number,
-	number
-], opts?: RevoluteJointOpts): Shape;
 type MetricSize = "M2" | "M2.5" | "M3" | "M4" | "M5" | "M6" | "M8" | "M10";
 type FastenerFit = "close" | "normal" | "loose" | "tap";
 interface FastenerHoleOptions {
@@ -5082,93 +5256,6 @@ declare function param(name: string, defaultValue: number, opts?: {
  * Renders as a checkbox in the UI.
  */
 declare function boolParam(name: string, defaultValue: boolean): boolean;
-interface RobotLinkExportOptions {
-	massKg?: number;
-	densityKgM3?: number;
-	collision?: "visual" | "convex" | "box" | "none";
-}
-interface RobotJointExportOptions {
-	effort?: number;
-	velocity?: number;
-	damping?: number;
-	friction?: number;
-}
-interface RobotDiffDrivePluginOptions {
-	leftJoints: string[];
-	rightJoints: string[];
-	wheelSeparationMm: number;
-	wheelRadiusMm: number;
-	topic?: string;
-	odomTopic?: string;
-	tfTopic?: string;
-	frameId?: string;
-	odomFrameId?: string;
-	maxLinearVelocity?: number;
-	maxAngularVelocity?: number;
-	linearAcceleration?: number;
-	angularAcceleration?: number;
-}
-interface RobotJointStatePublisherOptions {
-	enabled?: boolean;
-	joints?: string[];
-	topic?: string;
-	updateRate?: number;
-}
-type RobotPose6 = [
-	number,
-	number,
-	number,
-	number,
-	number,
-	number
-];
-interface RobotWorldKeyboardTeleopOptions {
-	enabled?: boolean;
-	linearStep?: number;
-	angularStep?: number;
-}
-interface RobotWorldOptions {
-	name?: string;
-	generateDemoWorld?: boolean;
-	spawnPose?: RobotPose6;
-	keyboardTeleop?: RobotWorldKeyboardTeleopOptions;
-}
-interface RobotExportOptions {
-	assembly: Assembly;
-	modelName?: string;
-	state?: JointState;
-	static?: boolean;
-	selfCollide?: boolean;
-	allowAutoDisable?: boolean;
-	links?: Record<string, RobotLinkExportOptions>;
-	joints?: Record<string, RobotJointExportOptions>;
-	plugins?: {
-		diffDrive?: RobotDiffDrivePluginOptions;
-		jointStatePublisher?: RobotJointStatePublisherOptions;
-	};
-	world?: RobotWorldOptions;
-}
-interface CollectedRobotExport {
-	modelName: string;
-	assembly: AssemblyDefinition;
-	state: JointState;
-	static: boolean;
-	selfCollide: boolean;
-	allowAutoDisable: boolean;
-	links: Record<string, RobotLinkExportOptions>;
-	joints: Record<string, RobotJointExportOptions>;
-	plugins: {
-		diffDrive?: RobotDiffDrivePluginOptions;
-		jointStatePublisher?: RobotJointStatePublisherOptions;
-	};
-	world: RobotWorldOptions | null;
-}
-/**
- * Declare that the current script should export an assembly as a robot package for the SDF CLI.
- *
- * Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
- */
-declare function robotExport(options: RobotExportOptions): CollectedRobotExport;
 /**
  * ForgeCAD — Scene Configuration API
  *
@@ -5542,6 +5629,7 @@ declare const verify: {
 };
 /** Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch. */
 declare function intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch;
+declare function faceProfile(shape: Shape | TrackedShape, faceName: string): Sketch;
 /** Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch. */
 declare function projectToPlane(shape: Shape, plane: PlaneSpec): Sketch;
 interface SheetMetalOptions {

@@ -122,6 +122,22 @@ mirrorCopy(shape: ShapeArg$1, normal: [ number, number, number ]): Shape
 
 Mirror a shape across a plane defined by its normal and union the mirror with the original.
 
+#### `filletEdgeSegment()`
+
+```ts
+filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape
+```
+
+Apply a fillet (rounded edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges. The edge must have been obtained from selectEdge() / selectEdges().
+
+#### `chamferEdgeSegment()`
+
+```ts
+chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape
+```
+
+Apply a chamfer (beveled edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges.
+
 #### `selectEdges()`
 
 ```ts
@@ -145,22 +161,6 @@ coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
 ```
 
 Coalesce collinear edge segments into longer logical edges. Multiple short mesh segments along the same line (e.g. from tessellation) are merged into a single EdgeSegment spanning the full extent. The `tolerance` controls how far endpoints can deviate from collinearity.
-
-#### `filletEdgeSegment()`
-
-```ts
-filletEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, radius: number, segments?: number): Shape
-```
-
-Apply a fillet (rounded edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges. The edge must have been obtained from selectEdge() / selectEdges().
-
-#### `chamferEdgeSegment()`
-
-```ts
-chamferEdgeSegment(shape: ShapeArg$2, segment: EdgeSegment, size: number): Shape
-```
-
-Apply a chamfer (beveled edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges.
 
 ### Imports & Composition
 
@@ -392,6 +392,12 @@ offsetSolid(shape: ShapeArg$3, thickness: number): Shape
 
 Uniformly offset all surfaces of a solid inward or outward by a thickness value. Unlike shell(), which hollows a solid, offsetSolid() produces a new solid whose surfaces are all shifted by the given thickness. Positive = outward, negative = inward. Requires the OCCT backend. Throws on Manifold. // Grow a box outward by 1mm on all sides offsetSolid(myBox, 1) // Shrink a shape inward by 0.5mm offsetSolid(myShape, -0.5)
 
+#### `faceProfile()`
+
+```ts
+faceProfile(shape: Shape | TrackedShape, faceName: string): Sketch
+```
+
 #### `torus()`
 
 ```ts
@@ -485,7 +491,7 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `withPorts()` — Attach named assembly ports (origin + axis + up) that survive transforms and imports.
 - `portNames()` — List named port identifiers carried by this shape.
 - `referencePoint()` — Resolve a named placement reference or built-in anchor to a 3D point.
-- `face()` — Resolve a defended semantic face by name on compile-covered shapes.
+- `face()` — Resolve a semantic face by name.  Works on compile-covered shapes and, as a fallback, on any planar-faced mesh (e.g. the result of boolean ops) via coplanar triangle clustering.
 - `faceNames()` — List defended semantic face names currently available on this shape.
 - `faceHistory()` — Get the transformation history for a specific face.
 - `placeReference()` — Translate the shape so the given reference lands on the target coordinate.
@@ -516,6 +522,8 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `project()` — Orthographically project the runtime solid onto the local XY plane.
 - `attachTo()` — Position this shape relative to another using named 3D anchor points. Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...), edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...). Anchor word order is flexible: 'front-left' and 'left-front' are equivalent. Named placement references (from withReferences) can also be used as anchors.
 - `onFace()` — Place this shape on a face of a parent shape. Think of it like sticking a label on a box surface: - `face` picks which surface ('front', 'back', 'top', etc.) - `u, v` position within that face's 2D plane (from center) - front/back: u = left/right (X), v = up/down (Z) - left/right: u = forward/back (Y), v = up/down (Z) - top/bottom: u = left/right (X), v = forward/back (Y) - `protrude` = how far the child sticks out (positive = outward from face)
+- `pocket()` — pocket(faceName: string, depth: number, opts?: PocketOptions): Shape
+- `boss()` — boss(faceName: string, height: number, opts?: BossOptions): Shape
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
 
@@ -570,6 +578,8 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `shell()` — Shelling returns a plain Shape because tracked topology is not preserved.
 - `boundingBox()` — boundingBox(): ShapeRuntimeBounds
 - `get volume()` — get volume(): number
+- `pocket()` — pocket(faceName: string, depth: number, opts?: PocketOptions): Shape
+- `boss()` — boss(faceName: string, height: number, opts?: BossOptions): Shape
 - `hole()` — hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
 - `cutout()` — cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
 

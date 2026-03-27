@@ -123,8 +123,18 @@ A quintic Hermite curve in 3D space. Interpolates between two endpoints matching
 - `lineH()` — lineH(dx: number): this
 - `lineV()` — lineV(dy: number): this
 - `lineAngled()` — lineAngled(length: number, degrees: number): this
-- `arcTo()` — Draw a circular arc from the current position to (x, y) with the given radius. `clockwise=true`  → arc curves to the right of the start→end direction. `clockwise=false` → arc curves to the left  of the start→end direction. Center is determined by the midpoint formula (not tangent-aware). For a G1-continuous arc chain use `tangentArcTo` instead.
-- `tangentArcTo()` — Draw a circular arc from the current position to (x, y) that is tangent to the current path direction at the start. Unlike `arcTo`, the radius is not specified — it is derived from the departure direction and the endpoint, guaranteeing G1 continuity with the previous segment. Chaining multiple `tangentArcTo` calls produces a fully smooth, kink-free curve. Throws if the endpoint lies exactly along the current direction (use lineTo).
-- `smoothCapTo()` — Smooth three-arc end cap from the current position to (endX, endY). Inserts: small corner arc → large cap arc → small corner arc, all G1- continuous with each other and with the preceding/following segments. Geometry is computed automatically — no need to know junction points. Example — slot with a bumped end cap: ```js path() .moveTo(0, 0).lineTo(40, 0) .smoothCapTo(40, 20, 4, 12) .lineTo(0, 20).close().extrude(5) ```
-- `close()` — close(): Sketch
+- `lineBy()` — lineBy(dx: number, dy: number): this
+- `arcBy()` — arcBy(dx: number, dy: number, radius: number, clockwise?: boolean): this
+- `bezierBy()` — bezierBy(dcp1x: number, dcp1y: number, dcp2x: number, dcp2y: number, dx: number,
+- `arcTo()` — Draw a circular arc from the current position to (x, y) with the given radius. `clockwise=true`  → arc curves to the right of the start→end direction. `clockwise=false` → arc curves to the left  of the start→end direction.
+- `tangentArcTo()` — G1-continuous arc — radius derived from current tangent + endpoint. Throws if endpoint is collinear with current direction.
+- `smoothCapTo()` — Smooth three-arc end cap from the current position to (endX, endY). Inserts: small corner arc → large cap arc → small corner arc, all G1-continuous.
+- `bezierTo()` — Cubic bezier from current position to (x, y) via two control points.
+- `tangentBezierTo()` — G1-continuous cubic bezier — first control point is auto-derived from the current tangent direction. `weight` controls how far the auto-placed control point extends along the tangent (default: 1/3 of the chord). The second control point `(cp2x, cp2y)` must be provided — it controls the arrival curvature. For a fully automatic smooth curve, see `smoothThrough`.
+- `smoothThrough()` — Catmull-Rom spline through a list of waypoints from the current position. The current position is included as the first point. The last waypoint becomes the new cursor position.
+- `fillet()` — Round the last corner (the junction between the previous two segments) with a tangent arc of the given radius. Must be called after at least two line/arc segments that form a corner. The fillet trims back both segments and inserts a tangent arc. ```js path().moveTo(0,0).lineTo(10,0).lineTo(10,10).fillet(2).lineTo(0,10).close() ```
+- `chamfer()` — Chamfer the last corner with a straight cut of the given distance. ```js path().moveTo(0,0).lineTo(10,0).lineTo(10,10).chamfer(2).lineTo(0,10).close() ```
+- `mirror()` — Mirror all existing segments across an axis and append the mirrored copy in reverse order, creating a symmetric path. The axis passes through the current cursor position. 'y' mirrors across the local Y-axis (flips X), or `[nx, ny]` for an arbitrary axis direction. ```js // Build right half, mirror to get full symmetric profile path().moveTo(0,0).lineTo(10,0).lineTo(10,5).mirror('x').close() ```
+- `close()` — Close the path and return a filled Sketch. If the path contains multiple sub-paths (multiple moveTo calls), the first sub-path is the outer contour and subsequent sub-paths are holes (subtracted from the outer contour).
+- `closeOffset()` — Close the path and return an offset version of the filled Sketch. Positive delta expands outward, negative shrinks inward.
 - `stroke()` — stroke(width: number, join?: "Round" | "Square"): Sketch

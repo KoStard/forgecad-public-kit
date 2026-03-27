@@ -18,6 +18,14 @@ jointsView(options?: JointsViewOptions): void
 
 Configure runtime joint controls that animate object transforms in the viewport without re-running the script.
 
+#### `explodeView()`
+
+```ts
+explodeView(options?: ExplodeViewOptions): void
+```
+
+Configure viewport exploded-view behavior for the current script execution. Multiple calls merge; later values override earlier ones.
+
 #### `cutPlane()`
 
 ```ts
@@ -31,14 +39,6 @@ Define a named section/cut plane. Appears as a toggle in the View Panel. When en
 ```ts
 cutPlane(name: string, normal: [ number, number, number ], options?: CutPlaneOptions): void
 ```
-
-#### `explodeView()`
-
-```ts
-explodeView(options?: ExplodeViewOptions): void
-```
-
-Configure viewport exploded-view behavior for the current script execution. Multiple calls merge; later values override earlier ones.
 
 #### `scene()`
 

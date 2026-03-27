@@ -16,7 +16,7 @@ Create 2D profiles for extrusion and other operations.
 path(): PathBuilder
 ```
 
-Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/close/stroke.
+Create a path builder for constructing 2D outlines.
 
 #### `stroke()`
 
@@ -24,7 +24,7 @@ Create a path builder for constructing 2D outlines with moveTo/lineTo/arcTo/clos
 stroke(points: [ number, number ][], width: number, join?: "Round" | "Square"): Sketch
 ```
 
-Create a stroked polyline sketch from an array of 2D points with the given width and corner join style.
+Create a stroked polyline sketch from an array of 2D points.
 
 #### `rect()`
 
