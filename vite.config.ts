@@ -695,6 +695,22 @@ function forgeDocsPlugin() {
         }
         next();
       });
+
+      // Rebuild docs-web/ when any markdown source changes
+      const docsSourceDir = path.resolve(__dirname, 'docs', 'permanent');
+      let debounce: ReturnType<typeof setTimeout> | null = null;
+      const watcher = chokidar.watch(`${docsSourceDir}/**/*.md`, { ignoreInitial: true });
+      watcher.on('all', () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          try {
+            execSync('node scripts/build-docs-site.mjs', { cwd: __dirname, stdio: 'pipe' });
+            console.log('✓ docs-web rebuilt');
+          } catch (e: any) {
+            console.error('✗ build:docs failed:', e.stderr?.toString() ?? e.message);
+          }
+        }, 300);
+      });
     },
     closeBundle() {
       // Copy docs-web/ into dist/docs/ for production builds
