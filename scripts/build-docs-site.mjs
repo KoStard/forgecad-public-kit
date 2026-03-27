@@ -904,6 +904,7 @@ function getAppJs() {
   const input = document.getElementById('search-input');
   const results = document.getElementById('search-results');
   const content = document.getElementById('doc-content');
+  const contentScroller = document.getElementById('content');
   const sidebarLinks = document.querySelectorAll('.sidebar-link');
   const searchTrigger = document.getElementById('search-trigger');
 
@@ -961,7 +962,7 @@ function getAppJs() {
 
     currentDocId = docId;
     content.innerHTML = page.html;
-    content.scrollTop = 0;
+    contentScroller.scrollTop = 0;
 
     // Update sidebar
     sidebarLinks.forEach(l => {
