@@ -111,8 +111,9 @@ function buildCornerGeometry(points: [number, number][], spec: FilletCornerSpec,
   const centerDistance = spec.radius / Math.sin(interiorAngle / 2);
   const center: [number, number] = [current[0] + bisectorX * centerDistance, current[1] + bisectorY * centerDistance];
 
-  // Convex: arc sweeps in winding direction. Concave: arc sweeps opposite.
-  const sweep = isConcave ? -winding * interiorAngle : winding * interiorAngle;
+  // The fillet arc subtends (π − interiorAngle). Convex: sweep in winding direction; concave: opposite.
+  const arcAngle = Math.PI - interiorAngle;
+  const sweep = isConcave ? -winding * arcAngle : winding * arcAngle;
 
   const requestedSegments = spec.segments == null ? defaultSegmentsForSweep(sweep) : Math.round(spec.segments);
   const segments = Math.max(2, requestedSegments);
