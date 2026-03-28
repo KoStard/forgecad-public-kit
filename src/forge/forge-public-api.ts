@@ -113,6 +113,7 @@ export {
   linearPattern2d,
   loadFont,
   loft,
+  loftAlongSpine,
   mirrorCopy,
   ngon,
   Point2D,

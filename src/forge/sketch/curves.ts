@@ -358,6 +358,62 @@ export function loft(profiles: Sketch[], heights: number[], options: LoftOptions
   });
 }
 
+export interface LoftAlongSpineOptions {
+  /** Number of samples when spine is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /**
+   * Preferred "up" vector for local profile frame.
+   * Auto fallback is used near parallel segments.
+   */
+  up?: Vec3;
+}
+
+/**
+ * Loft between multiple profiles positioned along an arbitrary 3D spine curve.
+ *
+ * Unlike loft() which only supports Z heights, loftAlongSpine() places each
+ * profile at a position along a 3D spine, oriented perpendicular to the spine
+ * tangent. This enables lofting along curved paths — e.g., a wing root-to-tip
+ * transition that follows a swept-back leading edge.
+ *
+ * The tValues array specifies where each profile sits along the spine (0 = start,
+ * 1 = end). Must have the same length as profiles and be in [0, 1].
+ *
+ * Internally uses variableSweep infrastructure with SDF interpolation.
+ *
+ * Performance note: uses level-set meshing, heavier than simple loft().
+ */
+export function loftAlongSpine(
+  profiles: Sketch[],
+  spine: Curve3D | Vec3[],
+  tValues: number[],
+  options: LoftAlongSpineOptions = {},
+): Shape {
+  if (profiles.length < 2) throw new Error('loftAlongSpine requires at least two profiles');
+  if (profiles.length !== tValues.length) {
+    throw new Error('loftAlongSpine requires tValues.length === profiles.length');
+  }
+  for (const t of tValues) {
+    if (t < 0 || t > 1) throw new Error(`loftAlongSpine: t=${t} is out of range [0, 1]`);
+  }
+
+  const sections: VariableSweepSection[] = profiles.map((profile, i) => ({
+    t: tValues[i],
+    profile,
+  }));
+
+  return variableSweep(spine, sections, {
+    samples: options.samples,
+    edgeLength: options.edgeLength,
+    boundsPadding: options.boundsPadding,
+    up: options.up,
+  });
+}
+
 /**
  * Sweep a 2D profile along a 3D path to create a solid.
  *
