@@ -11,7 +11,7 @@
 
 import type { SdfNode, Vec3 } from './sdfNode';
 import { simplex3, seededSimplex3 } from './noise';
-import { gyroid, schwarzP, diamond } from './tpms';
+import { gyroid, schwarzP, diamond, lidinoid } from './tpms';
 import { worley3, seededWorley3 } from './voronoi';
 
 const { abs, cos, max, min, sin, sqrt, PI } = Math;
@@ -271,9 +271,12 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
     }
     case 'sdf:displace': {
       const fn = compileSdfNode(node.child);
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
       // eslint-disable-next-line no-new-func
-      const displaceFn = new Function('x', 'y', 'z', `return (${node.functionBody});`) as (x: number, y: number, z: number) => number;
-      return (p) => fn(p) + displaceFn(p[0], p[1], p[2]);
+      const displaceFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
+      return (p) => fn(p) + (displaceFn as any)(p[0], p[1], p[2], ...constValues);
     }
     case 'sdf:onion': {
       const fn = compileSdfNode(node.child);
@@ -297,6 +300,25 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
     case 'sdf:diamond': {
       const { cellSize, thickness } = node;
       return (p) => diamond(p[0], p[1], p[2], cellSize, thickness);
+    }
+    case 'sdf:lidinoid': {
+      const { cellSize, thickness } = node;
+      return (p) => lidinoid(p[0], p[1], p[2], cellSize, thickness);
+    }
+
+    // ── Spatial blend ──
+    case 'sdf:spatialBlend': {
+      const fnA = compileSdfNode(node.a);
+      const fnB = compileSdfNode(node.b);
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
+      // eslint-disable-next-line no-new-func
+      const blendFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
+      return (p) => {
+        const t = clamp(blendFn(p[0], p[1], p[2], ...constValues) as number, 0, 1);
+        return fnA(p) * (1 - t) + fnB(p) * t;
+      };
     }
 
     // ── Noise / patterns ──
@@ -334,9 +356,12 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
 
     // ── Custom ──
     case 'sdf:custom': {
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
       // eslint-disable-next-line no-new-func
-      const customFn = new Function('x', 'y', 'z', `return (${node.functionBody});`) as (x: number, y: number, z: number) => number;
-      return (p) => customFn(p[0], p[1], p[2]);
+      const customFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
+      return (p) => (customFn as any)(p[0], p[1], p[2], ...constValues);
     }
   }
 }
@@ -457,9 +482,14 @@ export function estimateSdfBounds(node: SdfNode): SdfBounds {
     // TPMS — need explicit bounds from user; use a sensible default
     case 'sdf:gyroid':
     case 'sdf:schwarzP':
-    case 'sdf:diamond': {
+    case 'sdf:diamond':
+    case 'sdf:lidinoid': {
       const s = node.cellSize * 3; // 3 cells in each direction
       return { min: [-s, -s, -s], max: [s, s, s] };
+    }
+
+    case 'sdf:spatialBlend': {
+      return unionBounds([estimateSdfBounds(node.a), estimateSdfBounds(node.b)], 0);
     }
 
     // Noise / patterns — infinite fields, use a sensible default

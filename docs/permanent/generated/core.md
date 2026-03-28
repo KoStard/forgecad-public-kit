@@ -310,6 +310,12 @@ smoothIntersection(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfS
 morph(a: SdfShape, b: SdfShape, t: number): SdfShape
 ```
 
+#### `blend()`
+
+```ts
+blend(a: SdfShape, b: SdfShape, fn: (x: number, y: number, z: number) => number, options?: BlendOptions): SdfShape
+```
+
 #### `gyroid()`
 
 ```ts
@@ -326,6 +332,12 @@ schwarzP(options: TpmsOptions): SdfShape
 
 ```ts
 diamond(options: TpmsOptions): SdfShape
+```
+
+#### `lidinoid()`
+
+```ts
+lidinoid(options: TpmsOptions): SdfShape
 ```
 
 #### `noise()`
@@ -364,10 +376,22 @@ knurl(options?: KnurlOptions): SdfShape
 perforated(options?: PerforatedOptions): SdfShape
 ```
 
+#### `scales()`
+
+```ts
+scales(options?: ScalesOptions): SdfShape
+```
+
+#### `brick()`
+
+```ts
+brick(options?: BrickOptions): SdfShape
+```
+
 #### `fromFunction()`
 
 ```ts
-fromFunction(fn: (x: number, y: number, z: number) => number, bounds: { min: Vec3$1; max: Vec3$1; }): SdfShape
+fromFunction(fn: (x: number, y: number, z: number) => number, bounds: { min: Vec3$1; max: Vec3$1; }, constants?: Record<string, number>): SdfShape
 ```
 
 #### `twist()`
@@ -804,7 +828,7 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `bend()` — Bend around the Z axis with given radius.
 - `repeat()` — Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite.
 - `shell()` — Hollow out, keeping only a shell of given thickness.
-- `displace()` — Displace the surface by a function of position.
+- `displace()` — Displace the surface by a function of position. Pass constants to inject named values into the function body (avoids closure serialization issues).
 - `onion()` — Create concentric onion layers.
 
 ---

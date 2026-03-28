@@ -143,6 +143,8 @@ export interface SdfDisplaceNode {
   child: SdfNode;
   /** Serialized as a function body string: receives (x, y, z) and returns a number. */
   functionBody: string;
+  /** Named constants injected as additional function parameters (avoids closure serialization issues). */
+  constants?: Record<string, number>;
 }
 
 export interface SdfOnionNode {
@@ -171,6 +173,23 @@ export interface SdfDiamondNode {
   kind: 'sdf:diamond';
   cellSize: number;
   thickness: number;
+}
+
+export interface SdfLidinoidNode {
+  kind: 'sdf:lidinoid';
+  cellSize: number;
+  thickness: number;
+}
+
+// ─── Spatial blend ──────────────────────────────────────────────────────────
+
+export interface SdfSpatialBlendNode {
+  kind: 'sdf:spatialBlend';
+  a: SdfNode;
+  b: SdfNode;
+  /** Function body returning 0..1. 0 = fully a, 1 = fully b. */
+  functionBody: string;
+  constants?: Record<string, number>;
 }
 
 // ─── Noise / pattern nodes ──────────────────────────────────────────────────
@@ -204,6 +223,8 @@ export interface SdfCustomNode {
   /** Function body string: receives (x, y, z) and returns signed distance. */
   functionBody: string;
   bounds: { min: Vec3; max: Vec3 };
+  /** Named constants injected as additional function parameters (avoids closure serialization issues). */
+  constants?: Record<string, number>;
 }
 
 // ─── Union type ──────────────────────────────────────────────────────────────
@@ -238,6 +259,9 @@ export type SdfNode =
   | SdfGyroidNode
   | SdfSchwarzPNode
   | SdfDiamondNode
+  | SdfLidinoidNode
+  // Spatial blend
+  | SdfSpatialBlendNode
   // Noise / patterns
   | SdfNoiseNode
   | SdfVoronoiNode
@@ -293,7 +317,7 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
     case 'sdf:shell':
       return { kind: 'sdf:shell', child: cloneSdfNode(node.child), thickness: node.thickness };
     case 'sdf:displace':
-      return { kind: 'sdf:displace', child: cloneSdfNode(node.child), functionBody: node.functionBody };
+      return { kind: 'sdf:displace', child: cloneSdfNode(node.child), functionBody: node.functionBody, ...(node.constants ? { constants: { ...node.constants } } : {}) };
     case 'sdf:onion':
       return { kind: 'sdf:onion', child: cloneSdfNode(node.child), layers: node.layers, thickness: node.thickness };
 
@@ -304,6 +328,18 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
       return { kind: 'sdf:schwarzP', cellSize: node.cellSize, thickness: node.thickness };
     case 'sdf:diamond':
       return { kind: 'sdf:diamond', cellSize: node.cellSize, thickness: node.thickness };
+    case 'sdf:lidinoid':
+      return { kind: 'sdf:lidinoid', cellSize: node.cellSize, thickness: node.thickness };
+
+    // Spatial blend
+    case 'sdf:spatialBlend':
+      return {
+        kind: 'sdf:spatialBlend',
+        a: cloneSdfNode(node.a),
+        b: cloneSdfNode(node.b),
+        functionBody: node.functionBody,
+        constants: node.constants ? { ...node.constants } : undefined,
+      };
 
     // Noise / patterns
     case 'sdf:noise':
@@ -313,6 +349,6 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
 
     // Custom
     case 'sdf:custom':
-      return { kind: 'sdf:custom', functionBody: node.functionBody, bounds: { min: [...node.bounds.min], max: [...node.bounds.max] } };
+      return { kind: 'sdf:custom', functionBody: node.functionBody, bounds: { min: [...node.bounds.min], max: [...node.bounds.max] }, ...(node.constants ? { constants: { ...node.constants } } : {}) };
   }
 }

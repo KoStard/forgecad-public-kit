@@ -6,10 +6,13 @@
  */
 
 export type {
+  BlendOptions,
+  BrickOptions,
   HoneycombOptions,
   KnurlOptions,
   NoiseOptions,
   PerforatedOptions,
+  ScalesOptions,
   SdfToShapeOptions,
   TpmsOptions,
   VoronoiOptions,
@@ -17,7 +20,10 @@ export type {
 } from './sdf';
 export {
   bend,
+  blend,
   box,
+  // Surface patterns
+  brick,
   capsule,
   cone,
   cylinder,
@@ -29,11 +35,13 @@ export {
   // Patterns
   honeycomb,
   knurl,
+  lidinoid,
   morph,
   // Noise
   noise,
   perforated,
   repeat,
+  scales,
   // Builder class
   SdfShape,
   schwarzP,

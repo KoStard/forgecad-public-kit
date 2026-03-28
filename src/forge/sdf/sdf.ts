@@ -122,9 +122,9 @@ export class SdfShape {
     return new SdfShape({ kind: 'sdf:shell', child: this._node, thickness });
   }
 
-  /** Displace the surface by a function of position. */
-  displace(fn: (x: number, y: number, z: number) => number): SdfShape {
-    return new SdfShape({ kind: 'sdf:displace', child: this._node, functionBody: extractFunctionBody(fn) });
+  /** Displace the surface by a function of position. Pass constants to inject named values into the function body (avoids closure serialization issues). */
+  displace(fn: (x: number, y: number, z: number) => number, constants?: Record<string, number>): SdfShape {
+    return new SdfShape({ kind: 'sdf:displace', child: this._node, functionBody: extractFunctionBody(fn), constants });
   }
 
   /** Create concentric onion layers. */
@@ -187,6 +187,37 @@ export function morph(a: SdfShape, b: SdfShape, t: number): SdfShape {
   return new SdfShape({ kind: 'sdf:morph', a: a._node, b: b._node, t });
 }
 
+// ─── Spatial blend factory ──────────────────────────────────────────────────
+
+export interface BlendOptions {
+  /** Optional named constants accessible in the blend function. */
+  constants?: Record<string, number>;
+}
+
+/**
+ * Spatially blend between two SDF patterns.
+ * The blend function receives (x, y, z) and returns 0..1:
+ * 0 = fully pattern `a`, 1 = fully pattern `b`.
+ *
+ * ```js
+ * // Schwarz-P at bottom, gyroid at top, smooth transition
+ * sdf.blend(
+ *   sdf.schwarzP({ cellSize: 6, thickness: 1 }),
+ *   sdf.gyroid({ cellSize: 8, thickness: 1 }),
+ *   (x, y, z) => Math.max(0, Math.min(1, y / 30))
+ * ).intersect(sdf.sphere(20)).toShape()
+ * ```
+ */
+export function blend(a: SdfShape, b: SdfShape, fn: (x: number, y: number, z: number) => number, options?: BlendOptions): SdfShape {
+  return new SdfShape({
+    kind: 'sdf:spatialBlend',
+    a: a._node,
+    b: b._node,
+    functionBody: extractFunctionBody(fn),
+    constants: options?.constants,
+  });
+}
+
 // ─── TPMS lattice factories ──────────────────────────────────────────────────
 
 export interface TpmsOptions {
@@ -207,6 +238,11 @@ export function schwarzP(options: TpmsOptions): SdfShape {
 /** Diamond TPMS lattice — stiffest TPMS structure. */
 export function diamond(options: TpmsOptions): SdfShape {
   return new SdfShape({ kind: 'sdf:diamond', cellSize: options.cellSize, thickness: options.thickness });
+}
+
+/** Lidinoid TPMS lattice — visually distinct from gyroid, popular in research and art. */
+export function lidinoid(options: TpmsOptions): SdfShape {
+  return new SdfShape({ kind: 'sdf:lidinoid', cellSize: options.cellSize, thickness: options.thickness });
 }
 
 // ─── Noise / pattern factories ──────────────────────────────────────────────
@@ -414,6 +450,81 @@ export function perforated(options?: PerforatedOptions): SdfShape {
   return cylinder(1000, r).repeat([sp, 0, sp], [0, 0, 0]);
 }
 
+// ─── Surface pattern presets ────────────────────────────────────────────────
+
+export interface ScalesOptions {
+  /** Scale diameter. Default: 5 */
+  size?: number;
+  /** How much scales protrude. Default: 0.8 */
+  depth?: number;
+}
+
+/**
+ * Fish/dragon scale pattern — overlapping circular scales in hex-packed rows.
+ * Returns an infinite-extent SDF; intersect with a bounding shape.
+ */
+export function scales(options?: ScalesOptions): SdfShape {
+  const size = options?.size ?? 5;
+  const depth = options?.depth ?? 0.8;
+  const halfDepth = depth * 0.5;
+  const halfSize = size * 0.5;
+  const rowHeight = size * 0.866;
+  const halfRowHeight = rowHeight;
+  // Moderate default bounds — user should intersect with a bounding shape
+  const ext = size * 8;
+  const functionBody = `(function() {
+  var s = ${size};
+  var rh = ${rowHeight};
+  var row = Math.floor(z / rh);
+  var offset = (row & 1) * s * 0.5;
+  var col = Math.round((x - offset) / s);
+  var cx = col * s + offset;
+  var cz = row * rh;
+  var dx = x - cx, dz = z - cz;
+  var dist = Math.sqrt(dx * dx + dz * dz);
+  var profile = Math.max(0, 1 - dist / ${halfSize});
+  var overlap = (z - cz) / ${halfRowHeight} * ${halfDepth};
+  return -(profile * profile * ${depth} + overlap);
+})()`;
+  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -depth * 2, -ext], max: [ext, depth * 2, ext] } });
+}
+
+export interface BrickOptions {
+  /** Brick width. Default: 10 */
+  width?: number;
+  /** Brick height. Default: 5 */
+  height?: number;
+  /** Mortar groove depth. Default: 0.5 */
+  depth?: number;
+  /** Mortar gap width. Default: 1 */
+  mortar?: number;
+}
+
+/**
+ * Brick/stone wall pattern — running bond with mortar grooves.
+ * Oriented in XY plane. Intersect with a bounding shape.
+ */
+export function brick(options?: BrickOptions): SdfShape {
+  const width = options?.width ?? 10;
+  const height = options?.height ?? 5;
+  const depth = options?.depth ?? 0.5;
+  const mortar = options?.mortar ?? 1;
+  const halfMortar = mortar * 0.5;
+  const ext = Math.max(width, height) * 8;
+  const functionBody = `(function() {
+  var w = ${width}, h = ${height}, m = ${halfMortar};
+  var row = Math.floor(y / h);
+  var offset = (row & 1) * w * 0.5;
+  var bx = ((x - offset) % w + w) % w;
+  var by = (y % h + h) % h;
+  var dx = Math.min(bx, w - bx);
+  var dy = Math.min(by, h - by);
+  var d = Math.min(dx, dy);
+  return d < m ? ${depth} : -${depth};
+})()`;
+  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -ext, -depth * 2], max: [ext, ext, depth * 2] } });
+}
+
 // ─── Custom SDF ──────────────────────────────────────────────────────────────
 
 /**
@@ -423,8 +534,8 @@ export function perforated(options?: PerforatedOptions): SdfShape {
  *
  * You must provide bounds since the function is opaque.
  */
-export function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: { min: Vec3; max: Vec3 }): SdfShape {
-  return new SdfShape({ kind: 'sdf:custom', functionBody: extractFunctionBody(fn), bounds });
+export function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: { min: Vec3; max: Vec3 }, constants?: Record<string, number>): SdfShape {
+  return new SdfShape({ kind: 'sdf:custom', functionBody: extractFunctionBody(fn), bounds, constants });
 }
 
 // ─── Domain operation factories ──────────────────────────────────────────────
