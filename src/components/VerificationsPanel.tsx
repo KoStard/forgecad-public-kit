@@ -133,11 +133,103 @@ function VerificationRow({ result, onNavigate }: VerificationRowProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Spec group — collapsible section for grouped verification results
+// ---------------------------------------------------------------------------
+
+interface SpecGroupProps {
+  name: string;
+  results: VerificationResult[];
+  onNavigate?: (line: number) => void;
+}
+
+function SpecGroup({ name, results, onNavigate }: SpecGroupProps) {
+  const failures = results.filter((v) => v.status === 'fail');
+  const passes = results.filter((v) => v.status === 'pass');
+  const hasFailures = failures.length > 0;
+  const [collapsed, setCollapsed] = useState(!hasFailures);
+
+  // Auto-expand when failures appear
+  const prevHadFailures = useRef(hasFailures);
+  useEffect(() => {
+    if (hasFailures && !prevHadFailures.current) setCollapsed(false);
+    prevHadFailures.current = hasFailures;
+  }, [hasFailures]);
+
+  const headerColor = hasFailures ? 'var(--fc-warning, #e6a817)' : 'var(--fc-success, #4caf50)';
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      <div
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 0',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        <span style={{ fontSize: 9, color: 'var(--fc-textDim)', width: 10 }}>{collapsed ? '▶' : '▼'}</span>
+        <span style={{ color: headerColor, fontSize: 12 }}>{hasFailures ? '⚠' : '✓'}</span>
+        <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--fc-text)' }}>{name}</span>
+        <span
+          style={{
+            background: headerColor,
+            color: 'var(--fc-bg)',
+            borderRadius: 8,
+            padding: '1px 6px',
+            fontSize: 10,
+            fontWeight: 700,
+          }}
+        >
+          {passes.length}/{results.length}
+        </span>
+      </div>
+      {!collapsed && (
+        <div style={{ paddingLeft: 18 }}>
+          {failures.map((v) => (
+            <VerificationRow key={v.id} result={v} onNavigate={onNavigate} />
+          ))}
+          {passes.length > 0 && failures.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--fc-border)', margin: '4px 0' }} />
+          )}
+          {passes.map((v) => (
+            <VerificationRow key={v.id} result={v} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
+
 export function VerificationsPanel() {
   const verifications = useForgeStore((s) => s.result?.verifications) ?? [];
   const requestEditorNavigate = useForgeStore((s) => s.requestEditorNavigate);
   const [collapsed, setCollapsed] = useState(true);
   const prevHadFailures = useRef(false);
+
+  // Split into grouped (spec) and ungrouped results, preserving insertion order for groups
+  const groupOrder: string[] = [];
+  const groups = new Map<string, VerificationResult[]>();
+  const ungrouped: VerificationResult[] = [];
+
+  for (const v of verifications) {
+    if (v.group) {
+      if (!groups.has(v.group)) {
+        groupOrder.push(v.group);
+        groups.set(v.group, []);
+      }
+      groups.get(v.group)!.push(v);
+    } else {
+      ungrouped.push(v);
+    }
+  }
 
   const failures = verifications.filter((v) => v.status === 'fail');
   const passes = verifications.filter((v) => v.status === 'pass');
@@ -152,6 +244,8 @@ export function VerificationsPanel() {
   if (verifications.length === 0) return null;
 
   const headerColor = hasFailures ? 'var(--fc-warning, #e6a817)' : 'var(--fc-success, #4caf50)';
+  const ungroupedFailures = ungrouped.filter((v) => v.status === 'fail');
+  const ungroupedPasses = ungrouped.filter((v) => v.status === 'pass');
 
   return (
     <div
@@ -215,19 +309,24 @@ export function VerificationsPanel() {
             padding: '0 12px 8px',
           }}
         >
-          {/* Show failures first for visibility */}
-          {failures.map((v) => (
+          {/* Spec groups first */}
+          {groupOrder.map((groupName) => (
+            <SpecGroup key={groupName} name={groupName} results={groups.get(groupName)!} onNavigate={requestEditorNavigate} />
+          ))}
+
+          {/* Separator between groups and ungrouped */}
+          {groupOrder.length > 0 && ungrouped.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--fc-border)', margin: '6px 0' }} />
+          )}
+
+          {/* Ungrouped results (backward-compatible flat list) */}
+          {ungroupedFailures.map((v) => (
             <VerificationRow key={v.id} result={v} onNavigate={requestEditorNavigate} />
           ))}
-          {passes.length > 0 && failures.length > 0 && (
-            <div
-              style={{
-                borderTop: '1px solid var(--fc-border)',
-                margin: '4px 0',
-              }}
-            />
+          {ungroupedPasses.length > 0 && ungroupedFailures.length > 0 && (
+            <div style={{ borderTop: '1px solid var(--fc-border)', margin: '4px 0' }} />
           )}
-          {passes.map((v) => (
+          {ungroupedPasses.map((v) => (
             <VerificationRow key={v.id} result={v} />
           ))}
         </div>

@@ -5869,6 +5869,60 @@ interface ConnectEdgesOptions extends TransitionSurfaceOptions {
 	flipB?: boolean;
 }
 declare function connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape;
+type VerificationStatus = "pass" | "fail";
+interface VerificationResult {
+	id: string;
+	label: string;
+	status: VerificationStatus;
+	message: string;
+	/** 1-based source line number, if captured from the call stack */
+	line?: number;
+	/** Human-readable expected value for display */
+	expected?: string;
+	/** Human-readable actual value for display */
+	actual?: string;
+	/** Spec name — when set, the UI groups this result under a collapsible section */
+	group?: string;
+}
+interface SpecResult {
+	/** Spec name */
+	name: string;
+	/** Number of checks that passed */
+	passed: number;
+	/** Total number of checks */
+	total: number;
+	/** The individual verification results added by this spec */
+	results: VerificationResult[];
+}
+interface Spec {
+	/** The display name of this spec */
+	readonly name: string;
+	/**
+	 * Run this spec's checks against one or more shapes.
+	 * All `verify.*` calls inside the check function are automatically
+	 * grouped under this spec's name in the Checks panel.
+	 */
+	check(...args: unknown[]): SpecResult;
+}
+/**
+ * Create a named spec — a reusable bundle of verification checks.
+ *
+ * ```js
+ * const fitSpec = spec("Fits enclosure", (shape) => {
+ *   verify.lessThan("Width",  shape.boundingBox().max[0] - shape.boundingBox().min[0], 200);
+ *   verify.notEmpty("Has geometry", shape);
+ * });
+ *
+ * fitSpec.check(myShape);   // grouped as "Fits enclosure" in the Checks panel
+ * fitSpec.check(otherShape); // can be reused on multiple shapes
+ * ```
+ *
+ * @param name   Display name shown in the Checks panel
+ * @param checkFn  Function that receives the shapes passed to `.check()` and
+ *                 calls `verify.*` methods. Any verify calls made inside this
+ *                 function are tagged with the spec name for grouped display.
+ */
+declare function spec(name: string, checkFn: (...args: any[]) => void): Spec;
 interface ShapeLike$1 {
 	boundingBox(): {
 		min: number[];

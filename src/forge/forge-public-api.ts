@@ -158,7 +158,8 @@ export { ConstrainedSketchBuilder } from './sketch/constraints';
 export type { HighlightOptions } from './sketch/highlights';
 export type { EdgeRef, FaceRef } from './sketch/topology';
 export { composeChain, Transform } from './transform';
-export { verify } from './verification';
+export type { Spec, SpecResult } from './verification';
+export { spec, verify } from './verification';
 
 // ─── Wrapper functions: differ from their kernel/sketch source signatures ─────
 //

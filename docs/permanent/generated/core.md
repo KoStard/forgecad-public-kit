@@ -470,6 +470,14 @@ Pick a connection point from an EdgeSegment (from selectEdge/selectEdges). EdgeS
 connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape
 ```
 
+#### `spec()`
+
+```ts
+spec(name: string, checkFn: (...args: any[]) => void): Spec
+```
+
+Create a named spec — a reusable bundle of verification checks. ```js const fitSpec = spec("Fits enclosure", (shape) => { verify.lessThan("Width",  shape.boundingBox().max[0] - shape.boundingBox().min[0], 200); verify.notEmpty("Has geometry", shape); }); fitSpec.check(myShape);   // grouped as "Fits enclosure" in the Checks panel fitSpec.check(otherShape); // can be reused on multiple shapes ``` calls `verify.*` methods. Any verify calls made inside this function are tagged with the spec name for grouped display.
+
 #### `faceProfile()`
 
 ```ts

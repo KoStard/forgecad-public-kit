@@ -6,7 +6,7 @@ This directory contains **hand-written API guides** for model authors. For a com
 
 | Directory | Audience | What's in it |
 |-----------|----------|-------------|
-| `core/` | Model authors | Core reference: primitives, transforms, booleans, imports, parameters, topology |
+| `core/` | Model authors | Core reference: primitives, transforms, booleans, imports, parameters, topology, specs |
 | `sketch/` | Model authors (sketch-heavy tasks) | 2D sketch construction, transforms, booleans, on-face, extrude |
 | `assembly/` | Model authors (mechanisms) | Assembly graph, joints, couplings, kinematics |
 | `sheet-metal/` | Model authors (folded parts) | Sheet metal, flanges, flat patterns |

@@ -110,6 +110,8 @@ export type {
   ToolpathSegment,
   TransformInput,
   Vec3,
+  Spec,
+  SpecResult,
   VerificationResult,
   VerificationStatus,
   ViewConfig,

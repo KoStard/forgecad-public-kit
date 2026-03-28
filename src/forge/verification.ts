@@ -25,6 +25,74 @@ export interface VerificationResult {
   expected?: string;
   /** Human-readable actual value for display */
   actual?: string;
+  /** Spec name — when set, the UI groups this result under a collapsible section */
+  group?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Spec — a named, reusable bundle of verification checks
+// ---------------------------------------------------------------------------
+
+export interface SpecResult {
+  /** Spec name */
+  name: string;
+  /** Number of checks that passed */
+  passed: number;
+  /** Total number of checks */
+  total: number;
+  /** The individual verification results added by this spec */
+  results: VerificationResult[];
+}
+
+export interface Spec {
+  /** The display name of this spec */
+  readonly name: string;
+  /**
+   * Run this spec's checks against one or more shapes.
+   * All `verify.*` calls inside the check function are automatically
+   * grouped under this spec's name in the Checks panel.
+   */
+  check(...args: unknown[]): SpecResult;
+}
+
+/**
+ * Create a named spec — a reusable bundle of verification checks.
+ *
+ * ```js
+ * const fitSpec = spec("Fits enclosure", (shape) => {
+ *   verify.lessThan("Width",  shape.boundingBox().max[0] - shape.boundingBox().min[0], 200);
+ *   verify.notEmpty("Has geometry", shape);
+ * });
+ *
+ * fitSpec.check(myShape);   // grouped as "Fits enclosure" in the Checks panel
+ * fitSpec.check(otherShape); // can be reused on multiple shapes
+ * ```
+ *
+ * @param name   Display name shown in the Checks panel
+ * @param checkFn  Function that receives the shapes passed to `.check()` and
+ *                 calls `verify.*` methods. Any verify calls made inside this
+ *                 function are tagged with the spec name for grouped display.
+ */
+export function spec(name: string, checkFn: (...args: any[]) => void): Spec {
+  return {
+    name,
+    check(...args: unknown[]): SpecResult {
+      const before = _collected.length;
+      _activeGroup = name;
+      try {
+        checkFn(...args);
+      } finally {
+        _activeGroup = null;
+      }
+      const added = _collected.slice(before);
+      return {
+        name,
+        passed: added.filter((r) => r.status === 'pass').length,
+        total: added.length,
+        results: added,
+      };
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -33,6 +101,7 @@ export interface VerificationResult {
 
 let _collected: VerificationResult[] = [];
 let _counter = 0;
+let _activeGroup: string | null = null;
 
 export function resetVerifications(): void {
   _collected = [];
@@ -101,6 +170,7 @@ function captureSourceLine(): number | undefined {
 }
 
 function push(result: VerificationResult): void {
+  if (_activeGroup) result.group = _activeGroup;
   _collected.push(result);
 }
 

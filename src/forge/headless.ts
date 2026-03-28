@@ -163,7 +163,7 @@ export { computeCuttingLayout, formatCutSequence, generateCuttingLayoutPdf } fro
 export * from './sketch';
 export type { Mat4, RotateAroundToMode, RotateAroundToOptions, TransformInput, Vec3 } from './transform';
 export { composeChain, Transform } from './transform';
-export type { VerificationResult, VerificationStatus } from './verification';
+export type { Spec, SpecResult, VerificationResult, VerificationStatus } from './verification';
 export type {
   JointOverlayViewConfig,
   JointOverlayViewConfigOptions,

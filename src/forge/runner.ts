@@ -129,7 +129,7 @@ import {
 } from './sketch';
 import type { SolverWasmRunDebugSnapshot } from './sketch/constraints/solver-wasm';
 import { composeChain, Transform } from './transform';
-import { getCollectedVerifications, resetVerifications, type VerificationResult, verify } from './verification';
+import { getCollectedVerifications, resetVerifications, spec, type VerificationResult, verify } from './verification';
 import { getCollectedViewConfig, resetViewConfig, type ViewConfig, viewConfig } from './scene/viewConfig';
 
 // Sub-module imports
@@ -474,6 +474,7 @@ function executeFile(
       viewConfig,
       scene,
       verify,
+      spec,
       gcode,
       GCodeBuilder,
     };

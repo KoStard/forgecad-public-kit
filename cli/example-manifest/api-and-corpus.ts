@@ -26,6 +26,7 @@ const API_EXACT_PART_PATHS = [
   'examples/api/rotate-around-to.forge.js',
   'examples/api/sketch-basics.forge.js',
   'examples/api/sketch-on-face.forge.js',
+  'examples/api/spec-demo.forge.js',
   'examples/api/text2d-basics.forge.js',
   'examples/api/text2d-font.forge.js',
   'examples/api/extrude-options.forge.js',

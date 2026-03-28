@@ -324,7 +324,7 @@ const MODULES = [
       "Section & Projection",
     ],
     classNames: ["Shape", "TrackedShape", "Transform", "ShapeGroup"],
-    constNames: ["ANCHOR3D_NAMES", "verify", "Constraint"],
+    constNames: ["ANCHOR3D_NAMES", "verify", "spec", "Constraint"],
   },
   {
     slug: "sketch",
