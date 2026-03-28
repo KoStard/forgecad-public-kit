@@ -9,7 +9,8 @@
  *   - positions: non-indexed triangle vertex positions (triCount * 9)
  *   - normals:   per-vertex normals (triCount * 9) — either:
  *       - smooth B-rep surface normals when `vertNormals` is provided (OCCT)
- *       - flat face normals via cross product (Manifold fallback)
+ *       - auto-smooth normals for Manifold meshes (angle-based averaging)
+ *       - flat face normals as final fallback
  *   - edgePositions: sharp edge line segment endpoints (edgeCount * 6)
  *     (for OCCT, the caller typically replaces these with B-rep edge curves)
  *
@@ -23,8 +24,15 @@ export interface GeometryArrays {
   edgePositions: Float32Array;
 }
 
-/** cos(1°) — edges with dot-product <= this are considered sharp. */
+/** cos(1°) — edges with dot-product <= this are considered sharp for edge detection. */
 const EDGE_THRESHOLD_DOT = Math.cos(Math.PI / 180);
+
+/**
+ * cos(30°) — for smooth normal computation, edges with face-normal dot-product
+ * above this threshold are considered "smooth" and their face normals are averaged.
+ * Below this, the edge is treated as a crease and normals are not averaged across it.
+ */
+const SMOOTH_THRESHOLD_DOT = Math.cos((30 * Math.PI) / 180);
 
 export function computeGeometryArrays(mesh: {
   numProp: number;
@@ -97,7 +105,7 @@ export function computeGeometryArrays(mesh: {
       normals[o + 7] = vertNormals[i2 * 3 + 1];
       normals[o + 8] = vertNormals[i2 * 3 + 2];
     } else {
-      // Flat face normals (same normal for all 3 vertices)
+      // Temporary: flat normals — will be overwritten by smooth normals below
       normals[o] = fnx;
       normals[o + 1] = fny;
       normals[o + 2] = fnz;
@@ -114,6 +122,11 @@ export function computeGeometryArrays(mesh: {
     faceNz[t] = fnz;
   }
 
+  // Auto-smooth normals for Manifold meshes (no B-rep normals)
+  if (!vertNormals && triCount > 0) {
+    computeAutoSmoothNormals(triVerts, vertProperties, numProp, triCount, faceNx, faceNy, faceNz, normals, mesh.mergeFromVert, mesh.mergeToVert);
+  }
+
   const edgePositions = computeSharpEdges(
     triVerts,
     vertProperties,
@@ -127,6 +140,79 @@ export function computeGeometryArrays(mesh: {
   );
 
   return { positions, normals, edgePositions };
+}
+
+/**
+ * Compute auto-smooth normals for Manifold meshes.
+ *
+ * For each triangle vertex, averages the face normals of all adjacent triangles
+ * that belong to the same "smooth group" — connected via edges where the dihedral
+ * angle is below the smooth threshold (30 degrees). Faces separated by sharp
+ * creases keep their flat normals.
+ *
+ * This produces smooth shading on curved surfaces (spheres, lofts, sweeps) while
+ * preserving hard edges on boxes, chamfers, and other intentionally sharp features.
+ */
+function computeAutoSmoothNormals(
+  triVerts: Uint32Array,
+  vertProperties: Float32Array,
+  numProp: number,
+  triCount: number,
+  faceNx: Float32Array,
+  faceNy: Float32Array,
+  faceNz: Float32Array,
+  normals: Float32Array,
+  mergeFromVert: Uint32Array | undefined,
+  mergeToVert: Uint32Array | undefined,
+): void {
+  const numVerts = vertProperties.length / numProp;
+  const canon = buildCanonicalMap(numVerts, mergeFromVert, mergeToVert);
+
+  // Build adjacency: for each canonical vertex, list of triangle indices that share it
+  const vertToTris = new Map<number, number[]>();
+  for (let t = 0; t < triCount; t++) {
+    for (let v = 0; v < 3; v++) {
+      const cv = canon[triVerts[t * 3 + v]];
+      let list = vertToTris.get(cv);
+      if (!list) {
+        list = [];
+        vertToTris.set(cv, list);
+      }
+      list.push(t);
+    }
+  }
+
+  // For each triangle vertex, compute smooth normal by averaging face normals
+  // of adjacent triangles that form a smooth group with this triangle
+  for (let t = 0; t < triCount; t++) {
+    for (let v = 0; v < 3; v++) {
+      const cv = canon[triVerts[t * 3 + v]];
+      const adjacentTris = vertToTris.get(cv);
+      if (!adjacentTris || adjacentTris.length <= 1) continue;
+
+      // Average face normals of adjacent triangles that are "smooth" relative to this triangle
+      let sx = 0, sy = 0, sz = 0;
+      for (const adj of adjacentTris) {
+        const dot = faceNx[t] * faceNx[adj] + faceNy[t] * faceNy[adj] + faceNz[t] * faceNz[adj];
+        if (dot >= SMOOTH_THRESHOLD_DOT) {
+          sx += faceNx[adj];
+          sy += faceNy[adj];
+          sz += faceNz[adj];
+        }
+      }
+
+      const slen = Math.sqrt(sx * sx + sy * sy + sz * sz);
+      if (slen > 1e-9) {
+        sx /= slen;
+        sy /= slen;
+        sz /= slen;
+        const o = t * 9 + v * 3;
+        normals[o] = sx;
+        normals[o + 1] = sy;
+        normals[o + 2] = sz;
+      }
+    }
+  }
 }
 
 function computeSharpEdges(
