@@ -2368,6 +2368,8 @@ interface SdfDisplaceNode {
 	child: SdfNode;
 	/** Serialized as a function body string: receives (x, y, z) and returns a number. */
 	functionBody: string;
+	/** Named constants injected as additional function parameters (avoids closure serialization issues). */
+	constants?: Record<string, number>;
 }
 interface SdfOnionNode {
 	kind: "sdf:onion";
@@ -2391,6 +2393,51 @@ interface SdfDiamondNode {
 	cellSize: number;
 	thickness: number;
 }
+interface SdfLidinoidNode {
+	kind: "sdf:lidinoid";
+	cellSize: number;
+	thickness: number;
+}
+interface SdfSpatialBlendNode {
+	kind: "sdf:spatialBlend";
+	a: SdfNode;
+	b: SdfNode;
+	/** Function body returning 0..1. 0 = fully a, 1 = fully b. */
+	functionBody: string;
+	constants?: Record<string, number>;
+}
+interface SdfNoiseNode {
+	kind: "sdf:noise";
+	/** Spatial frequency — smaller = larger features. */
+	scale: number;
+	/** Peak displacement amplitude. */
+	amplitude: number;
+	/** Number of octaves for fractal Brownian motion (1 = plain simplex). */
+	octaves: number;
+	/** Seed for deterministic variation. 0 = default permutation. */
+	seed: number;
+}
+interface SdfVoronoiNode {
+	kind: "sdf:voronoi";
+	/** Size of each Voronoi cell in world units. */
+	cellSize: number;
+	/** Wall thickness between cells. */
+	wallThickness: number;
+	/** Seed for deterministic variation. */
+	seed: number;
+	/**
+	 * When set, enables surface-aware mode using IQ two-pass with membrane suppression.
+	 * The child SDF's gradient is used to estimate the surface normal, and walls aligned
+	 * with that normal are suppressed. This is the child SDF tree whose gradient provides
+	 * the surface normal for filtering.
+	 */
+	surfaceChild?: SdfNode;
+	/**
+	 * Membrane suppression threshold (0..1). Higher = more aggressive suppression.
+	 * 0 = no filtering, 1 = suppress all walls. Default: 0.7.
+	 */
+	suppressionThreshold?: number;
+}
 interface SdfCustomNode {
 	kind: "sdf:custom";
 	/** Function body string: receives (x, y, z) and returns signed distance. */
@@ -2399,8 +2446,10 @@ interface SdfCustomNode {
 		min: Vec3$1;
 		max: Vec3$1;
 	};
+	/** Named constants injected as additional function parameters (avoids closure serialization issues). */
+	constants?: Record<string, number>;
 }
-type SdfNode = SdfSphereNode | SdfBoxNode | SdfCylinderNode | SdfTorusNode | SdfCapsuleNode | SdfConeNode | SdfUnionNode | SdfDifferenceNode | SdfIntersectionNode | SdfSmoothUnionNode | SdfSmoothDifferenceNode | SdfSmoothIntersectionNode | SdfMorphNode | SdfTranslateNode | SdfRotateNode | SdfScaleNode | SdfTwistNode | SdfBendNode | SdfRepeatNode | SdfShellNode | SdfDisplaceNode | SdfOnionNode | SdfGyroidNode | SdfSchwarzPNode | SdfDiamondNode | SdfCustomNode;
+type SdfNode = SdfSphereNode | SdfBoxNode | SdfCylinderNode | SdfTorusNode | SdfCapsuleNode | SdfConeNode | SdfUnionNode | SdfDifferenceNode | SdfIntersectionNode | SdfSmoothUnionNode | SdfSmoothDifferenceNode | SdfSmoothIntersectionNode | SdfMorphNode | SdfTranslateNode | SdfRotateNode | SdfScaleNode | SdfTwistNode | SdfBendNode | SdfRepeatNode | SdfShellNode | SdfDisplaceNode | SdfOnionNode | SdfGyroidNode | SdfSchwarzPNode | SdfDiamondNode | SdfLidinoidNode | SdfSpatialBlendNode | SdfNoiseNode | SdfVoronoiNode | SdfCustomNode;
 declare const SHEET_METAL_EDGES: readonly [
 	"top",
 	"right",
@@ -2554,8 +2603,8 @@ declare class SdfShape {
 	repeat(spacing: Vec3$1, count?: Vec3$1): SdfShape;
 	/** Hollow out, keeping only a shell of given thickness. */
 	shell(thickness: number): SdfShape;
-	/** Displace the surface by a function of position. */
-	displace(fn: (x: number, y: number, z: number) => number): SdfShape;
+	/** Displace the surface by a function of position. Pass constants to inject named values into the function body (avoids closure serialization issues). */
+	displace(fn: (x: number, y: number, z: number) => number, constants?: Record<string, number>): SdfShape;
 	/** Create concentric onion layers. */
 	onion(layers: number, thickness: number): SdfShape;
 }
@@ -2575,6 +2624,11 @@ declare function smoothIntersection(a: SdfShape, b: SdfShape, options: {
 	radius: number;
 }): SdfShape;
 declare function morph(a: SdfShape, b: SdfShape, t: number): SdfShape;
+interface BlendOptions {
+	/** Optional named constants accessible in the blend function. */
+	constants?: Record<string, number>;
+}
+declare function blend(a: SdfShape, b: SdfShape, fn: (x: number, y: number, z: number) => number, options?: BlendOptions): SdfShape;
 interface TpmsOptions {
 	cellSize: number;
 	thickness: number;
@@ -2582,10 +2636,89 @@ interface TpmsOptions {
 declare function gyroid(options: TpmsOptions): SdfShape;
 declare function schwarzP(options: TpmsOptions): SdfShape;
 declare function diamond(options: TpmsOptions): SdfShape;
+declare function lidinoid(options: TpmsOptions): SdfShape;
+interface NoiseOptions {
+	/** Spatial frequency — smaller = larger features. Default: 0.1 */
+	scale?: number;
+	/** Peak displacement amplitude. Default: 1 */
+	amplitude?: number;
+	/** fBm octaves (1 = plain simplex, higher = more detail). Default: 1 */
+	octaves?: number;
+	/** Seed for deterministic variation. Default: 0 */
+	seed?: number;
+}
+declare function noise(options?: NoiseOptions): SdfShape;
+interface VoronoiOptions {
+	/** Size of each Voronoi cell in world units. Default: 10 */
+	cellSize?: number;
+	/** Wall thickness between cells. Default: 1 */
+	wallThickness?: number;
+	/** Seed for deterministic variation. Default: 0 */
+	seed?: number;
+	/**
+	 * Projection weight for membrane suppression (0..1). Controls how much of
+	 * the surface-normal distance component is removed from Voronoi cell distances.
+	 * 0 = no projection (classic 3D voronoi with membranes).
+	 * 1 = full tangent-plane projection (pure 2D pattern on surface).
+	 * Default: 0.85. Only active when voronoi is intersected with another shape.
+	 */
+	suppressionThreshold?: number;
+}
+declare function voronoi(options?: VoronoiOptions): SdfShape;
+interface HoneycombOptions {
+	/** Size of each hex cell. Default: 8 */
+	cellSize?: number;
+	/** Wall thickness. Default: 1 */
+	wallThickness?: number;
+}
+declare function honeycomb(options?: HoneycombOptions): SdfShape;
+interface WavesOptions {
+	/** Distance between wave peaks. Default: 10 */
+	wavelength?: number;
+	/** Height of waves. Default: 1 */
+	amplitude?: number;
+	/** Axis along which waves propagate: 'x', 'y', or 'z'. Default: 'x' */
+	axis?: "x" | "y" | "z";
+}
+declare function waves(options?: WavesOptions): SdfShape;
+interface KnurlOptions {
+	/** Distance between knurl ridges. Default: 3 */
+	pitch?: number;
+	/** Depth of knurl grooves. Default: 0.5 */
+	depth?: number;
+	/** Helix angle in degrees. Default: 30 */
+	angle?: number;
+}
+declare function knurl(options?: KnurlOptions): SdfShape;
+interface PerforatedOptions {
+	/** Hole radius. Default: 3 */
+	radius?: number;
+	/** Center-to-center spacing. Default: 8 */
+	spacing?: number;
+}
+declare function perforated(options?: PerforatedOptions): SdfShape;
+interface ScalesOptions {
+	/** Scale diameter. Default: 5 */
+	size?: number;
+	/** How much scales protrude. Default: 0.8 */
+	depth?: number;
+}
+declare function scales(options?: ScalesOptions): SdfShape;
+interface BrickOptions {
+	/** Brick width. Default: 10 */
+	width?: number;
+	/** Brick height. Default: 5 */
+	height?: number;
+	/** Mortar groove depth. Default: 0.5 */
+	depth?: number;
+	/** Mortar gap width. Default: 1 */
+	mortar?: number;
+}
+declare function brick(options?: BrickOptions): SdfShape;
 declare function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: {
 	min: Vec3$1;
 	max: Vec3$1;
-}): SdfShape;
+}, constants?: Record<string, number>): SdfShape;
 declare function twist(shape: SdfShape, degreesPerUnit: number): SdfShape;
 declare function bend(shape: SdfShape, radius: number): SdfShape;
 declare function repeat(shape: SdfShape, spacing: Vec3$1, count?: Vec3$1): SdfShape;
@@ -6281,7 +6414,7 @@ declare function highlight(face: FaceRef, opts?: HighlightOptions): void;
 declare function highlight(edge: EdgeRef, opts?: HighlightOptions): void;
 
 declare namespace sdf {
-	export { SdfShape, SdfToShapeOptions, TpmsOptions, bend, box, capsule, cone, cylinder, diamond, fromFunction, gyroid, morph, repeat, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist };
+	export { BlendOptions, BrickOptions, HoneycombOptions, KnurlOptions, NoiseOptions, PerforatedOptions, ScalesOptions, SdfShape, SdfToShapeOptions, TpmsOptions, VoronoiOptions, WavesOptions, bend, blend, box, brick, capsule, cone, cylinder, diamond, fromFunction, gyroid, honeycomb, knurl, lidinoid, morph, noise, perforated, repeat, scales, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist, voronoi, waves };
 }
 /** All library parts. Access via `lib.xxx()` in scripts. */
 declare const lib: typeof partLibrary;

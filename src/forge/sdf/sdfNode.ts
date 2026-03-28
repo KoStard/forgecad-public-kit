@@ -143,6 +143,8 @@ export interface SdfDisplaceNode {
   child: SdfNode;
   /** Serialized as a function body string: receives (x, y, z) and returns a number. */
   functionBody: string;
+  /** Named constants injected as additional function parameters (avoids closure serialization issues). */
+  constants?: Record<string, number>;
 }
 
 export interface SdfOnionNode {
@@ -173,6 +175,59 @@ export interface SdfDiamondNode {
   thickness: number;
 }
 
+export interface SdfLidinoidNode {
+  kind: 'sdf:lidinoid';
+  cellSize: number;
+  thickness: number;
+}
+
+// ─── Spatial blend ──────────────────────────────────────────────────────────
+
+export interface SdfSpatialBlendNode {
+  kind: 'sdf:spatialBlend';
+  a: SdfNode;
+  b: SdfNode;
+  /** Function body returning 0..1. 0 = fully a, 1 = fully b. */
+  functionBody: string;
+  constants?: Record<string, number>;
+}
+
+// ─── Noise / pattern nodes ──────────────────────────────────────────────────
+
+export interface SdfNoiseNode {
+  kind: 'sdf:noise';
+  /** Spatial frequency — smaller = larger features. */
+  scale: number;
+  /** Peak displacement amplitude. */
+  amplitude: number;
+  /** Number of octaves for fractal Brownian motion (1 = plain simplex). */
+  octaves: number;
+  /** Seed for deterministic variation. 0 = default permutation. */
+  seed: number;
+}
+
+export interface SdfVoronoiNode {
+  kind: 'sdf:voronoi';
+  /** Size of each Voronoi cell in world units. */
+  cellSize: number;
+  /** Wall thickness between cells. */
+  wallThickness: number;
+  /** Seed for deterministic variation. */
+  seed: number;
+  /**
+   * When set, enables surface-aware mode using IQ two-pass with membrane suppression.
+   * The child SDF's gradient is used to estimate the surface normal, and walls aligned
+   * with that normal are suppressed. This is the child SDF tree whose gradient provides
+   * the surface normal for filtering.
+   */
+  surfaceChild?: SdfNode;
+  /**
+   * Membrane suppression threshold (0..1). Higher = more aggressive suppression.
+   * 0 = no filtering, 1 = suppress all walls. Default: 0.7.
+   */
+  suppressionThreshold?: number;
+}
+
 // ─── Custom SDF function ─────────────────────────────────────────────────────
 
 export interface SdfCustomNode {
@@ -180,6 +235,8 @@ export interface SdfCustomNode {
   /** Function body string: receives (x, y, z) and returns signed distance. */
   functionBody: string;
   bounds: { min: Vec3; max: Vec3 };
+  /** Named constants injected as additional function parameters (avoids closure serialization issues). */
+  constants?: Record<string, number>;
 }
 
 // ─── Union type ──────────────────────────────────────────────────────────────
@@ -214,6 +271,12 @@ export type SdfNode =
   | SdfGyroidNode
   | SdfSchwarzPNode
   | SdfDiamondNode
+  | SdfLidinoidNode
+  // Spatial blend
+  | SdfSpatialBlendNode
+  // Noise / patterns
+  | SdfNoiseNode
+  | SdfVoronoiNode
   // Custom
   | SdfCustomNode;
 
@@ -266,7 +329,7 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
     case 'sdf:shell':
       return { kind: 'sdf:shell', child: cloneSdfNode(node.child), thickness: node.thickness };
     case 'sdf:displace':
-      return { kind: 'sdf:displace', child: cloneSdfNode(node.child), functionBody: node.functionBody };
+      return { kind: 'sdf:displace', child: cloneSdfNode(node.child), functionBody: node.functionBody, ...(node.constants ? { constants: { ...node.constants } } : {}) };
     case 'sdf:onion':
       return { kind: 'sdf:onion', child: cloneSdfNode(node.child), layers: node.layers, thickness: node.thickness };
 
@@ -277,9 +340,34 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
       return { kind: 'sdf:schwarzP', cellSize: node.cellSize, thickness: node.thickness };
     case 'sdf:diamond':
       return { kind: 'sdf:diamond', cellSize: node.cellSize, thickness: node.thickness };
+    case 'sdf:lidinoid':
+      return { kind: 'sdf:lidinoid', cellSize: node.cellSize, thickness: node.thickness };
+
+    // Spatial blend
+    case 'sdf:spatialBlend':
+      return {
+        kind: 'sdf:spatialBlend',
+        a: cloneSdfNode(node.a),
+        b: cloneSdfNode(node.b),
+        functionBody: node.functionBody,
+        constants: node.constants ? { ...node.constants } : undefined,
+      };
+
+    // Noise / patterns
+    case 'sdf:noise':
+      return { kind: 'sdf:noise', scale: node.scale, amplitude: node.amplitude, octaves: node.octaves, seed: node.seed };
+    case 'sdf:voronoi':
+      return {
+        kind: 'sdf:voronoi',
+        cellSize: node.cellSize,
+        wallThickness: node.wallThickness,
+        seed: node.seed,
+        ...(node.surfaceChild ? { surfaceChild: cloneSdfNode(node.surfaceChild) } : {}),
+        ...(node.suppressionThreshold !== undefined ? { suppressionThreshold: node.suppressionThreshold } : {}),
+      };
 
     // Custom
     case 'sdf:custom':
-      return { kind: 'sdf:custom', functionBody: node.functionBody, bounds: { min: [...node.bounds.min], max: [...node.bounds.max] } };
+      return { kind: 'sdf:custom', functionBody: node.functionBody, bounds: { min: [...node.bounds.min], max: [...node.bounds.max] }, ...(node.constants ? { constants: { ...node.constants } } : {}) };
   }
 }

@@ -10,6 +10,9 @@
  */
 
 import type { SdfNode, Vec3 } from './sdfNode';
+import { simplex3, seededSimplex3 } from './noise';
+import { gyroid, schwarzP, diamond, lidinoid } from './tpms';
+import { worley3, seededWorley3, worley3Surface, seededWorley3Surface } from './voronoi';
 
 const { abs, cos, max, min, sin, sqrt, PI } = Math;
 const TAU = 2 * PI;
@@ -81,30 +84,6 @@ function smin(a: number, b: number, k: number): number {
 
 function smax(a: number, b: number, k: number): number {
   return -smin(-a, -b, k);
-}
-
-// ─── TPMS primitives ─────────────────────────────────────────────────────────
-
-function gyroid(x: number, y: number, z: number, cellSize: number, thickness: number): number {
-  const s = TAU / cellSize;
-  return abs(sin(x * s) * cos(y * s) + sin(y * s) * cos(z * s) + sin(z * s) * cos(x * s)) - thickness;
-}
-
-function schwarzP(x: number, y: number, z: number, cellSize: number, thickness: number): number {
-  const s = TAU / cellSize;
-  return abs(cos(x * s) + cos(y * s) + cos(z * s)) - thickness;
-}
-
-function diamond(x: number, y: number, z: number, cellSize: number, thickness: number): number {
-  const s = TAU / cellSize;
-  return (
-    abs(
-      sin(x * s) * sin(y * s) * sin(z * s) +
-        sin(x * s) * cos(y * s) * cos(z * s) +
-        cos(x * s) * sin(y * s) * cos(z * s) +
-        cos(x * s) * cos(y * s) * sin(z * s),
-    ) - thickness
-  );
 }
 
 // ─── Tree compiler ───────────────────────────────────────────────────────────
@@ -292,9 +271,12 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
     }
     case 'sdf:displace': {
       const fn = compileSdfNode(node.child);
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
       // eslint-disable-next-line no-new-func
-      const displaceFn = new Function('x', 'y', 'z', `return (${node.functionBody});`) as (x: number, y: number, z: number) => number;
-      return (p) => fn(p) + displaceFn(p[0], p[1], p[2]);
+      const displaceFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
+      return (p) => fn(p) + (displaceFn as any)(p[0], p[1], p[2], ...constValues);
     }
     case 'sdf:onion': {
       const fn = compileSdfNode(node.child);
@@ -319,12 +301,100 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
       const { cellSize, thickness } = node;
       return (p) => diamond(p[0], p[1], p[2], cellSize, thickness);
     }
+    case 'sdf:lidinoid': {
+      const { cellSize, thickness } = node;
+      return (p) => lidinoid(p[0], p[1], p[2], cellSize, thickness);
+    }
+
+    // ── Spatial blend ──
+    case 'sdf:spatialBlend': {
+      const fnA = compileSdfNode(node.a);
+      const fnB = compileSdfNode(node.b);
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
+      // eslint-disable-next-line no-new-func
+      const blendFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
+      return (p) => {
+        const t = clamp(blendFn(p[0], p[1], p[2], ...constValues) as number, 0, 1);
+        return fnA(p) * (1 - t) + fnB(p) * t;
+      };
+    }
+
+    // ── Noise / patterns ──
+    case 'sdf:noise': {
+      const { scale: sc, amplitude: amp, octaves, seed } = node;
+      const noiseFn = seed !== 0 ? seededSimplex3(seed) : simplex3;
+      return (p) => {
+        let value = 0;
+        let freq = sc;
+        let a = amp;
+        for (let o = 0; o < octaves; o++) {
+          value += a * noiseFn(p[0] * freq, p[1] * freq, p[2] * freq);
+          freq *= 2;
+          a *= 0.5;
+        }
+        return value;
+      };
+    }
+    case 'sdf:voronoi': {
+      const { cellSize, wallThickness, seed, surfaceChild, suppressionThreshold } = node;
+      const invCell = 1 / cellSize;
+      const halfWall = wallThickness * 0.5;
+      const threshold = suppressionThreshold ?? 0.7;
+
+      if (surfaceChild) {
+        // Surface-aware mode: projected-distance (F2-F1)/2.
+        // Computes Voronoi distances in the tangent plane perpendicular to
+        // the surface normal, preventing walls from forming parallel to the surface.
+        //
+        // For gradient estimation, if the surfaceChild is a shell node, use the
+        // inner shape (before abs()) for a smoother gradient without the kink
+        // at the shell midline.
+        const gradNode = surfaceChild.kind === 'sdf:shell' ? surfaceChild.child : surfaceChild;
+        const gradFn = compileSdfNode(gradNode);
+        const wFn = seed !== 0 ? seededWorley3Surface(seed) : worley3Surface;
+        const eps = cellSize * 0.05;
+
+        return (p) => {
+          // Estimate surface normal via central-difference gradient
+          const gx = gradFn([p[0] + eps, p[1], p[2]]) - gradFn([p[0] - eps, p[1], p[2]]);
+          const gy = gradFn([p[0], p[1] + eps, p[2]]) - gradFn([p[0], p[1] - eps, p[2]]);
+          const gz = gradFn([p[0], p[1], p[2] + eps]) - gradFn([p[0], p[1], p[2] - eps]);
+          const glen = sqrt(gx * gx + gy * gy + gz * gz);
+          let nx = 0, ny = 0, nz = 0;
+          if (glen > 1e-10) {
+            const invG = 1 / glen;
+            nx = gx * invG;
+            ny = gy * invG;
+            nz = gz * invG;
+          }
+
+          const wallDist = wFn(
+            p[0] * invCell, p[1] * invCell, p[2] * invCell,
+            nx, ny, nz, threshold,
+          );
+          return wallDist * cellSize - halfWall;
+        };
+      }
+
+      // Standard mode: F2-F1 wall distance (may have membranes in 3D)
+      const wFn = seed !== 0 ? seededWorley3(seed) : worley3;
+      return (p) => {
+        const [f1, f2] = wFn(p[0] * invCell, p[1] * invCell, p[2] * invCell);
+        const wallDist = (f2 - f1) * 0.5 * cellSize;
+        return wallDist - halfWall;
+      };
+    }
 
     // ── Custom ──
     case 'sdf:custom': {
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
       // eslint-disable-next-line no-new-func
-      const customFn = new Function('x', 'y', 'z', `return (${node.functionBody});`) as (x: number, y: number, z: number) => number;
-      return (p) => customFn(p[0], p[1], p[2]);
+      const customFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
+      return (p) => (customFn as any)(p[0], p[1], p[2], ...constValues);
     }
   }
 }
@@ -445,8 +515,24 @@ export function estimateSdfBounds(node: SdfNode): SdfBounds {
     // TPMS — need explicit bounds from user; use a sensible default
     case 'sdf:gyroid':
     case 'sdf:schwarzP':
-    case 'sdf:diamond': {
+    case 'sdf:diamond':
+    case 'sdf:lidinoid': {
       const s = node.cellSize * 3; // 3 cells in each direction
+      return { min: [-s, -s, -s], max: [s, s, s] };
+    }
+
+    case 'sdf:spatialBlend': {
+      return unionBounds([estimateSdfBounds(node.a), estimateSdfBounds(node.b)], 0);
+    }
+
+    // Noise / patterns — infinite fields, use a sensible default
+    case 'sdf:noise': {
+      // Noise is an infinite field; default to ~6 wavelengths
+      const extent = 6 / node.scale;
+      return { min: [-extent, -extent, -extent], max: [extent, extent, extent] };
+    }
+    case 'sdf:voronoi': {
+      const s = node.cellSize * 5; // 5 cells in each direction
       return { min: [-s, -s, -s], max: [s, s, s] };
     }
 
