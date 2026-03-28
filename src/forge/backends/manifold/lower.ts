@@ -448,7 +448,13 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
       // Standard SDF convention (used by sdfEval): negative = inside, positive = outside.
       // Negate to bridge the two conventions.
       const negated = (p: Vec3) => -evalFn(p);
-      return wasm.Manifold.levelSet(negated as any, plan.bounds, plan.edgeLength, 0);
+      // Use a coarser initial grid, then smooth + refine adaptively.
+      // This produces fewer but better-placed triangles: tight curves get more
+      // resolution, flat areas stay coarse. The coarser grid also speeds up
+      // the expensive per-voxel SDF evaluation.
+      const coarseEdge = plan.edgeLength * 3;
+      const raw = wasm.Manifold.levelSet(negated as any, plan.bounds, coarseEdge, 0);
+      return raw.smoothOut().refineToLength(plan.edgeLength);
     }
     default:
       assertExhaustive(plan);
