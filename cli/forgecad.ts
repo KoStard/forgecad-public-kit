@@ -265,9 +265,9 @@ const commands: CommandDefinition[] = [
   {
     group: 'Shell',
     path: ['skill', 'install'],
-    summary: 'Install the ForgeCAD agent skill to ~/.agents/skills/forgecad/SKILL.md (Claude Code, Codex, OpenCode, …).',
-    usage: ['forgecad skill install'],
-    examples: ['forgecad skill install'],
+    summary: 'Install the ForgeCAD agent skill to ~/.agents/skills/forgecad/SKILL.md. Use --dev for internals/conventions docs.',
+    usage: ['forgecad skill install [--dev]'],
+    examples: ['forgecad skill install', 'forgecad skill install --dev'],
     run: runSkillInstallCli,
   },
   {

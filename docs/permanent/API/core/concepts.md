@@ -120,3 +120,9 @@ Extract a face's 2D boundary as a `Sketch` for manual workflows:
 const profile = faceProfile(box(100, 100, 20), 'top');
 const tool = profile.offset(-5).extrude(8);  // shrink + extrude manually
 ```
+
+## SDF Modeling
+
+For organic shapes, smooth blending, TPMS lattices, and surface deformations, ForgeCAD provides a parallel SDF (Signed Distance Field) pipeline via the `sdf` namespace. SDF shapes convert to regular `Shape` objects via `.toShape()`.
+
+See [sdf.md](sdf.md) for the full reference — primitives, smooth booleans, TPMS, twist/bend/displace, custom functions, and workflow tips.

@@ -42,6 +42,12 @@ Execution model, colors, coordinate system, primitives, booleans, patterns, impo
 - `docs/permanent/API/core/edge-queries.md`
 - `docs/permanent/generated/core.md`
 
+### 1b. SDF Modeling (when using smooth booleans, TPMS, deformations, or fromFunction)
+
+Primitives, smooth booleans, TPMS lattices, twist/bend/displace, morph, custom functions, gotchas.
+
+- `docs/permanent/API/core/sdf.md`
+
 ### 2. Geometry and Positioning (when placement/orientation matters)
 
 Axis conventions, winding rules, and placement strategy.

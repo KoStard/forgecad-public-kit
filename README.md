@@ -82,10 +82,13 @@ ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain 
 Install a self-contained ForgeCAD skill for coding agents that support the `~/.agents/skills/` convention (all API docs inlined — no repo required):
 
 ```bash
-forgecad skill install
+forgecad skill install        # model-authoring docs (for users building models)
+forgecad skill install --dev  # + internals, coding conventions, skill maintenance (for ForgeCAD developers)
 ```
 
 This copies a pre-built `SKILL.md` to `~/.agents/skills/forgecad/SKILL.md`. Reload your agent to activate. Run again after upgrading ForgeCAD to pick up updated docs.
+
+The **standard** skill covers primitives, sketch, assembly, SDF, export, and CLI commands — everything needed to author `.forge.js` models. The **dev** skill adds compiler internals, constraint solver architecture, coding conventions, release processes, and skill system maintenance docs — for agents working on ForgeCAD itself.
 
 ### Chat UI (Claude.ai, ChatGPT, Gemini, …)
 
@@ -274,7 +277,7 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 | Export exact BREP (supported subset only) | `forgecad export brep examples/api/brep-exportable.forge.js` |
 | Generate report PDF | `forgecad export report examples/cup.forge.js` |
 | Parameter robustness scan | `forgecad check params examples/shoe-rack-doors.forge.js --samples 10` |
-| Install agent skill (Claude Code, Codex, OpenCode…) | `forgecad skill install` |
+| Install agent skill (Claude Code, Codex, OpenCode…) | `forgecad skill install [--dev]` |
 | Export all docs as a single file for chat-UI paste | `forgecad skill one-file ~/Desktop/forgecad-context.md` |
 | Prune merged local-only branches | `uv run cli/forge-prune-local-branches.py` |
 | Transform invariants | `forgecad check transforms` |

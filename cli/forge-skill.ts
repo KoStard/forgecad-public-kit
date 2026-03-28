@@ -3,8 +3,10 @@ import { homedir } from 'os';
 import { join, resolve } from 'path';
 import { resolvePackagePath } from './package-runtime';
 
-export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
-  const srcSkill = resolvePackagePath(import.meta.url, 'dist-skill', 'SKILL.md');
+export async function runSkillInstallCli(argv: string[] = []): Promise<void> {
+  const isDev = argv.includes('--dev');
+  const skillFile = isDev ? 'SKILL-dev.md' : 'SKILL.md';
+  const srcSkill = resolvePackagePath(import.meta.url, 'dist-skill', skillFile);
   const srcDocs = resolvePackagePath(import.meta.url, 'dist-skill', 'docs');
 
   if (!existsSync(srcSkill)) {
@@ -25,7 +27,8 @@ export async function runSkillInstallCli(_argv: string[] = []): Promise<void> {
     cpSync(srcDocs, join(destDir, 'docs'), { recursive: true });
   }
 
-  console.log(`ForgeCAD skill installed to ${dest}`);
+  const mode = isDev ? 'dev (includes internals, conventions, skill maintenance)' : 'standard (model authoring)';
+  console.log(`ForgeCAD skill installed to ${dest} [${mode}]`);
   console.log(`Reload your agent (Claude Code, Codex, OpenCode, …) to activate.`);
 }
 

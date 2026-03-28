@@ -10,12 +10,14 @@ const repoRoot = path.resolve(__dirname, "..");
 
 const devOutputPath = path.join(repoRoot, "skills/forgecad/SKILL.md");
 const installOutputPath = path.join(repoRoot, "dist-skill/SKILL.md");
+const installDevOutputPath = path.join(repoRoot, "dist-skill/SKILL-dev.md");
 const installDocsOutputDir = path.join(repoRoot, "dist-skill/docs");
 const sourceDocsDir = path.join(repoRoot, "docs/permanent");
 
 const docs = {
   // Core concepts and gotchas
   concepts: "docs/permanent/API/core/concepts.md",
+  sdf: "docs/permanent/API/core/sdf.md",
   topology: "docs/permanent/API/core/topology.md",
   parameters: "docs/permanent/API/core/parameters.md",
   edgeQueries: "docs/permanent/API/core/edge-queries.md",
@@ -80,6 +82,7 @@ const docs = {
 const oneFileDocs = {
   // Core concepts and slim skill guide
   concepts: "docs/permanent/API/core/concepts.md",
+  sdf: "docs/permanent/API/core/sdf.md",
   skillGuide: "docs/permanent/API/core/skill-guide.md",
 
   // Core supporting docs (concise)
@@ -143,6 +146,11 @@ const docGroups = [
     guidance:
       "Execution model, colors, coordinate system, primitives, booleans, patterns, imports, parameters, topology, edge queries.",
     paths: [docs.concepts, docs.parameters, docs.topology, docs.edgeQueries, docs.genCore],
+  },
+  {
+    title: "1b. SDF Modeling (when using smooth booleans, TPMS, deformations, or fromFunction)",
+    guidance: "Primitives, smooth booleans, TPMS lattices, twist/bend/displace, morph, custom functions, gotchas.",
+    paths: [docs.sdf],
   },
   {
     title: "2. Geometry and Positioning (when placement/orientation matters)",
@@ -210,7 +218,59 @@ const docGroups = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Dev-only docs — internals, project conventions, full CLI.
+// These appear only in SKILL-dev.md (--dev install).
+// ---------------------------------------------------------------------------
+const devDocs = {
+  compiler: "docs/permanent/internals/compiler.md",
+  constraintSolver: "docs/permanent/internals/constraint-solver.md",
+  constraintSolverQuality: "docs/permanent/internals/constraint-solver-quality.md",
+  sketch2dPipeline: "docs/permanent/internals/sketch-2d-pipeline.md",
+  codingBestPractices: "docs/permanent/project/coding-best-practices.md",
+  coding: "docs/permanent/project/coding.md",
+  vision: "docs/permanent/project/vision.md",
+  deployment: "docs/permanent/DEPLOYMENT.md",
+  releasing: "docs/permanent/RELEASING.md",
+  skillMaintenance: "docs/permanent/guides/skill-maintenance.md",
+};
+
+const devDocGroups = [
+  {
+    title: "12. Internals — Compiler & Geometry Pipeline (for ForgeCAD developers)",
+    guidance:
+      "Semantic feature graphs, lowering strategy, compile plans. Read when working on the compiler or geometry backends.",
+    paths: [devDocs.compiler],
+  },
+  {
+    title: "13. Internals — Constraint Solver (for solver work)",
+    guidance: "Solver architecture, phases, Gauss-Seidel/Newton-Raphson, quality tuning.",
+    paths: [devDocs.constraintSolver, devDocs.constraintSolverQuality],
+  },
+  {
+    title: "14. Internals — Sketch 2D Pipeline",
+    guidance: "2D sketch pipeline stages, constraint evaluation, winding enforcement.",
+    paths: [devDocs.sketch2dPipeline],
+  },
+  {
+    title: "15. Project Conventions (coding standards, releases)",
+    guidance: "Coding best practices, PR guidelines, release checklist, deployment.",
+    paths: [devDocs.codingBestPractices, devDocs.coding, devDocs.deployment, devDocs.releasing],
+  },
+  {
+    title: "16. Product Vision & Roadmap",
+    guidance: "Long-term direction, Manifold relationship, parity gaps.",
+    paths: [devDocs.vision],
+  },
+  {
+    title: "17. Skill System Maintenance",
+    guidance: "How to add docs, maintain standard vs dev skill, build and install flow.",
+    paths: [devDocs.skillMaintenance],
+  },
+];
+
 const allDocs = Object.values(docs);
+const allDevDocs = Object.values(devDocs);
 const allOneFileDocs = Object.values(oneFileDocs);
 
 function normalizePath(relativePath) {
@@ -306,10 +366,14 @@ function renderDocGroupsForInstall(groups) {
     .join("\n");
 }
 
-function buildInstallSkillContent() {
+function buildInstallSkillContent(extraGroups = []) {
+  const allGroups = [...docGroups, ...extraGroups];
+  const description = extraGroups.length > 0
+    ? "ForgeCAD development skill — model authoring plus compiler internals, solver architecture, coding conventions, and skill maintenance. Use when developing ForgeCAD itself."
+    : "ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when building or modifying ForgeCAD geometry, structuring multi-file projects, running notebook cells, validating scripts, or using ForgeCAD export/render tooling.";
   return `---
 name: forgecad
-description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when building or modifying ForgeCAD geometry, structuring multi-file projects, running notebook cells, validating scripts, or using ForgeCAD export/render tooling.
+description: ${description}
 ---
 
 # ForgeCAD
@@ -355,7 +419,7 @@ Useful notebook loop:
 
 Load groups top-to-bottom, stopping when you have what the task needs.
 
-${renderDocGroupsForInstall(docGroups)}
+${renderDocGroupsForInstall(allGroups)}
 `;
 }
 
@@ -430,7 +494,7 @@ ${docSections}
 // Run
 // ---------------------------------------------------------------------------
 
-[...new Set([...allDocs, ...allOneFileDocs])].forEach((docPath) => assertReadableFile(docPath));
+[...new Set([...allDocs, ...allDevDocs, ...allOneFileDocs])].forEach((docPath) => assertReadableFile(docPath));
 
 writeFileSync(devOutputPath, devSkillContent);
 console.log(`Wrote ${devOutputPath}`);
@@ -439,10 +503,13 @@ mkdirSync(path.dirname(installOutputPath), { recursive: true });
 writeFileSync(installOutputPath, buildInstallSkillContent());
 console.log(`Wrote ${installOutputPath}`);
 
+writeFileSync(installDevOutputPath, buildInstallSkillContent(devDocGroups));
+console.log(`Wrote ${installDevOutputPath}`);
+
 cpSync(sourceDocsDir, installDocsOutputDir, { recursive: true });
 console.log(`Copied docs -> ${installDocsOutputDir}`);
 
 writeFileSync(oneFileOutputPath, buildOneFileContent());
 console.log(`Wrote ${oneFileOutputPath}`);
 
-console.log(`Indexed ${allDocs.length} source files (${allOneFileDocs.length} for one-file output).`);
+console.log(`Indexed ${allDocs.length} standard + ${allDevDocs.length} dev source files (${allOneFileDocs.length} for one-file output).`);
