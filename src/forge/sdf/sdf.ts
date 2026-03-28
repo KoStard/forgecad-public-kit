@@ -13,7 +13,8 @@
 import { buildShapeFromSdfPlan } from './sdfBridge';
 import type { SdfBounds } from './sdfEval';
 import { estimateSdfBounds } from './sdfEval';
-import type { SdfNode, Vec3 } from './sdfNode';
+import type { SdfNode, SdfVoronoiNode, Vec3 } from './sdfNode';
+import { cloneSdfNode } from './sdfNode';
 
 // ─── SdfShape: the builder ───────────────────────────────────────────────────
 
@@ -63,7 +64,13 @@ export class SdfShape {
 
   /** SDF intersection (sharp). */
   intersect(...others: SdfShape[]): SdfShape {
-    return new SdfShape({ kind: 'sdf:intersection', children: [this._node, ...others.map((o) => o._node)] });
+    // Auto-enable surface-aware mode for voronoi nodes:
+    // When intersecting a shape with a voronoi, inject the non-voronoi shape
+    // as the voronoi's surfaceChild so membrane suppression works automatically.
+    // Also use smooth intersection for nicer edges where walls meet the shell.
+    const children = [this._node, ...others.map((o) => o._node)];
+    const enhanced = injectVoronoiSurfaceChild(children);
+    return new SdfShape({ kind: 'sdf:intersection', children: enhanced });
   }
 
   /** Smooth union — blends shapes together with a smooth radius. */
@@ -286,6 +293,14 @@ export interface VoronoiOptions {
   wallThickness?: number;
   /** Seed for deterministic variation. Default: 0 */
   seed?: number;
+  /**
+   * Projection weight for membrane suppression (0..1). Controls how much of
+   * the surface-normal distance component is removed from Voronoi cell distances.
+   * 0 = no projection (classic 3D voronoi with membranes).
+   * 1 = full tangent-plane projection (pure 2D pattern on surface).
+   * Default: 0.85. Only active when voronoi is intersected with another shape.
+   */
+  suppressionThreshold?: number;
 }
 
 /**
@@ -305,6 +320,7 @@ export function voronoi(options?: VoronoiOptions): SdfShape {
     cellSize: options?.cellSize ?? 10,
     wallThickness: options?.wallThickness ?? 1,
     seed: options?.seed ?? 0,
+    ...(options?.suppressionThreshold !== undefined ? { suppressionThreshold: options.suppressionThreshold } : {}),
   });
 }
 
@@ -585,4 +601,49 @@ function extractFunctionBody(fn: Function): string {
     return src.slice(start + 1, end).trim();
   }
   throw new Error('sdf.fromFunction(): could not extract function body. Use an arrow function: (x, y, z) => ...');
+}
+
+/**
+ * When intersecting children, detect voronoi nodes and inject the non-voronoi
+ * siblings as `surfaceChild` for automatic membrane suppression.
+ * Only injects if the voronoi doesn't already have a surfaceChild set.
+ */
+function injectVoronoiSurfaceChild(children: SdfNode[]): SdfNode[] {
+  // Find voronoi nodes and non-voronoi "surface" nodes
+  const voronoiIndices: number[] = [];
+  const surfaceIndices: number[] = [];
+  for (let i = 0; i < children.length; i++) {
+    if (children[i].kind === 'sdf:voronoi') {
+      voronoiIndices.push(i);
+    } else {
+      surfaceIndices.push(i);
+    }
+  }
+
+  // No voronoi or no surface shape — nothing to inject
+  if (voronoiIndices.length === 0 || surfaceIndices.length === 0) return children;
+
+  // Don't inject if user explicitly disabled suppression (threshold = 0)
+  const allDisabled = voronoiIndices.every((i) => {
+    const v = children[i] as SdfVoronoiNode;
+    return v.suppressionThreshold === 0;
+  });
+  if (allDisabled) return children;
+
+  // Build a surface reference: if there's one surface node, use it directly;
+  // if multiple, union them.
+  let surfaceNode: SdfNode;
+  if (surfaceIndices.length === 1) {
+    surfaceNode = children[surfaceIndices[0]];
+  } else {
+    surfaceNode = { kind: 'sdf:union', children: surfaceIndices.map((i) => children[i]) };
+  }
+
+  // Clone and inject surfaceChild into each voronoi node that doesn't have one
+  return children.map((child) => {
+    if (child.kind === 'sdf:voronoi' && !child.surfaceChild) {
+      return { ...child, surfaceChild: cloneSdfNode(surfaceNode) } as SdfVoronoiNode;
+    }
+    return child;
+  });
 }

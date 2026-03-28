@@ -2425,6 +2425,18 @@ interface SdfVoronoiNode {
 	wallThickness: number;
 	/** Seed for deterministic variation. */
 	seed: number;
+	/**
+	 * When set, enables surface-aware mode using IQ two-pass with membrane suppression.
+	 * The child SDF's gradient is used to estimate the surface normal, and walls aligned
+	 * with that normal are suppressed. This is the child SDF tree whose gradient provides
+	 * the surface normal for filtering.
+	 */
+	surfaceChild?: SdfNode;
+	/**
+	 * Membrane suppression threshold (0..1). Higher = more aggressive suppression.
+	 * 0 = no filtering, 1 = suppress all walls. Default: 0.7.
+	 */
+	suppressionThreshold?: number;
 }
 interface SdfCustomNode {
 	kind: "sdf:custom";
@@ -2643,6 +2655,14 @@ interface VoronoiOptions {
 	wallThickness?: number;
 	/** Seed for deterministic variation. Default: 0 */
 	seed?: number;
+	/**
+	 * Projection weight for membrane suppression (0..1). Controls how much of
+	 * the surface-normal distance component is removed from Voronoi cell distances.
+	 * 0 = no projection (classic 3D voronoi with membranes).
+	 * 1 = full tangent-plane projection (pure 2D pattern on surface).
+	 * Default: 0.85. Only active when voronoi is intersected with another shape.
+	 */
+	suppressionThreshold?: number;
 }
 declare function voronoi(options?: VoronoiOptions): SdfShape;
 interface HoneycombOptions {

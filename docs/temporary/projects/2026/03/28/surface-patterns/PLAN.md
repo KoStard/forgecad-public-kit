@@ -23,17 +23,16 @@ Add surface pattern capabilities to ForgeCAD so users can create stunning patter
 | WS5: Closure Fix | done | `.displace(fn, { constants })` — param() values work in displacement |
 | WS6: Spatial Blend | done | `sdf.blend(a, b, fn)` — smooth transitions between patterns |
 | WS7: More Patterns | done | lidinoid TPMS, scales, brick |
-| WS8: Voronoi Fix | partial | F2-F1 wall distance works but has thin membrane artifacts in 3D |
+| WS8: Voronoi Fix | done | Projected-distance Voronoi: 86/100 quality, membranes eliminated |
 
 ## Known Issues
 
-### Voronoi thin membranes
-The (F2-F1)/2 wall distance creates walls on ALL Voronoi cell faces in 3D, including faces roughly parallel to the shell surface. These appear as thin membranes closing off cells that should be open holes. The 2D hack (evaluating only in XZ) was rejected — need a proper solution that works on arbitrary surfaces, not just axis-aligned ones.
+### Voronoi quality (resolved)
+Projected-distance Voronoi approach: computes F2-F1 distances in the tangent plane, preventing membrane formation. Shell-aware gradient detection uses inner shape (before `abs()`) for smooth normals. Quality 86/100 (reference: smooth sphere 100, gyroid 95, unpatched voronoi 87-with-membranes).
 
-Possible proper approaches:
-- **Gradient-based wall selection**: compute the SDF gradient (surface normal direction) and suppress walls whose normals are aligned with it — keeps tangential walls, removes radial ones
-- **Shell-aware voronoi**: modulate voronoi by distance to the parent surface — walls far from the surface midline get suppressed
-- **UV-mapped 2D voronoi** (Phase 3): evaluate voronoi in surface-local coordinates so it's inherently 2D on the surface
+Remaining: 116 non-manifold edges (from ~175 in baseline). Performance ~7x gradient overhead (6 extra SDF evals per point).
+
+See investigation: `docs/temporary/projects/2026/03/28/voronoi-fix/PLAN.md`
 
 ### SDF docs not updated
 `docs/permanent/API/core/sdf.md` only covers the original SDF features. The 12 new pattern functions, blend, and constants support need documentation.

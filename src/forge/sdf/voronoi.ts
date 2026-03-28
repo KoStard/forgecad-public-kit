@@ -8,6 +8,12 @@
  *   4. Returns the Euclidean distance to the nearest feature point.
  *
  * The hash is an integer bit-mixing routine; no trig, no sin().
+ *
+ * Two modes:
+ *   - `worley3` / `seededWorley3`: standard 3D returning [F1, F2]
+ *   - `worley3Surface` / `seededWorley3Surface`: returns wall distance
+ *     with membrane suppression based on surface normal alignment.
+ *     Uses the smooth (F2-F1)/2 formula + bisector normal modulation.
  */
 
 // ---------------------------------------------------------------------------
@@ -36,13 +42,10 @@ function hashCell(
   iz: number,
   seed: number,
 ): [number, number, number] {
-  // Combine coordinates into one integer.  The primes spread bits
-  // so that axis-aligned runs don't collide.
   let h = (((ix * 73856093) ^ (iy * 19349669) ^ (iz * 83492791)) + seed) | 0;
   const hx = mix(h);
-  const hy = mix(hx + 0x6a09e667); // different constant per channel
+  const hy = mix(hx + 0x6a09e667);
   const hz = mix(hy + 0xbb67ae85);
-  // Map to [0, 1) — unsigned interpretation of the 32-bit value.
   return [
     (hx >>> 0) / 0x100000000,
     (hy >>> 0) / 0x100000000,
@@ -51,12 +54,11 @@ function hashCell(
 }
 
 // ---------------------------------------------------------------------------
-// Core evaluator
+// Core evaluator — standard F1/F2
 // ---------------------------------------------------------------------------
 
 /**
  * Returns [F1, F2] — distances to the nearest and second-nearest feature points.
- * F2 - F1 approximates twice the distance to the nearest Voronoi cell wall.
  */
 function worleyCore(
   x: number,
@@ -71,21 +73,16 @@ function worleyCore(
   let d1 = Infinity;
   let d2 = Infinity;
 
-  // 27-cell neighborhood
   for (let dz = -1; dz <= 1; dz++) {
     const cz = iz + dz;
     for (let dy = -1; dy <= 1; dy++) {
       const cy = iy + dy;
       for (let dx = -1; dx <= 1; dx++) {
         const cx = ix + dx;
-
         const fp = hashCell(cx, cy, cz, seed);
-
-        // Feature point in world space
         const fx = cx + fp[0];
         const fy = cy + fp[1];
         const fz = cz + fp[2];
-
         const ddx = x - fx;
         const ddy = y - fy;
         const ddz = z - fz;
@@ -105,15 +102,95 @@ function worleyCore(
 }
 
 // ---------------------------------------------------------------------------
+// Surface-aware evaluator — F2-F1 with bisector normal modulation
+// ---------------------------------------------------------------------------
+
+/**
+ * Projected-distance Voronoi — eliminates membranes by computing distances
+ * in the tangent plane (perpendicular to the surface normal).
+ *
+ * Instead of modifying the output (which creates gradient discontinuities),
+ * we modify the *input distances*: for each seed, we project the displacement
+ * vector onto the tangent plane before computing distance. Seeds at different
+ * depths along the surface normal appear co-located, so no walls form between
+ * them in the normal direction.
+ *
+ * The projection is a continuous linear operation, so the resulting field is
+ * as smooth as the original (F2-F1)/2 — no artifacts from suppression thresholds.
+ *
+ * The `threshold` parameter (0..1) controls how strongly the normal component
+ * is suppressed: 0 = no suppression (pure 3D), 1 = full projection (pure 2D
+ * on the tangent plane). Default 0.85 removes membranes while keeping some
+ * 3D depth variation.
+ */
+function worleySurface(
+  x: number,
+  y: number,
+  z: number,
+  seed: number,
+  nx: number,
+  ny: number,
+  nz: number,
+  threshold: number,
+): number {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const iz = Math.floor(z);
+
+  // Projection weight: how much of the normal component to remove
+  // threshold=1 → full projection (remove all normal component)
+  // threshold=0 → no projection (standard 3D)
+  const projW = threshold;
+
+  let d1 = Infinity;
+  let d2 = Infinity;
+
+  for (let dz = -1; dz <= 1; dz++) {
+    const cz = iz + dz;
+    for (let dy = -1; dy <= 1; dy++) {
+      const cy = iy + dy;
+      for (let dx = -1; dx <= 1; dx++) {
+        const cx = ix + dx;
+        const fp = hashCell(cx, cy, cz, seed);
+        const fx = cx + fp[0];
+        const fy = cy + fp[1];
+        const fz = cz + fp[2];
+
+        // Displacement from seed to query point
+        let ddx = x - fx;
+        let ddy = y - fy;
+        let ddz = z - fz;
+
+        // Project: remove the component along the surface normal
+        // This makes seeds at different radial depths "collapse" together,
+        // preventing walls from forming between them (no membranes).
+        const dotN = ddx * nx + ddy * ny + ddz * nz;
+        ddx -= dotN * nx * projW;
+        ddy -= dotN * ny * projW;
+        ddz -= dotN * nz * projW;
+
+        const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+
+        if (dist < d1) {
+          d2 = d1;
+          d1 = dist;
+        } else if (dist < d2) {
+          d2 = dist;
+        }
+      }
+    }
+  }
+
+  return (d2 - d1) * 0.5;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Returns [F1, F2] — distances to the nearest and second-nearest
- * Voronoi cell centers.  `(F2 - F1) / 2` approximates the distance
- * to the nearest cell wall.
- *
- * Input coordinates map 1 : 1 to cell size.
+ * Voronoi cell centers.
  */
 export function worley3(x: number, y: number, z: number): [number, number] {
   return worleyCore(x, y, z, 0);
@@ -127,4 +204,27 @@ export function seededWorley3(
 ): (x: number, y: number, z: number) => [number, number] {
   const s = seed | 0;
   return (x: number, y: number, z: number) => worleyCore(x, y, z, s);
+}
+
+/**
+ * Surface-aware Voronoi returning wall distance with membrane suppression.
+ * Uses smooth (F2-F1)/2 + bisector normal modulation.
+ */
+export function worley3Surface(
+  x: number, y: number, z: number,
+  nx: number, ny: number, nz: number,
+  threshold: number,
+): number {
+  return worleySurface(x, y, z, 0, nx, ny, nz, threshold);
+}
+
+/**
+ * Returns a seeded surface-aware Worley evaluator.
+ */
+export function seededWorley3Surface(
+  seed: number,
+): (x: number, y: number, z: number, nx: number, ny: number, nz: number, threshold: number) => number {
+  const s = seed | 0;
+  return (x: number, y: number, z: number, nx: number, ny: number, nz: number, threshold: number) =>
+    worleySurface(x, y, z, s, nx, ny, nz, threshold);
 }

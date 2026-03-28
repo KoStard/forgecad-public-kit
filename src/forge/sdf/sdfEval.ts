@@ -12,7 +12,7 @@
 import type { SdfNode, Vec3 } from './sdfNode';
 import { simplex3, seededSimplex3 } from './noise';
 import { gyroid, schwarzP, diamond, lidinoid } from './tpms';
-import { worley3, seededWorley3 } from './voronoi';
+import { worley3, seededWorley3, worley3Surface, seededWorley3Surface } from './voronoi';
 
 const { abs, cos, max, min, sin, sqrt, PI } = Math;
 const TAU = 2 * PI;
@@ -338,14 +338,48 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
       };
     }
     case 'sdf:voronoi': {
-      const { cellSize, wallThickness, seed } = node;
+      const { cellSize, wallThickness, seed, surfaceChild, suppressionThreshold } = node;
       const invCell = 1 / cellSize;
       const halfWall = wallThickness * 0.5;
+      const threshold = suppressionThreshold ?? 0.7;
+
+      if (surfaceChild) {
+        // Surface-aware mode: projected-distance (F2-F1)/2.
+        // Computes Voronoi distances in the tangent plane perpendicular to
+        // the surface normal, preventing walls from forming parallel to the surface.
+        //
+        // For gradient estimation, if the surfaceChild is a shell node, use the
+        // inner shape (before abs()) for a smoother gradient without the kink
+        // at the shell midline.
+        const gradNode = surfaceChild.kind === 'sdf:shell' ? surfaceChild.child : surfaceChild;
+        const gradFn = compileSdfNode(gradNode);
+        const wFn = seed !== 0 ? seededWorley3Surface(seed) : worley3Surface;
+        const eps = cellSize * 0.05;
+
+        return (p) => {
+          // Estimate surface normal via central-difference gradient
+          const gx = gradFn([p[0] + eps, p[1], p[2]]) - gradFn([p[0] - eps, p[1], p[2]]);
+          const gy = gradFn([p[0], p[1] + eps, p[2]]) - gradFn([p[0], p[1] - eps, p[2]]);
+          const gz = gradFn([p[0], p[1], p[2] + eps]) - gradFn([p[0], p[1], p[2] - eps]);
+          const glen = sqrt(gx * gx + gy * gy + gz * gz);
+          let nx = 0, ny = 0, nz = 0;
+          if (glen > 1e-10) {
+            const invG = 1 / glen;
+            nx = gx * invG;
+            ny = gy * invG;
+            nz = gz * invG;
+          }
+
+          const wallDist = wFn(
+            p[0] * invCell, p[1] * invCell, p[2] * invCell,
+            nx, ny, nz, threshold,
+          );
+          return wallDist * cellSize - halfWall;
+        };
+      }
+
+      // Standard mode: F2-F1 wall distance (may have membranes in 3D)
       const wFn = seed !== 0 ? seededWorley3(seed) : worley3;
-      // Voronoi as SDF: distance to the nearest cell WALL (not cell center).
-      // worley3 returns [F1, F2] — nearest and second-nearest feature point distances.
-      // The cell wall lies where F1 ≈ F2, so (F2 - F1) / 2 approximates wall distance.
-      // Subtracting halfWall thickens the walls.
       return (p) => {
         const [f1, f2] = wFn(p[0] * invCell, p[1] * invCell, p[2] * invCell);
         const wallDist = (f2 - f1) * 0.5 * cellSize;

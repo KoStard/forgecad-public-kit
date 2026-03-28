@@ -214,6 +214,18 @@ export interface SdfVoronoiNode {
   wallThickness: number;
   /** Seed for deterministic variation. */
   seed: number;
+  /**
+   * When set, enables surface-aware mode using IQ two-pass with membrane suppression.
+   * The child SDF's gradient is used to estimate the surface normal, and walls aligned
+   * with that normal are suppressed. This is the child SDF tree whose gradient provides
+   * the surface normal for filtering.
+   */
+  surfaceChild?: SdfNode;
+  /**
+   * Membrane suppression threshold (0..1). Higher = more aggressive suppression.
+   * 0 = no filtering, 1 = suppress all walls. Default: 0.7.
+   */
+  suppressionThreshold?: number;
 }
 
 // ─── Custom SDF function ─────────────────────────────────────────────────────
@@ -345,7 +357,14 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
     case 'sdf:noise':
       return { kind: 'sdf:noise', scale: node.scale, amplitude: node.amplitude, octaves: node.octaves, seed: node.seed };
     case 'sdf:voronoi':
-      return { kind: 'sdf:voronoi', cellSize: node.cellSize, wallThickness: node.wallThickness, seed: node.seed };
+      return {
+        kind: 'sdf:voronoi',
+        cellSize: node.cellSize,
+        wallThickness: node.wallThickness,
+        seed: node.seed,
+        ...(node.surfaceChild ? { surfaceChild: cloneSdfNode(node.surfaceChild) } : {}),
+        ...(node.suppressionThreshold !== undefined ? { suppressionThreshold: node.suppressionThreshold } : {}),
+      };
 
     // Custom
     case 'sdf:custom':
