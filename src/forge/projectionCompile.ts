@@ -523,6 +523,11 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
         ok: false,
         reason: 'projection replay cannot derive a planar projection basis from imported mesh files.',
       };
+    case 'sdf':
+      return {
+        ok: false,
+        reason: 'projection replay cannot derive a planar projection basis from SDF shapes.',
+      };
     default:
       assertExhaustive(plan);
   }

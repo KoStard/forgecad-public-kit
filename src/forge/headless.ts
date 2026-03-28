@@ -96,6 +96,7 @@ export {
   intersection,
   isAnchor3D,
   resolveAnchor3D,
+  sdf,
   Shape,
   setShapePlacementReferences,
   sphere,

@@ -21,7 +21,7 @@ Build a smooth Catmull-Rom spline sketch from 2D control points. A closed spline
 #### `spline3d()`
 
 ```ts
-spline3d(points: Vec3$2[], options?: Spline3DOptions): Curve3D
+spline3d(points: Vec3$3[], options?: Spline3DOptions): Curve3D
 ```
 
 Create a reusable 3D spline curve object (Catmull-Rom). The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for downstream use in sweep() or manual path operations.
@@ -37,7 +37,7 @@ Loft between multiple sketches along Z stations. Profiles can differ in topology
 #### `sweep()`
 
 ```ts
-sweep(profile: Sketch, path: Curve3D | Vec3$2[], options?: SweepOptions): Shape
+sweep(profile: Sketch, path: Curve3D | Vec3$3[], options?: SweepOptions): Shape
 ```
 
 Sweep a 2D profile along a 3D path to create a solid. Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline). The profile is interpreted in the local frame normal plane. Compatible sweeps can export through the OCCT exact route using the canonical path representation. Performance note: sweep uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape.
@@ -52,16 +52,16 @@ Sweep a 2D profile along a 3D path to create a solid. Path can be a Curve3D from
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `points` | `Vec3$2[]` | — |
+| `points` | `Vec3$3[]` | — |
 | `closed` | `boolean` | — |
 | `tension` | `number` | — |
 
 **Methods:**
 
-- `sampleBySegment()` — sampleBySegment(samplesPerSegment?: number): Vec3$2[]
-- `sample()` — sample(count?: number): Vec3$2[]
-- `pointAt()` — pointAt(t: number): Vec3$2
-- `tangentAt()` — tangentAt(t: number): Vec3$2
+- `sampleBySegment()` — sampleBySegment(samplesPerSegment?: number): Vec3$3[]
+- `sample()` — sample(count?: number): Vec3$3[]
+- `pointAt()` — pointAt(t: number): Vec3$3
+- `tangentAt()` — tangentAt(t: number): Vec3$3
 - `length()` — length(samples?: number): number
 
 ### `HermiteCurve3D`
@@ -72,10 +72,10 @@ A cubic Hermite curve in 3D space. Interpolates between two endpoints matching p
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `p0` | `Vec3$3` | Start position |
-| `p1` | `Vec3$3` | End position |
-| `t0` | `Vec3$3` | Scaled tangent at start (direction * weight * chordLength) |
-| `t1` | `Vec3$3` | Scaled tangent at end (direction * weight * chordLength) |
+| `p0` | `Vec3$4` | Start position |
+| `p1` | `Vec3$4` | End position |
+| `t0` | `Vec3$4` | Scaled tangent at start (direction * weight * chordLength) |
+| `t1` | `Vec3$4` | Scaled tangent at end (direction * weight * chordLength) |
 | `chordLength` | `number` | Chord length (straight-line distance between endpoints) |
 
 **Methods:**
@@ -96,12 +96,12 @@ A quintic Hermite curve in 3D space. Interpolates between two endpoints matching
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `p0` | `Vec3$3` | Start position |
-| `p1` | `Vec3$3` | End position |
-| `t0` | `Vec3$3` | Scaled tangent at start (direction * weight * chordLength) |
-| `t1` | `Vec3$3` | Scaled tangent at end (direction * weight * chordLength) |
-| `c0` | `Vec3$3` | Scaled second derivative at start (curvature * weight² * chordLength²) |
-| `c1` | `Vec3$3` | Scaled second derivative at end (curvature * weight² * chordLength²) |
+| `p0` | `Vec3$4` | Start position |
+| `p1` | `Vec3$4` | End position |
+| `t0` | `Vec3$4` | Scaled tangent at start (direction * weight * chordLength) |
+| `t1` | `Vec3$4` | Scaled tangent at end (direction * weight * chordLength) |
+| `c0` | `Vec3$4` | Scaled second derivative at start (curvature * weight² * chordLength²) |
+| `c1` | `Vec3$4` | Scaled second derivative at end (curvature * weight² * chordLength²) |
 | `chordLength` | `number` | Chord length (straight-line distance between endpoints) |
 
 **Methods:**

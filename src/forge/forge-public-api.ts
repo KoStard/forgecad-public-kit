@@ -46,7 +46,7 @@ export type { EdgeSelector } from './fillet';
 export { chamfer, draft, fillet, offsetSolid } from './fillet';
 export { group, ShapeGroup } from './group';
 export type { GeometryBackend, GeometryFidelity, GeometryInfo, GeometryRepresentation, GeometrySource, GeometryTopology } from './kernel';
-export { Shape } from './kernel';
+export { Shape, sdf } from './kernel';
 // `lib` — re-export the partLibrary object as `lib` so its full inferred type
 // (all the gear/pipe/extrusion helpers) is always in sync with library.ts.
 export { partLibrary as lib } from './library';

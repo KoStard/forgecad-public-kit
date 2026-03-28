@@ -10,10 +10,28 @@
 
 Create basic 3D shapes.
 
+#### `sphere()`
+
+```ts
+sphere(radius: number): SdfShape
+```
+
 #### `box()`
 
 ```ts
-box(x: number, y: number, z: number, center?: boolean): TrackedShape
+box(x: number, y: number, z: number): SdfShape
+```
+
+#### `cylinder()`
+
+```ts
+cylinder(height: number, radius: number): SdfShape
+```
+
+#### `box()`
+
+```ts
+box$1(x: number, y: number, z: number, center?: boolean): TrackedShape
 ```
 
 Create a rectangular box with named faces and edges. When center is false (default), one corner sits at the origin. Returns a TrackedShape with faces (top, bottom, side-left, side-right, side-top, side-bottom) and edges (vert-bl, vert-br, vert-tr, vert-tl, etc.).
@@ -21,7 +39,7 @@ Create a rectangular box with named faces and edges. When center is false (defau
 #### `cylinder()`
 
 ```ts
-cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape
+cylinder$1(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape
 ```
 
 Create a cylinder or cone with named faces and edges. When radiusTop differs from radius, creates a tapered cone. Use segments for regular prisms. Returns a TrackedShape with faces (top, bottom, side) and edges (top-rim, bottom-rim).
@@ -29,7 +47,7 @@ Create a cylinder or cone with named faces and edges. When radiusTop differs fro
 #### `sphere()`
 
 ```ts
-sphere(radius: number, segments?: number): Shape
+sphere$1(radius: number, segments?: number): Shape
 ```
 
 Create a sphere centered at the origin. Use segments for lower-poly approximations.
@@ -250,6 +268,90 @@ Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul
 portFactory(input: PortInput): PortDef
 ```
 
+#### `torus()`
+
+```ts
+torus(majorRadius: number, minorRadius: number): SdfShape
+```
+
+#### `capsule()`
+
+```ts
+capsule(height: number, radius: number): SdfShape
+```
+
+#### `cone()`
+
+```ts
+cone(height: number, radius: number): SdfShape
+```
+
+#### `smoothUnion()`
+
+```ts
+smoothUnion(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfShape
+```
+
+#### `smoothDifference()`
+
+```ts
+smoothDifference(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfShape
+```
+
+#### `smoothIntersection()`
+
+```ts
+smoothIntersection(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfShape
+```
+
+#### `morph()`
+
+```ts
+morph(a: SdfShape, b: SdfShape, t: number): SdfShape
+```
+
+#### `gyroid()`
+
+```ts
+gyroid(options: TpmsOptions): SdfShape
+```
+
+#### `schwarzP()`
+
+```ts
+schwarzP(options: TpmsOptions): SdfShape
+```
+
+#### `diamond()`
+
+```ts
+diamond(options: TpmsOptions): SdfShape
+```
+
+#### `fromFunction()`
+
+```ts
+fromFunction(fn: (x: number, y: number, z: number) => number, bounds: { min: Vec3$1; max: Vec3$1; }): SdfShape
+```
+
+#### `twist()`
+
+```ts
+twist(shape: SdfShape, degreesPerUnit: number): SdfShape
+```
+
+#### `bend()`
+
+```ts
+bend(shape: SdfShape, radius: number): SdfShape
+```
+
+#### `repeat()`
+
+```ts
+repeat(shape: SdfShape, spacing: Vec3$1, count?: Vec3$1): SdfShape
+```
+
 #### `fillet()`
 
 ```ts
@@ -341,7 +443,7 @@ Create a solid transition surface between two edges by sweeping a profile along 
 #### `transitionCurveFromPoints()`
 
 ```ts
-transitionCurveFromPoints(startPoint: Vec3$4, startTangent: Vec3$4, endPoint: Vec3$4, endTangent: Vec3$4, options?: TransitionCurveOptions): HermiteCurve3D
+transitionCurveFromPoints(startPoint: Vec3$5, startTangent: Vec3$5, endPoint: Vec3$5, endTangent: Vec3$5, options?: TransitionCurveOptions): HermiteCurve3D
 ```
 
 Convenience: create a transition curve from raw coordinate data. Useful when you have endpoints and directions as plain arrays without constructing TransitionEdge objects.
@@ -377,7 +479,7 @@ faceProfile(shape: Shape | TrackedShape, face: FaceSelector): Sketch
 #### `torus()`
 
 ```ts
-torus(majorRadius: number, minorRadius: number, segments?: number): Shape
+torus$1(majorRadius: number, minorRadius: number, segments?: number): Shape
 ```
 
 Create a torus (donut shape) centered at the origin, lying in the XY plane.
@@ -614,6 +716,28 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `portNames()` — List named port identifiers carried by this group.
 - `referencePoint()` — Resolve a named placement reference or built-in Anchor3D to a 3D point. Named refs take priority over built-in anchors.
 - `placeReference()` — Translate the group so the given reference lands on the target coordinate. ```javascript const placed = require('./bracket-assembly.forge.js').group .placeReference('mountCenter', [0, 0, 50]); ```
+
+### `SdfShape`
+
+**Methods:**
+
+- `toShape()` — Mesh this SDF into a ForgeCAD Shape via Manifold.levelSet(). Once converted, the result is a regular Shape — booleans, transforms, export all work.
+- `union()` — SDF union (sharp).
+- `subtract()` — SDF difference (sharp) — subtracts others from this.
+- `intersect()` — SDF intersection (sharp).
+- `smoothUnion()` — Smooth union — blends shapes together with a smooth radius.
+- `smoothSubtract()` — Smooth difference — smoothly carves other from this.
+- `smoothIntersect()` — Smooth intersection — smoothly intersects.
+- `morph()` — Morph between this shape and another. t=0 → this, t=1 → other.
+- `translate()` — translate(x: number, y: number, z: number): SdfShape
+- `rotate()` — rotate(xDeg: number, yDeg: number, zDeg: number): SdfShape
+- `scale()` — scale(factor: number): SdfShape
+- `twist()` — Twist around the Y axis.
+- `bend()` — Bend around the Z axis with given radius.
+- `repeat()` — Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite.
+- `shell()` — Hollow out, keeping only a shell of given thickness.
+- `displace()` — Displace the surface by a function of position.
+- `onion()` — Create concentric onion layers.
 
 ---
 

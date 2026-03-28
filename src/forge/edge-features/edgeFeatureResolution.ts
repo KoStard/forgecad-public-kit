@@ -289,6 +289,7 @@ function searchOwnerMatch(
     case 'loft':
     case 'sweep':
     case 'importedMesh':
+    case 'sdf':
       return {
         issue: {
           code: 'edge-owner-not-found',
@@ -397,6 +398,7 @@ function resolvePropagatedEdgeQueryAtOwnerBase(ownerBase: ShapeCompilePlan, ref:
     ownerBase.kind === 'filletEdges' ||
     ownerBase.kind === 'chamferEdges' ||
     ownerBase.kind === 'importedMesh' ||
+    ownerBase.kind === 'sdf' ||
     ownerBase.kind === 'torus' ||
     ownerBase.kind === 'draft' ||
     ownerBase.kind === 'offsetSolid'
@@ -663,6 +665,7 @@ function resolveSelectionFromOwnerBase(plan: ShapeCompilePlan, edgeName: string)
     case 'sweep':
     case 'trimByPlane':
     case 'importedMesh':
+    case 'sdf':
       return edgeIssue(
         'unsupported-edge-base',
         'Edge finishing v1 currently supports tracked vertical edges from compile-covered box() bodies and rectangle extrusions before topology-changing edits.',
@@ -716,6 +719,7 @@ function resolveEdgeChainAtOwnerBase(ownerBase: ShapeCompilePlan, ref: Propagate
     ownerBase.kind === 'filletEdges' ||
     ownerBase.kind === 'chamferEdges' ||
     ownerBase.kind === 'importedMesh' ||
+    ownerBase.kind === 'sdf' ||
     ownerBase.kind === 'torus' ||
     ownerBase.kind === 'draft' ||
     ownerBase.kind === 'offsetSolid'
@@ -773,6 +777,7 @@ function resolveCreatedEdgeChainAtOwnerBase(
     ownerBase.kind === 'filletEdges' ||
     ownerBase.kind === 'chamferEdges' ||
     ownerBase.kind === 'importedMesh' ||
+    ownerBase.kind === 'sdf' ||
     ownerBase.kind === 'torus' ||
     ownerBase.kind === 'draft' ||
     ownerBase.kind === 'offsetSolid'

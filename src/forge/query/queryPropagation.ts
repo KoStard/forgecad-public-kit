@@ -79,6 +79,7 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'draft':
     case 'offsetSolid':
     case 'importedMesh':
+    case 'sdf':
       return undefined;
     default:
       assertExhaustive(plan);
@@ -721,6 +722,7 @@ export function findShapeTopologyRewritePropagation(plan: ShapeCompilePlan | nul
     case 'draft':
     case 'offsetSolid':
     case 'importedMesh':
+    case 'sdf':
       return null;
     default:
       assertExhaustive(plan);
@@ -776,6 +778,7 @@ export function collectShapeTopologyRewritePropagations(plan: ShapeCompilePlan |
       case 'loft':
       case 'sweep':
       case 'importedMesh':
+      case 'sdf':
         return;
       default:
         assertExhaustive(current);

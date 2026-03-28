@@ -2254,6 +2254,153 @@ type PlaneSpec = {
 } | {
 	face: FaceRef;
 };
+type Vec3$1 = [
+	number,
+	number,
+	number
+];
+interface SdfSphereNode {
+	kind: "sdf:sphere";
+	radius: number;
+}
+interface SdfBoxNode {
+	kind: "sdf:box";
+	halfExtents: Vec3$1;
+}
+interface SdfCylinderNode {
+	kind: "sdf:cylinder";
+	height: number;
+	radius: number;
+}
+interface SdfTorusNode {
+	kind: "sdf:torus";
+	majorRadius: number;
+	minorRadius: number;
+}
+interface SdfCapsuleNode {
+	kind: "sdf:capsule";
+	height: number;
+	radius: number;
+}
+interface SdfConeNode {
+	kind: "sdf:cone";
+	height: number;
+	radius: number;
+}
+interface SdfUnionNode {
+	kind: "sdf:union";
+	children: SdfNode[];
+}
+interface SdfDifferenceNode {
+	kind: "sdf:difference";
+	/** First child is the base; subsequent children are subtracted. */
+	children: SdfNode[];
+}
+interface SdfIntersectionNode {
+	kind: "sdf:intersection";
+	children: SdfNode[];
+}
+interface SdfSmoothUnionNode {
+	kind: "sdf:smoothUnion";
+	children: SdfNode[];
+	radius: number;
+}
+interface SdfSmoothDifferenceNode {
+	kind: "sdf:smoothDifference";
+	children: SdfNode[];
+	radius: number;
+}
+interface SdfSmoothIntersectionNode {
+	kind: "sdf:smoothIntersection";
+	children: SdfNode[];
+	radius: number;
+}
+interface SdfMorphNode {
+	kind: "sdf:morph";
+	a: SdfNode;
+	b: SdfNode;
+	/** 0 = fully a, 1 = fully b */
+	t: number;
+}
+interface SdfTranslateNode {
+	kind: "sdf:translate";
+	child: SdfNode;
+	offset: Vec3$1;
+}
+interface SdfRotateNode {
+	kind: "sdf:rotate";
+	child: SdfNode;
+	/** Euler angles in degrees (X, Y, Z) */
+	degrees: Vec3$1;
+}
+interface SdfScaleNode {
+	kind: "sdf:scale";
+	child: SdfNode;
+	factor: number;
+}
+interface SdfTwistNode {
+	kind: "sdf:twist";
+	child: SdfNode;
+	/** Total twist angle in degrees over the full height of the shape */
+	degreesPerUnit: number;
+}
+interface SdfBendNode {
+	kind: "sdf:bend";
+	child: SdfNode;
+	/** Bend radius — larger = gentler bend */
+	radius: number;
+}
+interface SdfRepeatNode {
+	kind: "sdf:repeat";
+	child: SdfNode;
+	/** Spacing between repetitions [x, y, z]. 0 = no repetition on that axis. */
+	spacing: Vec3$1;
+	/** Max repetition count per side. 0 = infinite. */
+	count: Vec3$1;
+}
+interface SdfShellNode {
+	kind: "sdf:shell";
+	child: SdfNode;
+	thickness: number;
+}
+interface SdfDisplaceNode {
+	kind: "sdf:displace";
+	child: SdfNode;
+	/** Serialized as a function body string: receives (x, y, z) and returns a number. */
+	functionBody: string;
+}
+interface SdfOnionNode {
+	kind: "sdf:onion";
+	child: SdfNode;
+	/** Number of concentric layers */
+	layers: number;
+	thickness: number;
+}
+interface SdfGyroidNode {
+	kind: "sdf:gyroid";
+	cellSize: number;
+	thickness: number;
+}
+interface SdfSchwarzPNode {
+	kind: "sdf:schwarzP";
+	cellSize: number;
+	thickness: number;
+}
+interface SdfDiamondNode {
+	kind: "sdf:diamond";
+	cellSize: number;
+	thickness: number;
+}
+interface SdfCustomNode {
+	kind: "sdf:custom";
+	/** Function body string: receives (x, y, z) and returns signed distance. */
+	functionBody: string;
+	bounds: {
+		min: Vec3$1;
+		max: Vec3$1;
+	};
+}
+type SdfNode = SdfSphereNode | SdfBoxNode | SdfCylinderNode | SdfTorusNode | SdfCapsuleNode | SdfConeNode | SdfUnionNode | SdfDifferenceNode | SdfIntersectionNode | SdfSmoothUnionNode | SdfSmoothDifferenceNode | SdfSmoothIntersectionNode | SdfMorphNode | SdfTranslateNode | SdfRotateNode | SdfScaleNode | SdfTwistNode | SdfBendNode | SdfRepeatNode | SdfShellNode | SdfDisplaceNode | SdfOnionNode | SdfGyroidNode | SdfSchwarzPNode | SdfDiamondNode | SdfCustomNode;
 declare const SHEET_METAL_EDGES: readonly [
 	"top",
 	"right",
@@ -2363,11 +2510,90 @@ interface PlacementReferenceInput {
 	objects?: Record<string, PlacementObjectInput>;
 }
 type PlacementAnchorLike = Anchor3D | string;
+interface SdfToShapeOptions {
+	/** Target mesh edge length. Smaller = finer mesh. Default: auto-computed from bounds. */
+	edgeLength?: number;
+	/** Override auto-computed bounds. */
+	bounds?: {
+		min: Vec3$1;
+		max: Vec3$1;
+	};
+}
+declare class SdfShape {
+	/** @internal */
+	readonly _node: SdfNode;
+	/** @internal */
+	constructor(node: SdfNode);
+	/**
+	 * Mesh this SDF into a ForgeCAD Shape via Manifold.levelSet().
+	 * Once converted, the result is a regular Shape — booleans, transforms, export all work.
+	 */
+	toShape(options?: SdfToShapeOptions): Shape;
+	/** SDF union (sharp). */
+	union(...others: SdfShape[]): SdfShape;
+	/** SDF difference (sharp) — subtracts others from this. */
+	subtract(...others: SdfShape[]): SdfShape;
+	/** SDF intersection (sharp). */
+	intersect(...others: SdfShape[]): SdfShape;
+	/** Smooth union — blends shapes together with a smooth radius. */
+	smoothUnion(other: SdfShape, radius: number): SdfShape;
+	/** Smooth difference — smoothly carves other from this. */
+	smoothSubtract(other: SdfShape, radius: number): SdfShape;
+	/** Smooth intersection — smoothly intersects. */
+	smoothIntersect(other: SdfShape, radius: number): SdfShape;
+	/** Morph between this shape and another. t=0 → this, t=1 → other. */
+	morph(other: SdfShape, t: number): SdfShape;
+	translate(x: number, y: number, z: number): SdfShape;
+	rotate(xDeg: number, yDeg: number, zDeg: number): SdfShape;
+	scale(factor: number): SdfShape;
+	/** Twist around the Y axis. */
+	twist(degreesPerUnit: number): SdfShape;
+	/** Bend around the Z axis with given radius. */
+	bend(radius: number): SdfShape;
+	/** Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite. */
+	repeat(spacing: Vec3$1, count?: Vec3$1): SdfShape;
+	/** Hollow out, keeping only a shell of given thickness. */
+	shell(thickness: number): SdfShape;
+	/** Displace the surface by a function of position. */
+	displace(fn: (x: number, y: number, z: number) => number): SdfShape;
+	/** Create concentric onion layers. */
+	onion(layers: number, thickness: number): SdfShape;
+}
+declare function sphere(radius: number): SdfShape;
+declare function box(x: number, y: number, z: number): SdfShape;
+declare function cylinder(height: number, radius: number): SdfShape;
+declare function torus(majorRadius: number, minorRadius: number): SdfShape;
+declare function capsule(height: number, radius: number): SdfShape;
+declare function cone(height: number, radius: number): SdfShape;
+declare function smoothUnion(a: SdfShape, b: SdfShape, options: {
+	radius: number;
+}): SdfShape;
+declare function smoothDifference(a: SdfShape, b: SdfShape, options: {
+	radius: number;
+}): SdfShape;
+declare function smoothIntersection(a: SdfShape, b: SdfShape, options: {
+	radius: number;
+}): SdfShape;
+declare function morph(a: SdfShape, b: SdfShape, t: number): SdfShape;
+interface TpmsOptions {
+	cellSize: number;
+	thickness: number;
+}
+declare function gyroid(options: TpmsOptions): SdfShape;
+declare function schwarzP(options: TpmsOptions): SdfShape;
+declare function diamond(options: TpmsOptions): SdfShape;
+declare function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: {
+	min: Vec3$1;
+	max: Vec3$1;
+}): SdfShape;
+declare function twist(shape: SdfShape, degreesPerUnit: number): SdfShape;
+declare function bend(shape: SdfShape, radius: number): SdfShape;
+declare function repeat(shape: SdfShape, spacing: Vec3$1, count?: Vec3$1): SdfShape;
 type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
 type GeometryFidelity = "kernel-native" | "exact" | "sampled" | "deformed" | "mixed" | "unknown";
 type GeometryTopology = "none" | "synthetic" | "kernel";
-type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "level-set" | "loft" | "sweep" | "deform" | "draft" | "offset-solid" | "imported" | "unknown";
+type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "level-set" | "loft" | "sweep" | "deform" | "draft" | "offset-solid" | "imported" | "sdf" | "unknown";
 interface GeometryInfo {
 	backend: GeometryBackend;
 	representation: GeometryRepresentation;
@@ -4562,7 +4788,7 @@ interface TrackedShape {
 	 */
 	cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape;
 }
-type Vec3$1 = [
+type Vec3$2 = [
 	number,
 	number,
 	number
@@ -4570,10 +4796,10 @@ type Vec3$1 = [
 interface RectAreaRef {
 	/** Rectangle corners in order: bottom-left, bottom-right, top-right, top-left */
 	corners: [
-		Vec3$1,
-		Vec3$1,
-		Vec3$1,
-		Vec3$1
+		Vec3$2,
+		Vec3$2,
+		Vec3$2,
+		Vec3$2
 	];
 }
 type RectAreaArg = RectAreaRef | Rectangle2D;
@@ -4835,7 +5061,7 @@ type Vec2 = [
 	number,
 	number
 ];
-type Vec3$2 = [
+type Vec3$3 = [
 	number,
 	number,
 	number
@@ -4878,17 +5104,17 @@ interface SweepOptions {
 	 * Preferred "up" vector for local profile frame.
 	 * Auto fallback is used near parallel segments.
 	 */
-	up?: Vec3$2;
+	up?: Vec3$3;
 }
 declare class Curve3D {
-	readonly points: Vec3$2[];
+	readonly points: Vec3$3[];
 	readonly closed: boolean;
 	readonly tension: number;
-	constructor(points: Vec3$2[], options?: Spline3DOptions);
-	sampleBySegment(samplesPerSegment?: number): Vec3$2[];
-	sample(count?: number): Vec3$2[];
-	pointAt(t: number): Vec3$2;
-	tangentAt(t: number): Vec3$2;
+	constructor(points: Vec3$3[], options?: Spline3DOptions);
+	sampleBySegment(samplesPerSegment?: number): Vec3$3[];
+	sample(count?: number): Vec3$3[];
+	pointAt(t: number): Vec3$3;
+	tangentAt(t: number): Vec3$3;
 	length(samples?: number): number;
 }
 /**
@@ -4905,7 +5131,7 @@ declare function spline2d(points: Vec2[], options?: Spline2DOptions): Sketch;
  * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
  * downstream use in sweep() or manual path operations.
  */
-declare function spline3d(points: Vec3$2[], options?: Spline3DOptions): Curve3D;
+declare function spline3d(points: Vec3$3[], options?: Spline3DOptions): Curve3D;
 /**
  * Loft between multiple sketches along Z stations.
  *
@@ -4927,7 +5153,7 @@ declare function loft(profiles: Sketch[], heights: number[], options?: LoftOptio
  * Performance note: sweep uses level-set meshing internally. Prefer direct
  * primitives/extrude/revolve when they can express the same shape.
  */
-declare function sweep(profile: Sketch, path: Curve3D | Vec3$2[], options?: SweepOptions): Shape;
+declare function sweep(profile: Sketch, path: Curve3D | Vec3$3[], options?: SweepOptions): Shape;
 type PointArg$1 = [
 	number,
 	number
@@ -5021,16 +5247,16 @@ declare function filletCorners(points: PointInput[], corners: FilletCornerSpec[]
  * @returns Parsed opentype.Font object.
  */
 declare function loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype$1.Font;
-type Vec3$3 = [
+type Vec3$4 = [
 	number,
 	number,
 	number
 ];
 interface HermiteCurveEndpoint {
 	/** Position */
-	point: Vec3$3;
+	point: Vec3$4;
 	/** Tangent direction (will be normalized internally) */
-	tangent: Vec3$3;
+	tangent: Vec3$4;
 	/** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
 	weight?: number;
 }
@@ -5043,41 +5269,41 @@ interface HermiteCurveEndpoint {
  */
 declare class HermiteCurve3D {
 	/** Start position */
-	readonly p0: Vec3$3;
+	readonly p0: Vec3$4;
 	/** End position */
-	readonly p1: Vec3$3;
+	readonly p1: Vec3$4;
 	/** Scaled tangent at start (direction * weight * chordLength) */
-	readonly t0: Vec3$3;
+	readonly t0: Vec3$4;
 	/** Scaled tangent at end (direction * weight * chordLength) */
-	readonly t1: Vec3$3;
+	readonly t1: Vec3$4;
 	/** Chord length (straight-line distance between endpoints) */
 	readonly chordLength: number;
 	constructor(start: HermiteCurveEndpoint, end: HermiteCurveEndpoint);
 	/** Evaluate position at parameter t ∈ [0, 1] */
-	pointAt(t: number): Vec3$3;
+	pointAt(t: number): Vec3$4;
 	/** Evaluate tangent (first derivative) at parameter t ∈ [0, 1] */
-	tangentAt(t: number): Vec3$3;
+	tangentAt(t: number): Vec3$4;
 	/** Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1] */
-	curvatureAt(t: number): Vec3$3;
+	curvatureAt(t: number): Vec3$4;
 	/** Sample the curve as a polyline of evenly-spaced parameter values. */
-	sample(count?: number): Vec3$3[];
+	sample(count?: number): Vec3$4[];
 	/** Approximate arc length by sampling. */
 	length(samples?: number): number;
 	/**
 	 * Sample with adaptive density — more points where curvature is higher.
 	 * Returns at least `minCount` points, up to `maxCount`.
 	 */
-	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$3[];
+	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$4[];
 	/** Convert to a format compatible with sweep() path input. */
-	toPolyline(samples?: number): Vec3$3[];
+	toPolyline(samples?: number): Vec3$4[];
 }
 interface EdgeEndpoint {
 	/** Connection point on the edge */
-	point: Vec3$3;
+	point: Vec3$4;
 	/** Tangent direction along the edge at the connection point */
-	tangent: Vec3$3;
+	tangent: Vec3$4;
 	/** Surface normal at the connection point (optional, for future G2 support) */
-	normal?: Vec3$3;
+	normal?: Vec3$4;
 	/** Weight controlling how far the curve follows this edge's tangent. Default 1.0. */
 	weight?: number;
 }
@@ -5099,11 +5325,11 @@ interface EdgeEndpoint {
 declare function hermiteTransition(a: EdgeEndpoint, b: EdgeEndpoint): HermiteCurve3D;
 interface QuinticHermiteCurveEndpoint {
 	/** Position */
-	point: Vec3$3;
+	point: Vec3$4;
 	/** Tangent direction (will be normalized internally) */
-	tangent: Vec3$3;
+	tangent: Vec3$4;
 	/** Second derivative / curvature vector. Default [0, 0, 0]. */
-	curvature?: Vec3$3;
+	curvature?: Vec3$4;
 	/** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
 	weight?: number;
 }
@@ -5118,37 +5344,37 @@ interface QuinticHermiteCurveEndpoint {
  */
 declare class QuinticHermiteCurve3D {
 	/** Start position */
-	readonly p0: Vec3$3;
+	readonly p0: Vec3$4;
 	/** End position */
-	readonly p1: Vec3$3;
+	readonly p1: Vec3$4;
 	/** Scaled tangent at start (direction * weight * chordLength) */
-	readonly t0: Vec3$3;
+	readonly t0: Vec3$4;
 	/** Scaled tangent at end (direction * weight * chordLength) */
-	readonly t1: Vec3$3;
+	readonly t1: Vec3$4;
 	/** Scaled second derivative at start (curvature * weight² * chordLength²) */
-	readonly c0: Vec3$3;
+	readonly c0: Vec3$4;
 	/** Scaled second derivative at end (curvature * weight² * chordLength²) */
-	readonly c1: Vec3$3;
+	readonly c1: Vec3$4;
 	/** Chord length (straight-line distance between endpoints) */
 	readonly chordLength: number;
 	constructor(start: QuinticHermiteCurveEndpoint, end: QuinticHermiteCurveEndpoint);
 	/** Evaluate position at parameter t ∈ [0, 1] */
-	pointAt(t: number): Vec3$3;
+	pointAt(t: number): Vec3$4;
 	/** Evaluate tangent (first derivative, normalized) at parameter t ∈ [0, 1] */
-	tangentAt(t: number): Vec3$3;
+	tangentAt(t: number): Vec3$4;
 	/** Evaluate curvature vector (second derivative) at parameter t ∈ [0, 1] */
-	curvatureAt(t: number): Vec3$3;
+	curvatureAt(t: number): Vec3$4;
 	/** Sample the curve as a polyline of evenly-spaced parameter values. */
-	sample(count?: number): Vec3$3[];
+	sample(count?: number): Vec3$4[];
 	/** Approximate arc length by sampling. */
 	length(samples?: number): number;
 	/**
 	 * Sample with adaptive density — more points where curvature is higher.
 	 * Returns at least `minCount` points, up to `maxCount`.
 	 */
-	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$3[];
+	sampleAdaptive(minCount?: number, maxCount?: number): Vec3$4[];
 	/** Convert to a format compatible with sweep() path input. */
-	toPolyline(samples?: number): Vec3$3[];
+	toPolyline(samples?: number): Vec3$4[];
 }
 /**
  * Create a quintic Hermite transition curve between two edge endpoints (G2 continuity).
@@ -5438,7 +5664,7 @@ interface TextOptions {
 declare function text2d(content: string, options?: TextOptions): Sketch;
 /** Returns the rendered width of a string in model units (same options as text2d). */
 declare function textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number;
-type Vec3$4 = [
+type Vec3$5 = [
 	number,
 	number,
 	number
@@ -5486,7 +5712,7 @@ interface TransitionSurfaceOptions extends TransitionCurveOptions {
 	/**
 	 * Preferred up vector for the sweep frame. Default: auto-detected.
 	 */
-	up?: Vec3$4;
+	up?: Vec3$5;
 	/** Edge length for level-set meshing. Smaller = finer. */
 	edgeLength?: number;
 	/** Extra bounds padding for level-set meshing. */
@@ -5497,19 +5723,19 @@ interface TransitionEdge {
 	 * Connection point on the edge.
 	 * Can be any point along the edge where the transition should connect.
 	 */
-	point: Vec3$4;
+	point: Vec3$5;
 	/**
 	 * Tangent direction at the connection point.
 	 * This is the direction the curve should initially follow when leaving this edge.
 	 * For a straight edge, this is typically the edge direction pointing "outward"
 	 * (away from the body of the edge, toward the other edge).
 	 */
-	tangent: Vec3$4;
+	tangent: Vec3$5;
 	/**
 	 * Surface normal at the connection point (optional).
 	 * Used as a hint for the sweep frame's up vector.
 	 */
-	normal?: Vec3$4;
+	normal?: Vec3$5;
 }
 /**
  * Create a smooth transition curve between two edges.
@@ -5568,7 +5794,7 @@ declare function transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge,
  * Useful when you have endpoints and directions as plain arrays
  * without constructing TransitionEdge objects.
  */
-declare function transitionCurveFromPoints(startPoint: Vec3$4, startTangent: Vec3$4, endPoint: Vec3$4, endTangent: Vec3$4, options?: TransitionCurveOptions): HermiteCurve3D;
+declare function transitionCurveFromPoints(startPoint: Vec3$5, startTangent: Vec3$5, endPoint: Vec3$5, endTangent: Vec3$5, options?: TransitionCurveOptions): HermiteCurve3D;
 type EdgeEnd = "start" | "end" | "mid";
 type TangentMode = "along" | "outward" | "auto";
 interface EdgePickOptions {
@@ -5582,7 +5808,7 @@ interface EdgePickOptions {
 	 */
 	tangentMode?: TangentMode;
 	/** Explicit tangent override (ignores tangentMode). */
-	tangent?: Vec3$4;
+	tangent?: Vec3$5;
 	/** Flip the computed tangent direction (useful for 'along' mode). */
 	flip?: boolean;
 }
@@ -5634,9 +5860,9 @@ interface ConnectEdgesOptions extends TransitionSurfaceOptions {
 	/** Tangent mode for edge B. Default: 'along'. */
 	tangentModeB?: TangentMode;
 	/** Explicit tangent for edge A. */
-	tangentA?: Vec3$4;
+	tangentA?: Vec3$5;
 	/** Explicit tangent for edge B. */
-	tangentB?: Vec3$4;
+	tangentB?: Vec3$5;
 	/** Flip tangent A. */
 	flipA?: boolean;
 	/** Flip tangent B. */
@@ -5822,17 +6048,17 @@ type _ShapeOperand = Shape | TrackedShape;
  * Returns a TrackedShape with faces (top, bottom, side-left, side-right, side-top, side-bottom)
  * and edges (vert-bl, vert-br, vert-tr, vert-tl, etc.).
  */
-declare function box(x: number, y: number, z: number, center?: boolean): TrackedShape;
+declare function box$1(x: number, y: number, z: number, center?: boolean): TrackedShape;
 /**
  * Create a cylinder or cone with named faces and edges.
  * When radiusTop differs from radius, creates a tapered cone. Use segments for regular prisms.
  * Returns a TrackedShape with faces (top, bottom, side) and edges (top-rim, bottom-rim).
  */
-declare function cylinder(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
+declare function cylinder$1(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
 /** Create a sphere centered at the origin. Use segments for lower-poly approximations. */
-declare function sphere(radius: number, segments?: number): Shape;
+declare function sphere$1(radius: number, segments?: number): Shape;
 /** Create a torus (donut shape) centered at the origin, lying in the XY plane. */
-declare function torus(majorRadius: number, minorRadius: number, segments?: number): Shape;
+declare function torus$1(majorRadius: number, minorRadius: number, segments?: number): Shape;
 /** Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays. */
 declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 /** Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted. */
@@ -5902,6 +6128,10 @@ declare function highlight(plane: {
 declare function highlight(shape: Shape | TrackedShape, opts?: HighlightOptions): void;
 declare function highlight(face: FaceRef, opts?: HighlightOptions): void;
 declare function highlight(edge: EdgeRef, opts?: HighlightOptions): void;
+
+declare namespace sdf {
+	export { SdfShape, SdfToShapeOptions, TpmsOptions, bend, box, capsule, cone, cylinder, diamond, fromFunction, gyroid, morph, repeat, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist };
+}
 /** All library parts. Access via `lib.xxx()` in scripts. */
 declare const lib: typeof partLibrary;
 

@@ -431,6 +431,8 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
       return compilerFailure(unsupportedNodeDiagnostic('shape-offsetSolid', path));
     case 'importedMesh':
       return compilerFailure(unsupportedNodeDiagnostic('shape-importedMesh', path));
+    case 'sdf':
+      return compilerFailure(unsupportedNodeDiagnostic('shape-sdf', path));
     default:
       assertExhaustive(plan);
   }

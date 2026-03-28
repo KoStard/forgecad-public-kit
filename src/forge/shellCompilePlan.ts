@@ -238,6 +238,7 @@ function lowerBaseShellPlanToConcretePlan(
     case 'boolean':
     case 'trimByPlane':
     case 'importedMesh':
+    case 'sdf':
       return {
         ok: false,
         reason: `Shape.shell() supports compile-covered box(), cylinder(), and straight extrude() bases. "${plan.kind}" bases are not supported.`,

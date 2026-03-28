@@ -11,6 +11,7 @@ import {
   type ShapeQueryOwner,
   type TopologyRewritePropagation,
 } from './queryModel';
+import { type SdfNode, cloneSdfNode } from './sdf/sdfNode';
 import type { EdgeFeatureTarget } from './shapeBackend';
 import type { SheetMetalModel, SheetMetalOutput } from './sheetMetalModel';
 import { cloneSheetMetalModel } from './sheetMetalModel';
@@ -335,6 +336,19 @@ export type ShapeCompilePlan =
       format: 'stl' | 'obj' | '3mf';
       /** Raw file bytes, read once at IR construction time. */
       fileData: ArrayBuffer;
+    }
+  | {
+      /**
+       * Signed Distance Field shape — evaluated via Manifold.levelSet().
+       *
+       * The SDF expression tree is compiled into a (Vec3) => number evaluator
+       * at lowering time. Bounds are auto-computed from the tree when not
+       * explicitly provided.
+       */
+      kind: 'sdf';
+      tree: SdfNode;
+      edgeLength: number;
+      bounds: { min: Vec3; max: Vec3 };
     };
 
 function cloneProfileTransform(step: ProfileCompileTransformStep): ProfileCompileTransformStep {
@@ -868,6 +882,14 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
       // Imported mesh — fileData is immutable raw bytes, share the reference.
       result = { kind: 'importedMesh', filePath: plan.filePath, format: plan.format, fileData: plan.fileData };
       break;
+    case 'sdf':
+      result = {
+        kind: 'sdf',
+        tree: cloneSdfNode(plan.tree),
+        edgeLength: plan.edgeLength,
+        bounds: { min: [...plan.bounds.min], max: [...plan.bounds.max] },
+      };
+      break;
     default:
       assertExhaustive(plan);
   }
@@ -963,6 +985,7 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOw
     case 'sweep':
     case 'boolean':
     case 'importedMesh':
+    case 'sdf':
       return null;
     default:
       assertExhaustive(plan);
@@ -1008,6 +1031,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'loft':
       case 'sweep':
       case 'importedMesh':
+      case 'sdf':
         return;
       default:
         assertExhaustive(current);
@@ -1063,6 +1087,7 @@ export function findShapeWorkplanePlacement(plan: ShapeCompilePlan): ShapeWorkpl
     case 'boolean':
     case 'revolve':
     case 'importedMesh':
+    case 'sdf':
       return null;
     default:
       assertExhaustive(plan);

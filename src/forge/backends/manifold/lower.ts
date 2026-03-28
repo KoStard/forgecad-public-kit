@@ -15,6 +15,7 @@ import { planeFrameToWorldToPlaneMatrix } from '../../planeFrame';
 import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
 import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
+import { compileSdfNode } from '../../sdf/sdfEval';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput } from '../../sketch/loftSweepLowering';
 import type { Vec3 } from '../../transform';
 import { Transform } from '../../transform';
@@ -422,6 +423,10 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
       return lowerShapeTrimByPlaneCompilePlan(plan, wasm);
     case 'importedMesh':
       return lowerImportedMeshToManifold(plan.fileData, plan.format, plan.filePath, wasm);
+    case 'sdf': {
+      const evalFn = compileSdfNode(plan.tree);
+      return wasm.Manifold.levelSet(evalFn as any, plan.bounds, plan.edgeLength, 0);
+    }
     default:
       assertExhaustive(plan);
   }

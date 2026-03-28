@@ -77,6 +77,7 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'draft':
     case 'offsetSolid':
     case 'importedMesh':
+    case 'sdf':
       return null;
     default:
       assertExhaustive(plan);

@@ -1422,6 +1422,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
       return table;
     }
     case 'importedMesh':
+    case 'sdf':
       return emptyFaceTable();
     default:
       assertExhaustive(plan);

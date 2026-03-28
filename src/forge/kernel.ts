@@ -125,6 +125,7 @@ export type GeometrySource =
   | 'draft'
   | 'offset-solid'
   | 'imported'
+  | 'sdf'
   | 'unknown';
 
 export interface GeometryInfo {
@@ -1404,6 +1405,9 @@ export function torus(majorRadius: number, minorRadius: number, segments?: numbe
     sources: ['primitive'],
   });
 }
+
+// ─── SDF namespace re-export ─────────────────────────────────────────────────
+export * as sdf from './sdf';
 
 function normalizeShapeOperands(apiName: string, inputs: readonly unknown[], minCount: number, usage: string): Shape[] {
   return normalizeVariadicArgs({
