@@ -976,6 +976,8 @@ function _lowerShapeCompilePlanToOCCTInner(plan: ShapeCompilePlan, oc?: OCCTModu
       return lowerLoftPlan(oc, plan);
     case 'sweep':
       return lowerSweepPlan(oc, plan);
+    case 'variableSweep':
+      throw new Error('variableSweep() is not yet supported with the OCCT backend. Use the default Manifold backend.');
     case 'importedMesh':
       throw new Error(
         `importMesh("${plan.filePath}") is not supported with the OCCT backend. ` +

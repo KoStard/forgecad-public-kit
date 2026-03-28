@@ -309,6 +309,9 @@ function lowerShapeCompilePlanToCadQueryResultAtPath(
         profile.diagnostics,
       );
     }
+    case 'variableSweep': {
+      return compilerFailure(compilerDiagnostic('cadquery-occt', 'unsupported-variable-sweep', path, 'variableSweep is not yet supported in CadQuery export.'));
+    }
     case 'boolean': {
       const shapes: CadQueryShapePlan[] = [];
       const diagnostics = [];

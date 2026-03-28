@@ -1,4 +1,4 @@
-import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
+import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, buildVariableSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
 import { buildShapeFromCompilePlan, getActiveBackend, type Shape } from '../kernel';
 import { scaleLevelSetBoundsPadding, scaleLevelSetEdgeLength, scaleSplineSamples, scaleSweepPathSamples } from '../quality';
 import { getSketchCompileProfilePlan, Sketch } from './core';
@@ -40,6 +40,27 @@ export interface LoftOptions {
 
 export interface SweepOptions {
   /** Number of samples when path is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /**
+   * Preferred "up" vector for local profile frame.
+   * Auto fallback is used near parallel segments.
+   */
+  up?: Vec3;
+}
+
+export interface VariableSweepSection {
+  /** Parameter along the spine (0 = start, 1 = end). */
+  t: number;
+  /** Cross-section profile at this station. */
+  profile: Sketch;
+}
+
+export interface VariableSweepOptions {
+  /** Number of samples when spine is a Curve3D. Default 48. */
   samples?: number;
   /** Marching-grid edge length for level-set meshing. Smaller = finer. */
   edgeLength?: number;
@@ -400,5 +421,94 @@ export function sweep(profile: Sketch, path: Curve3D | Vec3[], options: SweepOpt
   return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
     fidelity: isOCCTSweep ? 'kernel-native' : 'sampled',
     sources: isOCCTSweep ? ['sweep'] : ['sweep', 'level-set'],
+  });
+}
+
+/**
+ * Sweep a variable cross-section along a 3D spine curve.
+ *
+ * Unlike sweep(), which uses a single constant profile, variableSweep()
+ * interpolates between multiple profiles at different stations along the spine.
+ * This enables organic shapes like tapering tubes, bone-like structures, and
+ * sculptural forms.
+ *
+ * Each section specifies a t parameter (0 = start, 1 = end of spine) and a
+ * 2D profile sketch. The SDF-based level-set mesher smoothly blends between
+ * profiles at intermediate positions.
+ *
+ * Performance note: like sweep(), this uses level-set meshing internally.
+ */
+export function variableSweep(
+  spine: Curve3D | Vec3[],
+  sections: VariableSweepSection[],
+  options: VariableSweepOptions = {},
+): Shape {
+  if (sections.length < 2) throw new Error('variableSweep requires at least two sections');
+
+  const sortedSections = [...sections].sort((a, b) => a.t - b.t);
+  for (const s of sortedSections) {
+    if (s.t < 0 || s.t > 1) throw new Error(`variableSweep: section t=${s.t} is out of range [0, 1]`);
+  }
+
+  const requestedPathSamples = Math.max(4, options.samples ?? 48);
+  const effectivePathSamples = scaleSweepPathSamples(requestedPathSamples);
+  const pathPts = Array.isArray(spine) ? spine : spine.sample(effectivePathSamples);
+
+  if (pathPts.length < 2) throw new Error('variableSweep requires a spine with at least two points');
+
+  const up: Vec3 = options.up ?? [0, 0, 1];
+
+  // Compute max profile radius across all sections
+  let maxPr = 0;
+  for (const s of sortedSections) {
+    const b = s.profile.bounds();
+    maxPr = Math.max(maxPr, Math.abs(b.min[0]), Math.abs(b.max[0]), Math.abs(b.min[1]), Math.abs(b.max[1]));
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const p of pathPts) {
+    minX = Math.min(minX, p[0]);
+    minY = Math.min(minY, p[1]);
+    minZ = Math.min(minZ, p[2]);
+    maxX = Math.max(maxX, p[0]);
+    maxY = Math.max(maxY, p[1]);
+    maxZ = Math.max(maxZ, p[2]);
+  }
+
+  let pathLen = 0;
+  for (let i = 1; i < pathPts.length; i++) {
+    pathLen += vec3Len(vec3Sub(pathPts[i], pathPts[i - 1]));
+  }
+  const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ, pathLen, 1);
+  const requestedEdgeLength = options.edgeLength ?? Math.max(0.3, span / 110);
+  const edgeLength = scaleLevelSetEdgeLength(requestedEdgeLength);
+  const requestedPad = options.boundsPadding ?? Math.max(maxPr + edgeLength * 2, span * 0.04, 2);
+  const pad = scaleLevelSetBoundsPadding(requestedPad);
+
+  const sectionPlans = sortedSections.map((s) => ({
+    t: s.t,
+    profile: getSketchCompileProfilePlan(s.profile),
+  }));
+
+  const plan = buildVariableSweepShapeCompilePlan(
+    sectionPlans,
+    {
+      kind: 'polyline',
+      points: pathPts.map(([x, y, z]) => [x, y, z]),
+    },
+    { edgeLength, boundsPadding: pad, up },
+  );
+  if (!plan) {
+    throw new Error('variableSweep: one or more profiles is missing a compile plan.');
+  }
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'variableSweep')!;
+  return buildShapeFromCompilePlan(ownedPlan, sortedSections[0].profile.colorHex, {
+    fidelity: 'sampled',
+    sources: ['sweep', 'level-set'],
   });
 }

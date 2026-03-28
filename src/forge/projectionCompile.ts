@@ -498,6 +498,7 @@ function buildProjectionReplayContext(plan: ShapeCompilePlan | null): Projection
       };
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
       return {
         ok: false,
         reason: `projection replay currently does not reduce ${plan.kind} sources to one defended planar projection basis.`,

@@ -134,6 +134,7 @@ export {
   stroke,
   sweep,
   TrackedShape,
+  variableSweep,
   text2d,
   textWidth,
   union2d,

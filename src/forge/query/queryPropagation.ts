@@ -74,6 +74,7 @@ function rootPlanPropagation(plan: ShapeCompilePlan): TopologyRewritePropagation
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'filletEdges':
     case 'chamferEdges':
     case 'draft':
@@ -716,6 +717,7 @@ export function findShapeTopologyRewritePropagation(plan: ShapeCompilePlan | nul
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'filletEdges':
     case 'chamferEdges':
     case 'draft':
@@ -775,6 +777,7 @@ export function collectShapeTopologyRewritePropagations(plan: ShapeCompilePlan |
       case 'revolve':
       case 'loft':
       case 'sweep':
+      case 'variableSweep':
       case 'importedMesh':
         return;
       default:

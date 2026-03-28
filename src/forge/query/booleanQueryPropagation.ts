@@ -72,6 +72,7 @@ function rootTopologyRewritePropagation(plan: ShapeCompilePlan | null): Topology
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'filletEdges':
     case 'chamferEdges':
     case 'draft':
