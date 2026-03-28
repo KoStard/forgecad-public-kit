@@ -16,6 +16,7 @@ import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
 import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import { compileSdfNode } from '../../sdf/sdfEval';
+import { smoothSdfMesh } from '../../sdf/sdfSmooth';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput, buildVariableSweepLevelSetInput } from '../../sketch/loftSweepLowering';
 import type { Vec3 } from '../../transform';
 import { Transform } from '../../transform';
@@ -448,7 +449,10 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
       // Standard SDF convention (used by sdfEval): negative = inside, positive = outside.
       // Negate to bridge the two conventions.
       const negated = (p: Vec3) => -evalFn(p);
-      return wasm.Manifold.levelSet(negated as any, plan.bounds, plan.edgeLength, 0);
+      const raw = wasm.Manifold.levelSet(negated as any, plan.bounds, plan.edgeLength, 0);
+      // Laplacian smoothing + SDF projection: smooths grid-aligned vertex patterns
+      // from Marching Tetrahedra while keeping vertices on the true SDF surface.
+      return smoothSdfMesh(raw, evalFn, wasm);
     }
     default:
       assertExhaustive(plan);
