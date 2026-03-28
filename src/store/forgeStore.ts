@@ -636,6 +636,7 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const next = resolveForgeQualityPreset(quality);
     writeViewPreferences({ runQuality: next });
     set({ runQuality: next });
+    get().execute();
   },
   paramOverrides: {},
   paramOverridesByFile: {},

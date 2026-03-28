@@ -39,6 +39,8 @@ const buildViewportRenderSceneState = (
 export function useViewPanelState() {
   const activeBackend = useForgeStore((s) => s.activeBackend);
   const setActiveBackend = useForgeStore((s) => s.setActiveBackend);
+  const runQuality = useForgeStore((s) => s.runQuality);
+  const setRunQuality = useForgeStore((s) => s.setRunQuality);
   const renderMode = useForgeStore((s) => s.renderMode);
   const setRenderMode = useForgeStore((s) => s.setRenderMode);
   const projectionMode = useForgeStore((s) => s.projectionMode);
@@ -227,6 +229,8 @@ export function useViewPanelState() {
   return {
     activeBackend,
     setActiveBackend,
+    runQuality,
+    setRunQuality,
     renderMode,
     setRenderMode,
     projectionMode,

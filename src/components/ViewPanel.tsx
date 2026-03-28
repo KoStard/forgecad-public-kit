@@ -40,6 +40,8 @@ export function ViewPanel() {
   const {
     activeBackend,
     setActiveBackend,
+    runQuality,
+    setRunQuality,
     renderMode,
     setRenderMode,
     projectionMode,
@@ -155,6 +157,21 @@ export function ViewPanel() {
           </button>
           <button className={btn(activeBackend === 'occt')} onClick={() => setActiveBackend('occt')}>
             OCCT (exact)
+          </button>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Quality</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className={btn(runQuality === 'live')} onClick={() => setRunQuality('live')}>
+            Live
+          </button>
+          <button className={btn(runQuality === 'default')} onClick={() => setRunQuality('default')}>
+            Default
+          </button>
+          <button className={btn(runQuality === 'high')} onClick={() => setRunQuality('high')}>
+            High
           </button>
         </div>
       </div>
