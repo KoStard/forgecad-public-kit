@@ -54,17 +54,22 @@ function hashCell(
 // Core evaluator
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns [F1, F2] — distances to the nearest and second-nearest feature points.
+ * F2 - F1 approximates twice the distance to the nearest Voronoi cell wall.
+ */
 function worleyCore(
   x: number,
   y: number,
   z: number,
   seed: number,
-): number {
+): [number, number] {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const iz = Math.floor(z);
 
-  let minDist = Infinity;
+  let d1 = Infinity;
+  let d2 = Infinity;
 
   // 27-cell neighborhood
   for (let dz = -1; dz <= 1; dz++) {
@@ -86,14 +91,17 @@ function worleyCore(
         const ddz = z - fz;
         const dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
 
-        if (dist < minDist) {
-          minDist = dist;
+        if (dist < d1) {
+          d2 = d1;
+          d1 = dist;
+        } else if (dist < d2) {
+          d2 = dist;
         }
       }
     }
   }
 
-  return minDist;
+  return [d1, d2];
 }
 
 // ---------------------------------------------------------------------------
@@ -101,30 +109,22 @@ function worleyCore(
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the Euclidean distance from `(x, y, z)` to the nearest
- * Voronoi cell center.  Input coordinates map 1 : 1 to cell size,
- * so scale inputs to control cell density.
+ * Returns [F1, F2] — distances to the nearest and second-nearest
+ * Voronoi cell centers.  `(F2 - F1) / 2` approximates the distance
+ * to the nearest cell wall.
  *
- * The maximum possible return value is `sqrt(3)/2 ≈ 0.866` (the
- * corner of a unit cube to its center), so values are roughly in
- * `[0, 0.87]`.
+ * Input coordinates map 1 : 1 to cell size.
  */
-export function worley3(x: number, y: number, z: number): number {
+export function worley3(x: number, y: number, z: number): [number, number] {
   return worleyCore(x, y, z, 0);
 }
 
 /**
- * Returns a Worley-noise evaluator with a different pseudo-random
- * cell layout determined by `seed`.
- *
- * ```ts
- * const noise = seededWorley3(42);
- * const d = noise(px, py, pz);
- * ```
+ * Returns a seeded Worley-noise evaluator returning [F1, F2].
  */
 export function seededWorley3(
   seed: number,
-): (x: number, y: number, z: number) => number {
-  const s = seed | 0; // integer-ise once
+): (x: number, y: number, z: number) => [number, number] {
+  const s = seed | 0;
   return (x: number, y: number, z: number) => worleyCore(x, y, z, s);
 }

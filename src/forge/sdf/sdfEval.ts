@@ -342,15 +342,14 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
       const invCell = 1 / cellSize;
       const halfWall = wallThickness * 0.5;
       const wFn = seed !== 0 ? seededWorley3(seed) : worley3;
-      // Voronoi as SDF: distance to nearest cell edge, thickened to wallThickness.
-      // worley3 returns distance to nearest feature point. The cell walls are at
-      // the Voronoi edges — midpoints between feature points. A good approximation:
-      // the distance to the nearest edge is roughly (d2 - d1)/2 where d1, d2 are
-      // the two closest distances. For simplicity we use |d1 - threshold| which
-      // gives a uniform-thickness shell around each cell.
+      // Voronoi as SDF: distance to the nearest cell WALL (not cell center).
+      // worley3 returns [F1, F2] — nearest and second-nearest feature point distances.
+      // The cell wall lies where F1 ≈ F2, so (F2 - F1) / 2 approximates wall distance.
+      // Subtracting halfWall thickens the walls.
       return (p) => {
-        const d = wFn(p[0] * invCell, p[1] * invCell, p[2] * invCell) * cellSize;
-        return d - halfWall;
+        const [f1, f2] = wFn(p[0] * invCell, p[1] * invCell, p[2] * invCell);
+        const wallDist = (f2 - f1) * 0.5 * cellSize;
+        return wallDist - halfWall;
       };
     }
 
