@@ -244,6 +244,14 @@ export type ShapeCompilePlan =
       up: [number, number, number];
     }
   | {
+      kind: 'variableSweep';
+      sections: { t: number; profile: ProfileCompilePlan }[];
+      path: SweepPathCompilePlan;
+      edgeLength: number;
+      boundsPadding: number;
+      up: [number, number, number];
+    }
+  | {
       kind: 'boolean';
       op: 'union' | 'difference' | 'intersection';
       shapes: ShapeCompilePlan[];
@@ -779,6 +787,16 @@ export function cloneShapeCompilePlan(plan: ShapeCompilePlan | null): ShapeCompi
         up: [plan.up[0], plan.up[1], plan.up[2]],
       };
       break;
+    case 'variableSweep':
+      result = {
+        kind: 'variableSweep',
+        sections: plan.sections.map((s) => ({ t: s.t, profile: cloneProfileCompilePlan(s.profile)! })),
+        path: cloneSweepPathCompilePlan(plan.path),
+        edgeLength: plan.edgeLength,
+        boundsPadding: plan.boundsPadding,
+        up: [plan.up[0], plan.up[1], plan.up[2]],
+      };
+      break;
     case 'boolean':
       result = {
         kind: 'boolean',
@@ -983,6 +1001,7 @@ export function findShapePrimaryQueryOwner(plan: ShapeCompilePlan): ShapeQueryOw
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'boolean':
     case 'importedMesh':
     case 'sdf':
@@ -1030,6 +1049,7 @@ export function collectShapeQueryOwners(plan: ShapeCompilePlan): ShapeQueryOwner
       case 'revolve':
       case 'loft':
       case 'sweep':
+      case 'variableSweep':
       case 'importedMesh':
       case 'sdf':
         return;
@@ -1084,6 +1104,7 @@ export function findShapeWorkplanePlacement(plan: ShapeCompilePlan): ShapeWorkpl
     case 'sheetMetal':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'boolean':
     case 'revolve':
     case 'importedMesh':
@@ -1217,6 +1238,25 @@ export function buildSweepShapeCompilePlan(
   return {
     kind: 'sweep',
     profile: cloneProfileCompilePlan(profile)!,
+    path: cloneSweepPathCompilePlan(path),
+    edgeLength: canonicalNumber(options.edgeLength),
+    boundsPadding: canonicalNumber(options.boundsPadding),
+    up: [canonicalNumber(options.up[0]), canonicalNumber(options.up[1]), canonicalNumber(options.up[2])],
+  };
+}
+
+export function buildVariableSweepShapeCompilePlan(
+  sections: { t: number; profile: ProfileCompilePlan }[],
+  path: SweepPathCompilePlan,
+  options: {
+    edgeLength: number;
+    boundsPadding: number;
+    up: [number, number, number];
+  },
+): ShapeCompilePlan {
+  return {
+    kind: 'variableSweep',
+    sections: sections.map((s) => ({ t: canonicalNumber(s.t), profile: cloneProfileCompilePlan(s.profile)! })),
     path: cloneSweepPathCompilePlan(path),
     edgeLength: canonicalNumber(options.edgeLength),
     boundsPadding: canonicalNumber(options.boundsPadding),

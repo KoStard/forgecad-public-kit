@@ -288,6 +288,7 @@ function searchOwnerMatch(
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'importedMesh':
     case 'sdf':
       return {
@@ -393,6 +394,7 @@ function resolvePropagatedEdgeQueryAtOwnerBase(ownerBase: ShapeCompilePlan, ref:
     ownerBase.kind === 'revolve' ||
     ownerBase.kind === 'loft' ||
     ownerBase.kind === 'sweep' ||
+    ownerBase.kind === 'variableSweep' ||
     ownerBase.kind === 'transform' ||
     ownerBase.kind === 'queryOwner' ||
     ownerBase.kind === 'filletEdges' ||
@@ -663,6 +665,7 @@ function resolveSelectionFromOwnerBase(plan: ShapeCompilePlan, edgeName: string)
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'trimByPlane':
     case 'importedMesh':
     case 'sdf':
@@ -714,6 +717,7 @@ function resolveEdgeChainAtOwnerBase(ownerBase: ShapeCompilePlan, ref: Propagate
     ownerBase.kind === 'revolve' ||
     ownerBase.kind === 'loft' ||
     ownerBase.kind === 'sweep' ||
+    ownerBase.kind === 'variableSweep' ||
     ownerBase.kind === 'transform' ||
     ownerBase.kind === 'queryOwner' ||
     ownerBase.kind === 'filletEdges' ||
@@ -772,6 +776,7 @@ function resolveCreatedEdgeChainAtOwnerBase(
     ownerBase.kind === 'revolve' ||
     ownerBase.kind === 'loft' ||
     ownerBase.kind === 'sweep' ||
+    ownerBase.kind === 'variableSweep' ||
     ownerBase.kind === 'transform' ||
     ownerBase.kind === 'queryOwner' ||
     ownerBase.kind === 'filletEdges' ||

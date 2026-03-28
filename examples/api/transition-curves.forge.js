@@ -80,10 +80,13 @@ const cyl = cylinder(20, 8).translate(0, -55, 0);
 // Box: 12x12x12, corner at (25,-55,25)
 const box2 = box(12, 12, 12).translate(25, -55, 25);
 
-// Connect from cylinder rim (top, +X side) to box left face (mid-height)
+// Connect from cylinder rim (top, +X side at center Y=-55) to box left face
+// Cylinder rim at Y=-55: full radius available, so X=8 is on the rim.
+// Box left face at X=25, Y=-55 is on the face edge, Z=31 is mid-height.
+// End tangent [1,0,0] means the curve arrives going +X (into the face).
 const cylToBox = transitionSurface(
-  { point: [8, -49, 20], tangent: [1, 0, 1], normal: [0, 0, 1] },
-  { point: [25, -49, 31], tangent: [-1, 0, 0], normal: [-1, 0, 0] },
+  { point: [8, -55, 20], tangent: [1, 0, 0.65] },
+  { point: [25, -55, 31], tangent: [1, 0, 0] },
   { radius: 1.5, weightA: weight, weightB: weightB },
 );
 

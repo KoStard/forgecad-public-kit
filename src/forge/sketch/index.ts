@@ -35,6 +35,7 @@ export * from './patterns';
 export * from './placement3d';
 export * from './primitives';
 export * from './regions';
+export * from './surfacePatch';
 export * from './svgImport';
 export type { TextOptions } from './text';
 export { text2d, textWidth } from './text';

@@ -191,6 +191,137 @@ export function buildLoftLevelSetInput(
   };
 }
 
+interface VariableSweepSegment extends SweepSegment {
+  /** Cumulative arc-length parameter at the start of this segment (0..1 over total path length). */
+  tStart: number;
+  /** Cumulative arc-length parameter at the end of this segment (0..1 over total path length). */
+  tEnd: number;
+}
+
+export function buildVariableSweepLevelSetInput(
+  sections: { t: number; polygons: Vec2[][] }[],
+  pathPoints: Vec3[],
+  options: {
+    edgeLength: number;
+    boundsPadding: number;
+    up: Vec3;
+  },
+): LevelSetInput {
+  if (pathPoints.length < 2) {
+    throw new Error('variableSweep requires a path with at least two points');
+  }
+  if (sections.length < 2) {
+    throw new Error('variableSweep requires at least two sections');
+  }
+
+  // Sort sections by t
+  const sortedSections = [...sections].sort((a, b) => a.t - b.t);
+
+  // Compile an SDF for each section profile
+  const sectionSdfs = sortedSections.map((s) => ({
+    t: s.t,
+    sdf: compilePolygonsSdf(s.polygons),
+  }));
+
+  // Build segments with arc-length parameterization
+  const segments: VariableSweepSegment[] = [];
+  let totalLen = 0;
+  for (let index = 0; index < pathPoints.length - 1; index += 1) {
+    const a = pathPoints[index];
+    const b = pathPoints[index + 1];
+    const delta = vec3Sub(b, a);
+    const len = vec3Len(delta);
+    if (len < 1e-6) continue;
+    const tangent = vec3Scale(delta, 1 / len);
+    const frame = makeSweepFrame(tangent, options.up);
+    segments.push({ a, t: tangent, x: frame.x, y: frame.y, len, tStart: totalLen, tEnd: totalLen + len });
+    totalLen += len;
+  }
+  if (segments.length === 0) {
+    throw new Error('variableSweep path has no non-zero segments');
+  }
+
+  // Normalize tStart/tEnd to [0, 1]
+  if (totalLen > 1e-9) {
+    for (const seg of segments) {
+      seg.tStart /= totalLen;
+      seg.tEnd /= totalLen;
+    }
+  }
+
+  // Compute max profile radius across all sections for bounds padding
+  let profileRadius = 0;
+  for (const section of sortedSections) {
+    for (const loop of section.polygons) {
+      for (const [x, y] of loop) {
+        profileRadius = Math.max(profileRadius, Math.abs(x), Math.abs(y));
+      }
+    }
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const [x, y, z] of pathPoints) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+    maxZ = Math.max(maxZ, z);
+  }
+
+  const pad = Math.max(options.boundsPadding, profileRadius);
+
+  /** Interpolate between section SDFs at a given t parameter. */
+  function interpolatedSdf(u: number, q: number, tParam: number): number {
+    const tc = clamp(tParam, sortedSections[0].t, sortedSections[sortedSections.length - 1].t);
+
+    // Find the two bracketing sections
+    if (tc <= sectionSdfs[0].t) return sectionSdfs[0].sdf(u, q);
+    if (tc >= sectionSdfs[sectionSdfs.length - 1].t) return sectionSdfs[sectionSdfs.length - 1].sdf(u, q);
+
+    let idx = 0;
+    while (idx + 1 < sectionSdfs.length && tc > sectionSdfs[idx + 1].t) idx += 1;
+
+    const s0 = sectionSdfs[idx];
+    const s1 = sectionSdfs[idx + 1];
+    const blend = (tc - s0.t) / (s1.t - s0.t);
+    const f0 = s0.sdf(u, q);
+    const f1 = s1.sdf(u, q);
+    return f0 * (1 - blend) + f1 * blend;
+  }
+
+  return {
+    sdf: (point) => {
+      let field = -Infinity;
+      for (const segment of segments) {
+        const v = vec3Sub(point, segment.a);
+        const w = vec3Dot(v, segment.t);
+        const u = vec3Dot(v, segment.x);
+        const q = vec3Dot(v, segment.y);
+
+        // Compute the arc-length t parameter for this point projected onto this segment
+        const wClamped = clamp(w, 0, segment.len);
+        const tAtPoint = segment.tStart + (wClamped / segment.len) * (segment.tEnd - segment.tStart);
+
+        const profileField = interpolatedSdf(u, q, tAtPoint);
+        const capField = Math.min(w, segment.len - w);
+        field = Math.max(field, Math.min(profileField, capField));
+      }
+      return field;
+    },
+    bounds: {
+      min: [minX - pad, minY - pad, minZ - pad],
+      max: [maxX + pad, maxY + pad, maxZ + pad],
+    },
+    edgeLength: options.edgeLength,
+  };
+}
+
 export function buildSweepLevelSetInput(
   profilePolygons: Vec2[][],
   pathPoints: Vec3[],

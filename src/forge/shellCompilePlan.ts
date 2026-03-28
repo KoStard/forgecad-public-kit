@@ -235,6 +235,7 @@ function lowerBaseShellPlanToConcretePlan(
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'boolean':
     case 'trimByPlane':
     case 'importedMesh':

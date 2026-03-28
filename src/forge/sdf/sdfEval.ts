@@ -2,7 +2,11 @@
  * SDF Evaluator — compiles an SdfNode tree into a (Vec3) => number function.
  *
  * All distance functions follow Inigo Quilez's exact SDF formulas.
- * Negative = inside, positive = outside.
+ * Convention: negative = inside, positive = outside (standard math SDF).
+ *
+ * IMPORTANT: Manifold.levelSet() uses the OPPOSITE convention (positive = inside).
+ * The negation happens at the lowering boundary in manifold/lower.ts, NOT here.
+ * This module stays in standard SDF convention so formulas match reference material.
  */
 
 import type { SdfNode, Vec3 } from './sdfNode';

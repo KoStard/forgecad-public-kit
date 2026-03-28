@@ -16,7 +16,7 @@ import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
 import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import { compileSdfNode } from '../../sdf/sdfEval';
-import { buildLoftLevelSetInput, buildSweepLevelSetInput } from '../../sketch/loftSweepLowering';
+import { buildLoftLevelSetInput, buildSweepLevelSetInput, buildVariableSweepLevelSetInput } from '../../sketch/loftSweepLowering';
 import type { Vec3 } from '../../transform';
 import { Transform } from '../../transform';
 import {
@@ -174,6 +174,23 @@ function lowerShapeLoftCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'loft
 function lowerShapeSweepCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'sweep' }>, wasm: ManifoldToplevel): Manifold {
   const input = buildSweepLevelSetInput(
     lowerProfileCompilePlanToCrossSection(plan.profile, wasm).toPolygons() as [number, number][][],
+    plan.path.points.map(([x, y, z]) => [x, y, z]),
+    {
+      edgeLength: plan.edgeLength,
+      boundsPadding: plan.boundsPadding,
+      up: [plan.up[0], plan.up[1], plan.up[2]],
+    },
+  );
+  return wasm.Manifold.levelSet(input.sdf as any, input.bounds, input.edgeLength, 0);
+}
+
+function lowerShapeVariableSweepCompilePlan(plan: Extract<ShapeCompilePlan, { kind: 'variableSweep' }>, wasm: ManifoldToplevel): Manifold {
+  const sectionPolygons = plan.sections.map((s) => ({
+    t: s.t,
+    polygons: lowerProfileCompilePlanToCrossSection(s.profile, wasm).toPolygons() as [number, number][][],
+  }));
+  const input = buildVariableSweepLevelSetInput(
+    sectionPolygons,
     plan.path.points.map(([x, y, z]) => [x, y, z]),
     {
       edgeLength: plan.edgeLength,
@@ -401,6 +418,8 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
       return lowerShapeLoftCompilePlan(plan, wasm);
     case 'sweep':
       return lowerShapeSweepCompilePlan(plan, wasm);
+    case 'variableSweep':
+      return lowerShapeVariableSweepCompilePlan(plan, wasm);
     case 'boolean':
       return lowerShapeBooleanCompilePlan(plan, wasm);
     case 'transform':

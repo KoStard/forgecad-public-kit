@@ -294,6 +294,10 @@ function collectTimelineEntries(plan: ShapeCompilePlan, entries: TimelineEntry[]
       entries.push({ kind: 'sweep', label: 'Sweep', summary: summarizeProfile(plan.profile), category: 'sketch' });
       return;
 
+    case 'variableSweep':
+      entries.push({ kind: 'sweep', label: 'Variable Sweep', summary: `${plan.sections.length} sections`, category: 'sketch' });
+      return;
+
     case 'box':
       entries.push({ kind: 'box', label: 'Box', summary: `${plan.x} × ${plan.y} × ${plan.z}`, category: 'primitive' });
       return;

@@ -1336,6 +1336,7 @@ function resolveShapeFaceTableInternal(plan: ShapeCompilePlan | null, owner: Sha
     case 'revolve':
     case 'loft':
     case 'sweep':
+    case 'variableSweep':
     case 'fillet':
     case 'chamfer':
     case 'filletEdges':
