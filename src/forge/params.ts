@@ -47,7 +47,7 @@ export function getCollectedParams(): ParamDef[] {
   return _params;
 }
 
-/** Execute code inside a parameter scope (used by importPart/importSketch). */
+/** Execute code inside a parameter scope (used by require() with param overrides). */
 export function runWithParamScope<T>(scope: ParamScope, fn: () => T): T {
   _scopeStack.push(scope);
   try {

@@ -49,7 +49,7 @@ Create a revolute (hinge) joint. Auto-creates a param slider and rotates the sha
 **Methods:**
 
 - `mate()` — Register mate constraints between parts. Constraints are solved during `solve()` to derive part positions and explode hints. Part references use "partName:featureName" format.
-- `withReferences()` — Attach named placement reference points to this assembly. These are surfaced automatically on the ImportedAssembly when this file is imported with importAssembly(), so consumers can use placeReference() without re-declaring them. Returns `this` for chaining.
+- `withReferences()` — Attach named placement reference points to this assembly. These are surfaced automatically on the ImportedAssembly when this file is imported via require(), so consumers can use placeReference() without re-declaring them. Returns `this` for chaining.
 - `getReferences()` — getReferences(): PlacementReferences
 - `withPorts()` — Attach named ports to a specific part or the assembly root. Ports declared this way are in the part's local coordinate system.
 - `getPorts()` — Get ports declared on a part (in part-local space).

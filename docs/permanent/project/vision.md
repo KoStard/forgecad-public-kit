@@ -24,7 +24,7 @@ The kernel is not the product. The modeling layer on top is.
 - **Fillets & chamfers** — `filletCorners()` for selective 2D polygon corners, plus `filletEdge()` / `chamferEdge()` for vertical 3D edges using topology references
 - **Arc bridge** — `arcBridgeBetweenRects()` for smooth arc surfaces between rectangular areas (e.g., laptop hinges)
 - **Parameters** — `param()` creates live UI sliders, code re-executes on change
-- **Multi-file** — `importSketch()`, `importPart()` with circular import detection, folder support
+- **Multi-file** — `require()` with optional param overrides, circular import detection, folder support, named exports via `exports.name = value`
 - **Code-as-format** — plain JS/TS files, version-controllable, LLM-writable
 - **3D advanced ops** — `levelSet()` (SDF-based shapes), `warp()`, `split()`, `splitByPlane()`, `trimByPlane()`
 - **Sketch on face** — `sketch.onFace(body, face, ...)` places a 2D sketch on canonical or tracked planar faces and extrudes from that face normal

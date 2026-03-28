@@ -1,10 +1,10 @@
-const left = importPart("api/import-args-unit.forge.js", {
+const left = require("api/import-args-unit.forge.js", {
   "Width": 24,
   "Height": 24,
   "Depth": 8,
 }).translate(-20, 0, 0);
 
-const right = importPart("api/import-args-unit.forge.js", {
+const right = require("api/import-args-unit.forge.js", {
   "Width": 52,
   "Height": 16,
   "Depth": 12,

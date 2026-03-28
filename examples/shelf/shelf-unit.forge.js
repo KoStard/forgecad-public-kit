@@ -1,5 +1,5 @@
 // Tool Shelf — multi-shelf unit with identical containers
-// Demonstrates importPart() for reusing the same container across shelves
+// Demonstrates require() for reusing the same container across shelves
 
 const shelfW = param("Shelf Width", 800, { min: 400, max: 1200, unit: "mm" });
 const shelfD = param("Shelf Depth", 200, { min: 150, max: 350, unit: "mm" });
@@ -37,7 +37,7 @@ const backPanel = box(innerW, boardT / 2, totalH)
 const frame = union(leftPanel, rightPanel, backPanel, ...shelfBoards);
 
 // --- Import and place containers ---
-const container = importPart("shelf/container.forge.js");
+const container = require("shelf/container.forge.js");
 
 const containers = [];
 const gapX = (innerW - cols * (containerW + lipH * 2)) / (cols + 1);

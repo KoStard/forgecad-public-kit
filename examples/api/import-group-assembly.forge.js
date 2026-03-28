@@ -1,11 +1,11 @@
 // import-group-assembly.forge.js
-// Demonstrates importGroup(): bring in a multipart component and work on
+// Demonstrates require(): bring in a multipart component and work on
 // the whole group or individual named children separately.
 
 // --- Import the full assembly as a ShapeGroup ---
-const bracketAssembly = importGroup("api/import-group-source.forge.js");
+const bracketAssembly = require("api/import-group-source.forge.js");
 
-// Place it using a named reference (same API as importPart)
+// Place it using a named reference
 const placed = bracketAssembly.placeReference("mountCenter", [0, 0, 0]);
 
 // --- Access individual children by name ---
@@ -18,7 +18,7 @@ const dowel        = placed.child("Dowel");
 const highlight = leftBracket.color('#ff4444');
 
 // --- A second instance, shifted and with overridden params ---
-const secondAssembly = importGroup("api/import-group-source.forge.js", {
+const secondAssembly = require("api/import-group-source.forge.js", {
   "Height": 60,
   "Width": 80,
 }).translate(150, 0, 0);

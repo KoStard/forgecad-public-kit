@@ -1,9 +1,9 @@
 // Placement references let imported parts define semantic attachment points.
 
-const left = importPart("api/import-placement-widget-source.forge.js")
+const left = require("api/import-placement-widget-source.forge.js")
   .placeReference("mount", [-90, 0, 0]);
 
-const right = importPart("api/import-placement-widget-source.forge.js", {
+const right = require("api/import-placement-widget-source.forge.js", {
   "Post Height": 40,
 }).attachTo(left, "objects.post.top", "mount", [90, 0, 0]);
 

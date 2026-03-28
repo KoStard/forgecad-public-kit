@@ -539,7 +539,7 @@ export class ShapeGroup {
    * Translate the group so the given reference lands on the target coordinate.
    *
    * ```javascript
-   * const placed = importGroup('bracket-assembly.forge.js')
+   * const placed = require('./bracket-assembly.forge.js').group
    *   .placeReference('mountCenter', [0, 0, 50]);
    * ```
    */

@@ -241,7 +241,7 @@ export function logImportTrace(
   fileName: string,
   scope: ImportScope,
   options: RunnerExecutionOptions,
-  kind: 'importSketch' | 'importPart' | 'importSvgSketch' | 'importGroup' | 'importAssembly' | 'require',
+  kind: 'importSvgSketch' | 'importMesh' | 'require',
   target: string,
   phase: 'start' | 'success' | 'error',
   details: Record<string, unknown> = {},

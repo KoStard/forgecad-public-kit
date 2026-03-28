@@ -1,4 +1,4 @@
-// importAssembly + mergeInto() demo
+// require() + mergeInto() demo
 // Shows how to compose a parent assembly from imported sub-assemblies,
 // preserving full kinematic access across file boundaries.
 
@@ -11,7 +11,7 @@ const robot = assembly("Robot")
   .addPart("Chassis", chassis);
 
 // Merge the left arm — all parts/joints are prefixed "Left Arm."
-importAssembly("api/import-assembly-source.forge.js", { "Link Length": 100 })
+require("api/import-assembly-source.forge.js", { "Link Length": 100 })
   .mergeInto(robot, {
     prefix: "Left Arm",
     mountParent: "Chassis",
@@ -20,7 +20,7 @@ importAssembly("api/import-assembly-source.forge.js", { "Link Length": 100 })
   });
 
 // Merge the right arm — same source file, different prefix and position
-importAssembly("api/import-assembly-source.forge.js", { "Link Length": 100 })
+require("api/import-assembly-source.forge.js", { "Link Length": 100 })
   .mergeInto(robot, {
     prefix: "Right Arm",
     mountParent: "Chassis",

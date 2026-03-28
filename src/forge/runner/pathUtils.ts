@@ -22,7 +22,7 @@ const SVG_IMPORT_OPTION_KEYS = new Set([
 ]);
 
 export function parseImportParamArgs(
-  importKind: 'importSketch' | 'importPart' | 'importGroup' | 'importAssembly',
+  importKind: string,
   fileName: string,
   args: unknown,
 ): Record<string, number> {

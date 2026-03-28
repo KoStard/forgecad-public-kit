@@ -42,7 +42,7 @@ Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD 
 - Constraint-driven sketch workflows
 - Named entities and topology-aware operations
 - Parametric design via `param(...)` sliders
-- Multi-file composition with `importPart(...)`, `importSketch(...)`, and plain `.js` utility modules
+- Multi-file composition with `require(path, paramOverrides?)` and plain `.js` utility modules
 - Assembly + mechanism modeling with joints, sweeps, and collision checks
 - Script-authored BOM + dimension annotations for report export
 - Exact STEP/BREP export for the maintained replayable subset
@@ -66,7 +66,7 @@ import { box, union } from "forgecad";
 
 Modules can also use top-level `return` (including arrays) as the module value, as long as they do not also define exports in the same file.
 
-Use `importPart()` / `importSketch()` when you want the specialized model/sketch import behavior (parameter scoping, SVG parsing, dimension propagation). Use plain JS modules for reusable functions, classes, and constants. See [examples/api/js-module-imports.forge.js](examples/api/js-module-imports.forge.js).
+Use `require("./file.forge.js", { Param: value })` to import model files with optional parameter overrides (parameter scoping, dimension propagation). Use `importSvgSketch()` for SVG files. Use plain JS modules for reusable functions, classes, and constants. See [examples/api/js-module-imports.forge.js](examples/api/js-module-imports.forge.js).
 
 ## Seamless AI integration
 

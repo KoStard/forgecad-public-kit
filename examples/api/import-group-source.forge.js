@@ -1,6 +1,6 @@
 // import-group-source.forge.js
 // A multipart bracket assembly exported as a named ShapeGroup.
-// Import with: importGroup("api/import-group-source.forge.js")
+// Import with: require("api/import-group-source.forge.js")
 
 const thickness = param("Thickness", 4, { min: 2, max: 8, unit: "mm" });
 const height    = param("Height",    40, { min: 20, max: 80, unit: "mm" });
