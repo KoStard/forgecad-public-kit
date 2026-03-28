@@ -425,7 +425,11 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
       return lowerImportedMeshToManifold(plan.fileData, plan.format, plan.filePath, wasm);
     case 'sdf': {
       const evalFn = compileSdfNode(plan.tree);
-      return wasm.Manifold.levelSet(evalFn as any, plan.bounds, plan.edgeLength, 0);
+      // Manifold.levelSet convention: positive = inside, negative = outside.
+      // Standard SDF convention (used by sdfEval): negative = inside, positive = outside.
+      // Negate to bridge the two conventions.
+      const negated = (p: Vec3) => -evalFn(p);
+      return wasm.Manifold.levelSet(negated as any, plan.bounds, plan.edgeLength, 0);
     }
     default:
       assertExhaustive(plan);
