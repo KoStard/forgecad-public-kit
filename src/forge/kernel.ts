@@ -557,7 +557,7 @@ function resolveRotationPoint(shape: Shape, point: RotationPointLike): Vec3 {
 }
 
 /**
- * Bind dimensions to a shape instance. Used for importPart-scoped dimensions.
+ * Bind dimensions to a shape instance. Used for require()-scoped dimensions.
  * By default IDs are regenerated so multiple instances never collide.
  */
 export function setShapeDimensions(shape: Shape, dims: ShapeDimension[], options: { regenerateIds?: boolean } = {}): Shape {

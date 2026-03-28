@@ -8,7 +8,7 @@
 
 /** Regex patterns that match ForgeCAD import calls and ES/CJS imports. */
 const FORGE_IMPORT_RE =
-  /\b(?:importPart|importSketch|importAssembly|importGroup|importMesh|importSvgSketch)\s*\(\s*(?:"([^"]+)"|'([^']+)')/g;
+  /\b(?:importMesh|importSvgSketch)\s*\(\s*(?:"([^"]+)"|'([^']+)')/g;
 
 const REQUIRE_RE = /\brequire\s*\(\s*(?:"([^"]+)"|'([^']+)')/g;
 
@@ -21,7 +21,7 @@ export interface ImportRef {
   /** The raw path string from the source code. */
   raw: string;
   /** The kind of import. */
-  kind: 'forgePart' | 'forgeSketch' | 'forgeAssembly' | 'forgeGroup' | 'forgeMesh' | 'forgeSvg' | 'require' | 'esImport';
+  kind: 'forgeMesh' | 'forgeSvg' | 'require' | 'esImport';
 }
 
 /** Extract all import references from source code (non-recursive, single file). */
@@ -37,10 +37,6 @@ export function extractImports(code: string): ImportRef[] {
   };
 
   const kindMap: Record<string, ImportRef['kind']> = {
-    importPart: 'forgePart',
-    importSketch: 'forgeSketch',
-    importAssembly: 'forgeAssembly',
-    importGroup: 'forgeGroup',
     importMesh: 'forgeMesh',
     importSvgSketch: 'forgeSvg',
   };
@@ -50,8 +46,8 @@ export function extractImports(code: string): ImportRef[] {
   const forgeRe = new RegExp(FORGE_IMPORT_RE.source, FORGE_IMPORT_RE.flags);
   while ((m = forgeRe.exec(code)) !== null) {
     const path = m[1] ?? m[2];
-    const fn = m[0].match(/\b(importPart|importSketch|importAssembly|importGroup|importMesh|importSvgSketch)/)?.[1];
-    add(path, kindMap[fn!] ?? 'forgePart');
+    const fn = m[0].match(/\b(importMesh|importSvgSketch)/)?.[1];
+    add(path, kindMap[fn!] ?? 'forgeMesh');
   }
 
   // require()

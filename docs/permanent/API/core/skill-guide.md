@@ -90,18 +90,26 @@ const vent = box(80, 2, 12, true)
 - `.forge-notebook.json` — multi-cell notebook
 - `.svg` — vector artwork, imported as sketch geometry
 
-### Import Functions
+### Import Function
 
-| Function | Source returns | Result type | Child access |
-|----------|--------------|-------------|-------------|
-| `importPart()` | Shape/TrackedShape | Shape | No |
-| `importSketch()` | Sketch | Sketch | No |
-| `importGroup()` | ShapeGroup (via `group()`) | ShapeGroup | `.child("Name")` |
-| `importAssembly()` | Assembly (unsolved) | ImportedAssembly | `.part("Name")`, `.toGroup()` |
+Use `require(path, paramOverrides?)` to import any `.forge.js` file. The second argument is optional param overrides.
+
+```javascript
+const bracket = require("./bracket.forge.js");
+const bracket2 = require("./bracket.forge.js", { Width: 100, Thickness: 3 });
+```
+
+The return value matches what the imported file exports:
+- File `return`s a `Shape` → you get a `Shape`
+- File `return`s an `Assembly` → you get an `ImportedAssembly`
+- File `return`s a `ShapeGroup` → you get a `ShapeGroup`
+- File uses `exports.name = value` → you get an object with named properties
+
+Use `importSvgSketch()` for SVG files (separate function — SVG is a file format loader, not a module import).
 
 ### Import Rules
-- Paths: `./file.forge.js` resolves relative to caller; bare paths from project root
-- `paramOverrides` only affects that import call
+- Paths: `./file.forge.js` resolves relative to caller; bare paths resolve from project root
+- Param overrides only affect that import call
 - Circular imports throw an error
 - Each import call is a fresh execution
 
@@ -118,7 +126,7 @@ return union(base, post).withReferences({
 });
 
 // In assembly file:
-const widget = importPart("widget.forge.js")
+const widget = require("./widget.forge.js")
   .placeReference("mount", [120, 40, 0]);
 const cap = box(18, 18, 8, true)
   .attachTo(widget, "objects.post.top", "bottom");

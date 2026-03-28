@@ -186,18 +186,18 @@ ForgeCAD projects must scale cleanly across multiple files. Complex models shoul
 
 Every user-facing import mechanism must make multi-file composition a first-class path, not an afterthought:
 
-- A file that returns a `Shape` can be imported with `importPart()`.
-- A file that returns a `ShapeGroup` can be imported with `importGroup()`, children accessed by name.
-- A file that returns an `Assembly` can be imported with `importAssembly()`, with full kinematic and child-part access preserved.
-- Plain JS helpers and constants belong in regular `.js` modules imported via `require()`.
+- Any `.forge.js` file (returning a `Shape`, `ShapeGroup`, `Assembly`, or other type) can be imported with `require("./file.forge.js")`.
+- `require()` accepts an optional second argument for parameter overrides: `require("./part.forge.js", { Width: 100 })`.
+- Files can also use `exports.name = value` alongside or instead of `return` for named multi-export.
+- Plain JS helpers and constants belong in regular `.js` modules imported via `require()` or standard `import`.
 
 No user should have to choose between "clean file structure" and "full API access". If a new return type or authoring primitive appears, **its import path must ship at the same time or in the same milestone**.
 
 ### Consequences for API design
 
-- New authoring primitives (anything a user might `return` from a `.forge.js` file) need a corresponding `import*()` function.
+- New authoring primitives (anything a user might `return` from a `.forge.js` file) are automatically importable via `require()`.
 - Imported objects must expose the same child-access and placement-reference ergonomics that inline objects do.
-- Parameter overrides (`paramOverrides`) must be supported on every import function so multi-instance use is natural.
+- Parameter overrides must be supported via the second argument to `require()` so multi-instance use is natural.
 - If a sub-file feature cannot yet be fully composed (e.g. kinematic merge across file boundaries), document the limitation explicitly and create a tracked task — do not silently downgrade.
 
 ### Enforcement

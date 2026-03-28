@@ -1,5 +1,5 @@
 // Storage Container — parametric open-top bin
-// Used by shelf-unit.forge.js via importPart()
+// Used by shelf-unit.forge.js via require()
 
 const w = param("Container Width", 120, { min: 60, max: 200, unit: "mm" });
 const d = param("Container Depth", 180, { min: 100, max: 300, unit: "mm" });

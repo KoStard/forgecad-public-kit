@@ -118,7 +118,7 @@ function checkBooleanPropagation(): void {
 function checkImportRuntimePropagation(): void {
   const files: Record<string, string> = {
     'main.forge.js': `
-const p = importPart("child.forge.js").color("#222").translate(10, 0, 0);
+const p = require("child.forge.js").color("#222").translate(10, 0, 0);
 return p;
 `,
     'child.forge.js': `

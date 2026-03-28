@@ -164,39 +164,15 @@ Mirror a shape across a plane defined by its normal and union the mirror with th
 
 ### Imports & Composition
 
-Import parts, sketches, and assemblies from other files.
+Import model files and SVG assets from other files.
 
-#### `importSketch()`
-
-```ts
-importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch
-```
-
-Import a sketch from another ForgeCAD file or SVG. For .forge.js files, pass param overrides; for .svg files, pass SVG import options.
-
-#### `importPart()`
+#### `require()`
 
 ```ts
-importPart(fileName: string, paramOverrides?: Record<string, number>): Shape
+require$1(path: string, paramOverrides?: Record<string, number>): any
 ```
 
-Import a part from another ForgeCAD file. Returns a chainable Shape. The target file must return a Shape or TrackedShape.
-
-#### `importGroup()`
-
-```ts
-importGroup(fileName: string, paramOverrides?: Record<string, number>): ShapeGroup
-```
-
-Import a group from another ForgeCAD file. The target file must return a ShapeGroup via group().
-
-#### `importAssembly()`
-
-```ts
-importAssembly(fileName: string, paramOverrides?: Record<string, number>): ImportedAssembly
-```
-
-Import an assembly from another ForgeCAD file. The target file must return an unsolved Assembly instance.
+Import a module with optional ForgeCAD parameter overrides. Returns the module's exports.
 
 #### `importSvgSketch()`
 
@@ -637,7 +613,7 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `withPorts()` — Attach named assembly ports (origin + axis + up) that survive transforms.
 - `portNames()` — List named port identifiers carried by this group.
 - `referencePoint()` — Resolve a named placement reference or built-in Anchor3D to a 3D point. Named refs take priority over built-in anchors.
-- `placeReference()` — Translate the group so the given reference lands on the target coordinate. ```javascript const placed = importGroup('bracket-assembly.forge.js') .placeReference('mountCenter', [0, 0, 50]); ```
+- `placeReference()` — Translate the group so the given reference lands on the target coordinate. ```javascript const placed = require('./bracket-assembly.forge.js').group .placeReference('mountCenter', [0, 0, 50]); ```
 
 ---
 

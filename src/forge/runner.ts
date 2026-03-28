@@ -4,7 +4,7 @@
  * Takes user code, wraps it so that forge API is available,
  * executes it in a Function() sandbox, and returns the resulting Shape.
  *
- * Supports cross-file imports via importSketch() and importPart().
+ * Supports cross-file imports via require().
  */
 
 import './holeCut';
@@ -226,6 +226,22 @@ function hasExplicitModuleExports(exportsValue: unknown, initialExportsRef: unkn
 }
 
 /**
+ * Post-process the result of requiring a `.forge.js` child file:
+ * - Unwrap TrackedShape → Shape (topology is coordinate-system-relative and must not leak
+ *   into the parent; the shape's placement refs are already stored on the Shape layer).
+ * - Attach any `dim()` calls collected from the child onto the shape so subsequent
+ *   transforms (translate, rotate, …) propagate them correctly.
+ */
+function finalizeForgeJsImport(moduleExports: unknown, importedDims: DimensionDef[]): unknown {
+  // Unwrap TrackedShape to plain Shape — matches require() import behaviour and ensures
+  // that placement refs live on the Shape layer, not the TrackedShape topology layer.
+  const base = moduleExports instanceof TrackedShape ? moduleExports.toShape() : moduleExports;
+  if (!(base instanceof Shape)) return moduleExports;
+  if (importedDims.length === 0) return base;
+  return setShapeDimensions(base, [...getShapeDimensions(base), ...importedDims] as ShapeDimension[]);
+}
+
+/**
  * Execute a single file's code with the forge sandbox.
  * `allFiles` enables cross-file imports.
  * `visited` prevents circular imports.
@@ -253,64 +269,6 @@ function executeFile(
       importCallCount += 1;
       const local = `${name}#${importCallCount}`;
       return scope.namePrefix ? `${scope.namePrefix} > ${local}` : local;
-    };
-
-    const importSketch = (name: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch => {
-      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
-      if (isSvgImportPath(resolvedPath)) {
-        const svgOptions = parseSvgImportArgs('importSketch', name, paramOverrides);
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'start', {
-          requested: name,
-          mode: 'svg',
-          options: svgOptions,
-        });
-        try {
-          const result = sketchFromSvg(src, svgOptions);
-          logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'success', {
-            requested: name,
-            mode: 'svg',
-            got: 'Sketch',
-            area: Number(result.area().toFixed(4)),
-            verts: result.numVert(),
-          });
-          return result;
-        } catch (error) {
-          logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'error', {
-            requested: name,
-            mode: 'svg',
-            error: formatLogError(error),
-          });
-          throw error;
-        }
-      }
-
-      const localOverrides = parseImportParamArgs('importSketch', name, paramOverrides);
-      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'start', {
-        requested: name,
-        overrides: localOverrides,
-      });
-      let result: ReturnType<typeof executeFile>;
-      try {
-        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
-      } catch (error) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'error', {
-          requested: name,
-          error: formatLogError(error),
-        });
-        throw error;
-      }
-      validateConsumedOverrides(childScope, 'importSketch', resolvedPath);
-      if (result instanceof Sketch) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'success', {
-          requested: name,
-          got: 'Sketch',
-        });
-        return result;
-      }
-      const got = describeScriptResultType(result);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importSketch', resolvedPath, 'error', { requested: name, got });
-      throw new Error(`"${resolvedPath}" did not return a Sketch (got ${got})`);
     };
 
     // importSvgSketch("name.svg", options?) — parses an SVG into Sketch geometry
@@ -381,127 +339,6 @@ function executeFile(
         fidelity: 'sampled',
         sources: ['imported'],
       });
-    };
-
-    // importPart("name", { ...paramOverrides }) — executes another file, expects a Shape result
-    const importPart = (name: string, paramOverrides?: Record<string, number>): Shape => {
-      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
-      const localOverrides = parseImportParamArgs('importPart', name, paramOverrides);
-      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
-      const dimStart = getCollectedDimensions().length;
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'start', {
-        requested: name,
-        overrides: localOverrides,
-      });
-      let result: ReturnType<typeof executeFile>;
-      const savedJointsView = saveJointsView();
-      try {
-        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
-      } catch (error) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'error', {
-          requested: name,
-          error: formatLogError(error),
-        });
-        throw error;
-      } finally {
-        restoreJointsView(savedJointsView);
-      }
-      validateConsumedOverrides(childScope, 'importPart', resolvedPath);
-      const importedDims = takeCollectedDimensions(dimStart);
-      if (result instanceof Shape) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'success', {
-          requested: name,
-          got: 'Shape',
-          importedDims: importedDims.length,
-        });
-        return setShapeDimensions(result, importedDims as ShapeDimension[]);
-      }
-      if (result instanceof TrackedShape) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'success', {
-          requested: name,
-          got: 'TrackedShape',
-          importedDims: importedDims.length,
-          unwrapped: true,
-        });
-        return setShapeDimensions(result.toShape(), importedDims as ShapeDimension[]);
-      }
-      const got = describeScriptResultType(result);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importPart', resolvedPath, 'error', { requested: name, got });
-      throw new Error(`"${resolvedPath}" did not return a Shape (got ${got})`);
-    };
-
-    // importGroup("name", { ...paramOverrides }) — executes another file, expects a ShapeGroup result
-    const importGroup = (name: string, paramOverrides?: Record<string, number>): ShapeGroup => {
-      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
-      const localOverrides = parseImportParamArgs('importGroup', name, paramOverrides);
-      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importGroup', resolvedPath, 'start', {
-        requested: name,
-        overrides: localOverrides,
-      });
-      let result: ReturnType<typeof executeFile>;
-      const savedJointsView = saveJointsView();
-      try {
-        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
-      } catch (error) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importGroup', resolvedPath, 'error', {
-          requested: name,
-          error: formatLogError(error),
-        });
-        throw error;
-      } finally {
-        restoreJointsView(savedJointsView);
-      }
-      validateConsumedOverrides(childScope, 'importGroup', resolvedPath);
-      if (result instanceof ShapeGroup) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importGroup', resolvedPath, 'success', {
-          requested: name,
-          got: 'ShapeGroup',
-        });
-        return result;
-      }
-      const got = describeScriptResultType(result);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importGroup', resolvedPath, 'error', { requested: name, got });
-      throw new Error(
-        `"${resolvedPath}" did not return a ShapeGroup (got ${got}). Use group(...) as the return value, or use importPart() for single-shape files.`,
-      );
-    };
-
-    // importAssembly("name", { ...paramOverrides }) — executes another file, expects an Assembly result
-    const importAssembly = (name: string, paramOverrides?: Record<string, number>): ImportedAssembly => {
-      const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, name, allFiles, options);
-      const localOverrides = parseImportParamArgs('importAssembly', name, paramOverrides);
-      const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importAssembly', resolvedPath, 'start', {
-        requested: name,
-        overrides: localOverrides,
-      });
-      let result: ReturnType<typeof executeFile>;
-      const savedJointsView = saveJointsView();
-      try {
-        result = executeFile(src, lookupKey, allFiles, visited, childScope, options);
-      } catch (error) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importAssembly', resolvedPath, 'error', {
-          requested: name,
-          error: formatLogError(error),
-        });
-        throw error;
-      } finally {
-        restoreJointsView(savedJointsView);
-      }
-      validateConsumedOverrides(childScope, 'importAssembly', resolvedPath);
-      if (result instanceof Assembly) {
-        logImportTrace(_collectedLogs, fileName, scope, options, 'importAssembly', resolvedPath, 'success', {
-          requested: name,
-          got: 'Assembly',
-        });
-        return new ImportedAssembly(result, result.getReferences());
-      }
-      const got = describeScriptResultType(result);
-      logImportTrace(_collectedLogs, fileName, scope, options, 'importAssembly', resolvedPath, 'error', { requested: name, got });
-      throw new Error(
-        `"${resolvedPath}" did not return an Assembly (got ${got}). Return the assembly() instance directly (before calling .solve()).`,
-      );
     };
 
     // Wrappers that auto-unwrap TrackedShape for boolean ops
@@ -613,10 +450,6 @@ function executeFile(
       chamfer,
       draft,
       offsetSolid,
-      importSketch,
-      importPart,
-      importGroup,
-      importAssembly,
       importSvgSketch,
       importMesh,
       text2d,
@@ -643,7 +476,7 @@ function executeFile(
       GCodeBuilder,
     };
 
-    const requireModule = (requestedName: string): unknown => {
+    const requireModule = (requestedName: string, paramOverrides?: Record<string, number>): unknown => {
       if (typeof requestedName !== 'string' || requestedName.trim().length === 0) {
         throw new Error('Module specifier must be a non-empty string');
       }
@@ -667,7 +500,7 @@ function executeFile(
       if (isSvgImportPath(resolvedPath)) {
         throw new Error(
           `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is an SVG asset. ` +
-            'Use importSketch() or importSvgSketch() instead.',
+            'Use importSvgSketch() instead.',
         );
       }
       if (resolvedPath.endsWith('.forge-notebook.json')) {
@@ -675,6 +508,56 @@ function executeFile(
           `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is a notebook file. ` +
             'Export the notebook to .forge.js first.',
         );
+      }
+
+      const hasOverrides = paramOverrides != null && typeof paramOverrides === 'object' && Object.keys(paramOverrides).length > 0;
+
+      if (hasOverrides) {
+        const localOverrides = parseImportParamArgs('require', normalizedRequested, paramOverrides);
+        const childScope = createTrackedScope(makeChildScopePrefix(resolvedPath), localOverrides);
+        const dimStart = getCollectedDimensions().length;
+        logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'start', {
+          requested: normalizedRequested,
+          overrides: localOverrides,
+        });
+        const cacheKey = makeModuleCacheKey(lookupKey, childScope);
+        const cached = options.moduleCache.get(cacheKey);
+        if (cached) {
+          logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'success', {
+            requested: normalizedRequested,
+            got: describeScriptResultType(cached.exports),
+            cached: true,
+          });
+          return cached.exports;
+        }
+        const nextModuleEntry: ModuleCacheEntry = { exports: {}, loaded: false };
+        options.moduleCache.set(cacheKey, nextModuleEntry);
+        const savedJointsView = saveJointsView();
+        try {
+          const moduleExports = executeFile(src, lookupKey, allFiles, visited, childScope, options, 'module', nextModuleEntry);
+          nextModuleEntry.exports = moduleExports;
+          nextModuleEntry.loaded = true;
+          validateConsumedOverrides(childScope, 'require', resolvedPath);
+          const importedDims = takeCollectedDimensions(dimStart);
+          const finalExports = finalizeForgeJsImport(moduleExports, importedDims);
+          nextModuleEntry.exports = finalExports;
+          logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'success', {
+            requested: normalizedRequested,
+            got: describeScriptResultType(finalExports),
+            importedDims: importedDims.length,
+            cached: false,
+          });
+          return finalExports;
+        } catch (error) {
+          options.moduleCache.delete(cacheKey);
+          logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'error', {
+            requested: normalizedRequested,
+            error: formatLogError(error),
+          });
+          throw error;
+        } finally {
+          restoreJointsView(savedJointsView);
+        }
       }
 
       logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'start', { requested: normalizedRequested });
@@ -690,18 +573,23 @@ function executeFile(
         return cached.exports;
       }
 
+      const dimStart = getCollectedDimensions().length;
       const nextModuleEntry: ModuleCacheEntry = { exports: {}, loaded: false };
       options.moduleCache.set(cacheKey, nextModuleEntry);
       try {
         const moduleExports = executeFile(src, lookupKey, allFiles, visited, scope, options, 'module', nextModuleEntry);
         nextModuleEntry.exports = moduleExports;
         nextModuleEntry.loaded = true;
+        const importedDims = takeCollectedDimensions(dimStart);
+        const finalExports = finalizeForgeJsImport(moduleExports, importedDims);
+        nextModuleEntry.exports = finalExports;
         logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'success', {
           requested: normalizedRequested,
-          got: describeScriptResultType(moduleExports),
+          got: describeScriptResultType(finalExports),
+          importedDims: importedDims.length,
           cached: false,
         });
-        return moduleExports;
+        return finalExports;
       } catch (error) {
         options.moduleCache.delete(cacheKey);
         logImportTrace(_collectedLogs, fileName, scope, options, 'require', resolvedPath, 'error', {
@@ -735,13 +623,18 @@ function executeFile(
     );
 
     if (executionMode === 'module') {
-      if (returnValue !== undefined) {
-        if (hasExplicitModuleExports(moduleValue.exports, initialExportsRef)) {
-          throw new Error(
-            `"${fileName}" mixed top-level return with exports while being imported as a JS module. ` +
-              'Use either return or export/module.exports, not both.',
-          );
+      const hasExports = hasExplicitModuleExports(moduleValue.exports, initialExportsRef);
+      if (returnValue !== undefined && hasExports) {
+        const merged = { ...(moduleValue.exports as Record<string, unknown>), default: returnValue };
+        // Mark as an ES module so that __importDefault (esModuleInterop) recognises it
+        // and returns the value directly rather than double-wrapping it.
+        Object.defineProperty(merged, '__esModule', { value: true });
+        if (moduleCacheEntry) {
+          moduleCacheEntry.exports = merged;
         }
+        return merged;
+      }
+      if (returnValue !== undefined) {
         if (moduleCacheEntry) {
           moduleCacheEntry.exports = returnValue;
         }
@@ -1024,6 +917,57 @@ export function runScript(
           }
           throw new Error('Array results must contain Shape/Sketch items');
         });
+      } else if (result !== null && typeof result === 'object' && !Array.isArray(result) &&
+                 !(result instanceof Shape) && !(result instanceof Sketch) &&
+                 !(result instanceof TrackedShape) && !(result instanceof ShapeGroup) &&
+                 !(result instanceof GCodeBuilder) && !(result instanceof Assembly) &&
+                 !(result instanceof SolvedAssembly)) {
+        // Plain object return — check for default, then render all renderables
+        const obj = result as Record<string, unknown>;
+        const defaultValue = obj.default;
+        if (defaultValue && isRenderableEntryResult(defaultValue)) {
+          // Render the default as if it were the direct return
+          if (defaultValue instanceof Assembly) {
+            const items = defaultValue.solve().toSceneObjects();
+            items.forEach((item, index) => {
+              const label = `Object ${index + 1}`;
+              processNamedItem(item, label, label);
+            });
+          } else if (defaultValue instanceof SolvedAssembly) {
+            const items = defaultValue.toSceneObjects();
+            items.forEach((item, index) => {
+              const label = `Object ${index + 1}`;
+              processNamedItem(item, label, label);
+            });
+          } else if (defaultValue instanceof ShapeGroup) {
+            defaultValue.children.forEach((child, i) => {
+              const label = rootGroupChildLabel(defaultValue, i);
+              flattenGroupChild(child, label, undefined, [label]);
+            });
+          } else if (defaultValue instanceof TrackedShape) {
+            pushShape(defaultValue.toShape(), fileName, undefined, undefined, defaultValue.geometryInfo(), [fileName]);
+          } else if (defaultValue instanceof Shape) {
+            pushShape(defaultValue, fileName, undefined, undefined, undefined, [fileName]);
+          } else if (defaultValue instanceof Sketch) {
+            pushSketch(defaultValue, fileName, undefined, [fileName]);
+          }
+        } else {
+          // No default — render all renderable values
+          const entries = Object.entries(obj);
+          entries.forEach(([key, value]) => {
+            if (value instanceof TrackedShape) {
+              pushShape(value.toShape(), key, undefined, undefined, value.geometryInfo(), [key]);
+            } else if (value instanceof Shape) {
+              pushShape(value, key, undefined, undefined, undefined, [key]);
+            } else if (value instanceof Sketch) {
+              pushSketch(value, key, undefined, [key]);
+            } else if (value instanceof ShapeGroup) {
+              value.children.forEach((child, i) => {
+                flattenGroupChild(child, groupChildLabel(value, key, i), undefined, [key, shapeGroupChildSegment(value, i)]);
+              });
+            }
+          });
+        }
       } else if (result instanceof TrackedShape) {
         pushShape(result.toShape(), fileName, undefined, undefined, result.geometryInfo(), [fileName]);
       } else if (result instanceof Shape) {

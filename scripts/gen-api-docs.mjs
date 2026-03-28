@@ -427,7 +427,7 @@ const CATEGORIES = [
       "selectEdge", "selectEdges", "coalesceEdges",
     ],
   },
-  { title: "Imports & Composition", desc: "Import parts, sketches, and assemblies from other files.", names: ["importPart", "importSketch", "importGroup", "importAssembly", "importSvgSketch"] },
+  { title: "Imports & Composition", desc: "Import model files and SVG assets from other files.", names: ["require", "importSvgSketch"] },
   { title: "Parameters", desc: "Declare user-adjustable parameters with UI controls.", names: ["param", "boolParam"] },
   { title: "Grouping", desc: "Organize multiple shapes into named groups.", names: ["group"] },
   { title: "Assembly & Joints", desc: "Build kinematic assemblies with joints and couplings.", names: ["assembly", "joint", "bomToCsv"] },

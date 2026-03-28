@@ -1,10 +1,10 @@
-// importAssembly() demo
+// require() assembly demo
 // Shows how to import an Assembly, access named parts, and convert to a group.
 
 const angle = param("Shoulder Angle", 45, { min: -45, max: 120, unit: "°" });
 
 // Import the sub-assembly — get back an ImportedAssembly
-const subArm = importAssembly("api/import-assembly-source.forge.js", { "Link Length": 100 });
+const subArm = require("api/import-assembly-source.forge.js", { "Link Length": 100 });
 
 // Access a specific part by name (positioned at default joint state)
 const baseShape = subArm.part("Base");

@@ -124,7 +124,7 @@ return union(base, post).withReferences({
 Then consume them in the importing file:
 
 ```javascript
-const widget = importPart("widget.forge.js")
+const widget = require("./widget.forge.js")
   .placeReference("mount", [120, 40, 0]);
 
 const cap = box(18, 18, 8, true)

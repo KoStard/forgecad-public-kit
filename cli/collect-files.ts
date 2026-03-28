@@ -2,7 +2,7 @@
  * Shared CLI utilities for ForgeCAD CLI tools.
  *
  * Handles project file collection with correct path resolution
- * so that importSketch/importPart paths match between frontend and CLI.
+ * so that require() paths match between frontend and CLI.
  */
 
 import { readdirSync, readFileSync, statSync } from 'fs';

@@ -178,7 +178,7 @@ forgecad run examples/cup.forge.js --debug-imports
 
 Runs a `.forge.js` or notebook preview cell in the real runtime and prints object stats, diagnostics, and execution time.
 
-`--debug-imports` adds an import trace (source file, target file, overrides, return type, success/error phase), useful when debugging `importPart()`/`importSketch()` behavior.
+`--debug-imports` adds an import trace (source file, target file, overrides, return type, success/error phase), useful when debugging `require()` import behavior.
 
 ### SVG Export (no browser needed)
 
@@ -615,7 +615,7 @@ Runs shape-level invariants for dimension metadata propagation across:
 - transform APIs (`translate`, `rotate`, `transform`, `scale`, `mirror`, `rotateAround`)
 - copy/style APIs (`clone`, `color`, `setColor`)
 - boolean APIs (`add/subtract/intersect`, plus `union/difference/intersection`)
-- import runtime path (`importPart(...).color(...).translate(...)`)
+- import runtime path (`require(...).color(...).translate(...)`)
 
 ### Dimension Debugger
 
@@ -703,7 +703,7 @@ for (const obj of result.objects) {
 
 ### Cross-file imports
 
-When running scripts that use `importSketch()` / `importSvgSketch()` / `importPart()` or plain JS module imports, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports root-relative and relative imports, utility `.js` modules, and `.svg` assets (`./assets/logo.svg`):
+When running scripts that use `require()` / `importSvgSketch()` or plain JS module imports, pass all project files (or at least all files reachable by imports), keyed by project-relative path. This supports root-relative and relative imports, utility `.js` modules, and `.svg` assets (`./assets/logo.svg`):
 
 ```typescript
 import { readdirSync, readFileSync } from 'fs';
@@ -724,7 +724,7 @@ For utility modules that want explicit ForgeCAD imports instead of globals, use 
 import { box, union } from "forgecad";
 ```
 
-Keep using `importPart()` / `importSketch()` for model/sketch files when you want ForgeCAD-specific behavior like param override scopes or SVG parsing.
+Use `require("./file.forge.js", { Param: value })` for model/sketch files when you want ForgeCAD-specific behavior like param override scopes. Use `importSvgSketch()` for SVG assets.
 
 ## Dependencies
 

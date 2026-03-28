@@ -52,14 +52,14 @@ return plate;
 
 ## Parameter Overrides
 
-When importing files with `importPart()` or `importSketch()`, you can override their parameters:
+When importing files with `require()`, you can override their parameters via an optional second argument:
 
 ```javascript
-const bracket = importPart("bracket.forge.js", { Width: 80, Thickness: 3 });
-const logo = importSketch("logo.svg", { scale: 0.5 });
+const bracket = require("./bracket.forge.js", { Width: 80, Thickness: 3 });
+const logo = require("./logo.forge.js", { Scale: 0.5 });
 ```
 
-Override keys must match the `name` string passed to `param()` or `boolParam()` in the imported file. For `boolParam`, pass `1` (true) or `0` (false) as the override value.
+Override keys must match the `name` string passed to `param()` or `boolParam()` in the imported file. For `boolParam`, pass `1` (true) or `0` (false) as the override value. Use `importSvgSketch()` for SVG files (SVG import does not use param overrides).
 
 ## Tips
 

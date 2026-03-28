@@ -1,8 +1,8 @@
-// importAssembly + placement references demo
+// require() + placement references demo
 // Reference points are declared in the source file via assembly.withReferences().
 // The consumer gets them automatically — no re-declaration needed.
 
-const sub = importAssembly("api/import-assembly-source.forge.js");
+const sub = require("api/import-assembly-source.forge.js");
 
 console.log("ref names:", sub.referenceNames()); // ["points.origin", "points.top"]
 

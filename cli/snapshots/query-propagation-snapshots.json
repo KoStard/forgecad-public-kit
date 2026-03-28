@@ -15,7 +15,9 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["trimByPlane"],
+        "propagationOps": [
+          "trimByPlane"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-trimbyplane-2",
@@ -97,7 +99,9 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["trimByPlane"],
+        "propagationOps": [
+          "trimByPlane"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-splitbyplane-positive-3",
@@ -179,7 +183,9 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["trimByPlane"],
+        "propagationOps": [
+          "trimByPlane"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-splitbyplane-opposite-4",
@@ -267,7 +273,12 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["cut", "cut", "hole", "hole"],
+        "propagationOps": [
+          "cut",
+          "cut",
+          "hole",
+          "hole"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-5",
@@ -700,7 +711,11 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["cut", "hole", "cut"],
+        "propagationOps": [
+          "cut",
+          "hole",
+          "cut"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-4",
@@ -723,9 +738,9 @@
                 "note": "This face stays queryable through the cut rewrite."
               },
               {
-                "status": "ambiguous",
-                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
-                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
+                "status": "supported",
+                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
+                "note": "This face stays queryable through the cut rewrite."
               },
               {
                 "status": "supported",
@@ -775,14 +790,14 @@
             ],
             "preservedEdges": [
               {
-                "status": "ambiguous",
-                "query": "propagated-edge(split <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
-                "note": "cut rewrites at least one adjacent face of this vertical edge; its post-rewrite identity is not defended as one single edge target."
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
+                "note": "cut leaves this vertical edge unaffected; none of its adjacent faces are in the rewrite set."
               },
               {
-                "status": "ambiguous",
-                "query": "propagated-edge(split <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
-                "note": "cut rewrites at least one adjacent face of this vertical edge; its post-rewrite identity is not defended as one single edge target."
+                "status": "supported",
+                "query": "propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
+                "note": "cut leaves this vertical edge unaffected; none of its adjacent faces are in the rewrite set."
               },
               {
                 "status": "supported",
@@ -832,15 +847,15 @@
                 "code": "cut-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "canonical-face(front) @hole:shape-query-hole-3",
-                "query": "propagated-face(split <- canonical-face(front) @hole:shape-query-hole-3) @cut:shape-query-cut-4"
+                "source": "face-ref()",
+                "query": "propagated-face(split <- face-ref()) @cut:shape-query-cut-4"
               }
             ],
             "descendants": [
               "single(propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- created-face(hole:cap) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
-              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
@@ -857,6 +872,8 @@
               "single(created-face(cut:floor) @cut:shape-query-cut-4)",
               "edge-chain(created-edge(cut:entry-rim#edge) @cut:shape-query-cut-4)",
               "edge-chain(created-edge(cut:forward-end-rim#edge) @cut:shape-query-cut-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)",
+              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)",
               "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)",
               "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)"
             ]
@@ -1146,7 +1163,14 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["boolean:difference", "cut", "hole", "fillet", "boolean:union", "fillet"],
+        "propagationOps": [
+          "boolean:difference",
+          "cut",
+          "hole",
+          "fillet",
+          "boolean:union",
+          "fillet"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-9",
@@ -1614,7 +1638,12 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["hole", "chamfer", "boolean:union", "chamfer"],
+        "propagationOps": [
+          "hole",
+          "chamfer",
+          "boolean:union",
+          "chamfer"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-hole-6",
@@ -1856,7 +1885,14 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["boolean:difference", "boolean:difference", "boolean:union", "shell", "boolean:union", "boolean:union"],
+        "propagationOps": [
+          "boolean:difference",
+          "boolean:difference",
+          "boolean:union",
+          "shell",
+          "boolean:union",
+          "boolean:union"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-12",
@@ -3112,7 +3148,15 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["boolean:difference", "cut", "hole", "chamfer", "boolean:union", "fillet", "boolean:union"],
+        "propagationOps": [
+          "boolean:difference",
+          "cut",
+          "hole",
+          "chamfer",
+          "boolean:union",
+          "fillet",
+          "boolean:union"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-difference-11",
@@ -3689,7 +3733,13 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["cut", "hole", "hole", "hole", "hole"],
+        "propagationOps": [
+          "cut",
+          "hole",
+          "hole",
+          "hole",
+          "hole"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-6",
@@ -4386,7 +4436,16 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["boolean:union", "cut", "hole", "hole", "hole", "hole", "boolean:union", "boolean:union"],
+        "propagationOps": [
+          "boolean:union",
+          "cut",
+          "hole",
+          "hole",
+          "hole",
+          "hole",
+          "boolean:union",
+          "boolean:union"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-union-14",
@@ -5332,7 +5391,14 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["cut", "cut", "cut", "cut", "cut", "cut"],
+        "propagationOps": [
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-7",
@@ -6218,7 +6284,14 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["cut", "cut", "cut", "cut", "cut", "cut"],
+        "propagationOps": [
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut",
+          "cut"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-cut-14",
@@ -7110,7 +7183,13 @@
           "target": "cadquery-occt",
           "diagnosticCodes": []
         },
-        "propagationOps": ["boolean:union", "trimByPlane", "cut", "hole", "boolean:union"],
+        "propagationOps": [
+          "boolean:union",
+          "trimByPlane",
+          "cut",
+          "hole",
+          "boolean:union"
+        ],
         "propagations": [
           {
             "rewriteId": "shape-query-boolean-union-8",

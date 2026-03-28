@@ -2804,7 +2804,7 @@ declare class ShapeGroup {
 	 * Translate the group so the given reference lands on the target coordinate.
 	 *
 	 * ```javascript
-	 * const placed = importGroup('bracket-assembly.forge.js')
+	 * const placed = require('./bracket-assembly.forge.js').group
 	 *   .placeReference('mountCenter', [0, 0, 50]);
 	 * ```
 	 */
@@ -3131,12 +3131,12 @@ declare class Assembly {
 	/**
 	 * Attach named placement reference points to this assembly.
 	 * These are surfaced automatically on the ImportedAssembly when this file is
-	 * imported with importAssembly(), so consumers can use placeReference() without
+	 * imported via require(), so consumers can use placeReference() without
 	 * re-declaring them.
 	 * Returns `this` for chaining.
 	 */
 	withReferences(refs: Pick<PlacementReferenceInput, "points">): Assembly;
-	/** @internal — used by importAssembly() to seed ImportedAssembly refs. */
+	/** @internal — used by require() to seed ImportedAssembly refs. */
 	getReferences(): PlacementReferences;
 	/**
 	 * Attach named ports to a specific part or the assembly root.
@@ -5749,14 +5749,8 @@ declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
 /** Keep only the overlapping volume of the input shapes (intersection boolean). */
 declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
-/** Import a sketch from another ForgeCAD file or SVG. For .forge.js files, pass param overrides; for .svg files, pass SVG import options. */
-declare function importSketch(fileName: string, paramOverrides?: Record<string, number> | SvgImportOptions): Sketch;
-/** Import a part from another ForgeCAD file. Returns a chainable Shape. The target file must return a Shape or TrackedShape. */
-declare function importPart(fileName: string, paramOverrides?: Record<string, number>): Shape;
-/** Import a group from another ForgeCAD file. The target file must return a ShapeGroup via group(). */
-declare function importGroup(fileName: string, paramOverrides?: Record<string, number>): ShapeGroup;
-/** Import an assembly from another ForgeCAD file. The target file must return an unsolved Assembly instance. */
-declare function importAssembly(fileName: string, paramOverrides?: Record<string, number>): ImportedAssembly;
+/** Import a module with optional ForgeCAD parameter overrides. Returns the module's exports. */
+declare function require$1(path: string, paramOverrides?: Record<string, number>): any;
 /** Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification. */
 declare function importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch;
 /** Import an external mesh file (STL, OBJ, 3MF) as a Shape. */

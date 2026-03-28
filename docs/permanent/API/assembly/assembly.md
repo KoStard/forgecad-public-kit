@@ -36,20 +36,22 @@ return mech.solve({ shoulder: 60 });
 
 ## Return types and imports — how they fit together
 
-| Return value | Standalone | `importPart` | `importGroup` | `importAssembly` |
-|---|---|---|---|---|
-| `Shape` | yes | yes | — | — |
-| `Sketch` | yes | — | — | — |
-| `ShapeGroup` | yes | — | yes | — |
-| `Assembly` (unsolved) | **yes** | — | — | yes |
-| `SolvedAssembly` | **yes** | — | — | — |
+| Return value | Standalone | `require()` result type |
+|---|---|---|
+| `Shape` | yes | `Shape` |
+| `Sketch` | yes | `Sketch` |
+| `ShapeGroup` | yes | `ShapeGroup` |
+| `Assembly` (unsolved) | **yes** | `ImportedAssembly` |
+| `SolvedAssembly` | **yes** | `SolvedAssembly` |
 
-**`Assembly` is the dual-use type**: a file that returns an unsolved `Assembly` works both as a standalone renderable script *and* as an import target for `importAssembly()`.
+Use `require("./file.forge.js")` to import any `.forge.js` file. Pass param overrides as the second argument: `require("./file.forge.js", { Speed: 2 })`.
+
+**`Assembly` is the dual-use type**: a file that returns an unsolved `Assembly` works both as a standalone renderable script *and* as an import target for `require()` (which returns an `ImportedAssembly`).
 
 Pattern for dual-use assembly files:
 
 ```javascript
-// handle.forge.js — works standalone AND importable via importAssembly()
+// handle.forge.js — works standalone AND importable via require()
 const mech = assembly("Handle")
   .addPart("Base", baseBracket)
   .addPart("Arm", arm)
@@ -62,12 +64,12 @@ mech.toJointsView({
   }],
 });
 
-return mech; // works standalone (auto-solved + animated) AND with importAssembly()
+return mech; // works standalone (auto-solved + animated) AND with require()
 ```
 
 ```javascript
 // case.forge.js — imports the handle as a positioned assembly
-const handle = importAssembly("./handle.forge.js");
+const handle = require("./handle.forge.js");
 
 // Convenience transforms: solve at defaults, return ShapeGroup
 const handleGroup = handle.rotate(0, 0, -90).translate(0, -20, 50);
@@ -347,12 +349,12 @@ That keeps mechanism setup in earlier cells and collision/sweep investigation in
 
 ## ImportedAssembly
 
-`importAssembly()` returns an `ImportedAssembly` with these capabilities:
+`require("./assembly.forge.js")` returns an `ImportedAssembly` when the file returns an `Assembly`. It has these capabilities:
 
 ### Kinematic access
 
 ```javascript
-const arm = importAssembly("arm.forge.js");
+const arm = require("./arm.forge.js");
 
 // Full kinematic access
 const solved = arm.solve({ shoulder: 45 });
@@ -379,7 +381,7 @@ const baseChild = g.child("Base");
 `ImportedAssembly` has `.rotate()`, `.translate()`, `.scale()`, `.mirror()`, `.color()`, and `.child()` that auto-solve at defaults and return a `ShapeGroup`:
 
 ```javascript
-const handle = importAssembly("./handle.forge.js");
+const handle = require("./handle.forge.js");
 const positioned = handle.rotate(0, 0, -90).translate(0, -20, 50);
 // positioned is a ShapeGroup — use directly in named arrays or group()
 ```
@@ -387,7 +389,7 @@ const positioned = handle.rotate(0, 0, -90).translate(0, -20, 50);
 ### Placement references
 
 ```javascript
-const arm = importAssembly("arm.forge.js");
+const arm = require("./arm.forge.js");
 const placed = arm.placeReference("mountHole", [100, 0, 50]);
 ```
 
@@ -403,7 +405,7 @@ const robot = assembly("Robot")
   .addPart("Chassis", chassis);
 
 // Merge left arm — all parts/joints prefixed "Left Arm."
-importAssembly("arm.forge.js")
+require("./arm.forge.js")
   .mergeInto(robot, {
     prefix: "Left Arm",
     mountParent: "Chassis",
@@ -412,7 +414,7 @@ importAssembly("arm.forge.js")
   });
 
 // Merge right arm — same source file, different prefix and position
-importAssembly("arm.forge.js")
+require("./arm.forge.js")
   .mergeInto(robot, {
     prefix: "Right Arm",
     mountParent: "Chassis",

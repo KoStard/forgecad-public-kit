@@ -644,7 +644,7 @@ export class Assembly {
   /**
    * Attach named placement reference points to this assembly.
    * These are surfaced automatically on the ImportedAssembly when this file is
-   * imported with importAssembly(), so consumers can use placeReference() without
+   * imported via require(), so consumers can use placeReference() without
    * re-declaring them.
    * Returns `this` for chaining.
    */
@@ -653,7 +653,7 @@ export class Assembly {
     return this;
   }
 
-  /** @internal — used by importAssembly() to seed ImportedAssembly refs. */
+  /** @internal — used by require() to seed ImportedAssembly refs. */
   getReferences(): PlacementReferences {
     return clonePlacementReferences(this._refs);
   }

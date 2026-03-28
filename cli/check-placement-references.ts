@@ -2,7 +2,7 @@
 /**
  * Placement reference invariants.
  *
- * Ensures named points/edges/surfaces/objects survive transforms and importPart().
+ * Ensures named points/edges/surfaces/objects survive transforms and require() imports.
  */
 import '../src/forge/holeCut';
 import { resolveShapeEdgeDescendant, resolveSupportedEdgeFeatureSelection } from '../src/forge/edge-features/edgeFeatureResolution';
@@ -108,7 +108,7 @@ function checkTransformAndPlacementHelpers(): void {
 function checkImportRuntimePropagation(): void {
   const files: Record<string, string> = {
     'main.forge.js': `
-const imported = importPart("child.forge.js").placeReference("socket", [20, 0, 0]);
+const imported = require("child.forge.js").placeReference("socket", [20, 0, 0]);
 return imported;
 `,
     'child.forge.js': `

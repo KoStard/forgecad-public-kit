@@ -19,7 +19,8 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ### Import and Composition
 
-- `importPart()` for parts, `importSketch()` for sketches/SVGs, with explicit `paramOverrides`.
+- `require("./file.forge.js", { Param: value })` for any model file, with optional param overrides.
+- `importSvgSketch()` for SVG files (file format loader, not a module import).
 - `.withReferences()` + `.placeReference()` for reusable placement.
 - Plain `.js` modules for shared helpers/constants (not model imports).
 
