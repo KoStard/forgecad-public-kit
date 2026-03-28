@@ -1,22 +1,26 @@
-// Phone Stand Assembly
+// Base: flat rectangular plate
+const base = box(100, 80, 10)
+  .translate(0, 0, 0)
+  .color("#666666");
 
-// Base: flat bottom piece, wider than tall (landscape), sits on table (Z_min ≈ 0)
-const base = box(120, 80, 12, false)
-  .translate(0, 0, 0);
+// Support: angled plate + top lip
+const plate = box(60, 5, 90)
+  .translate(0, 0, 10)
+  .rotate(65, 0, 0);
 
-// Support: angled piece that holds the phone
-// 100mm wide, 80mm long, 6mm thick
-// Center positioned above base, rotated 20° to lean backward
-const support = box(100, 80, 6, false)
-  .translate(0, 40, 50)
-  .rotate(0, 0, 20);
+const lip = box(60, 5, 10)
+  .translate(0, 0, 85);
 
-// Create assembly with base and support
-const phoneStand = assembly("PhoneStand")
+const support = union(plate, lip)
+  .color("#2196F3");
+
+// Assembly with fixed joint
+const a = assembly("PhoneStand")
   .addPart("Base", base)
   .addPart("Support", support)
   .addFixed("mount", "Base", "Support", {
-    frame: Transform.identity().translate(0, 40, 6)
+    axis: [1, 0, 0],
+    frame: Transform.identity().translate(0, -40, 10)
   });
 
-return phoneStand;
+return a.solve();

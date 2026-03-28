@@ -58,7 +58,7 @@ if (modelId && !apiKey) {
 // Discover tasks
 // ---------------------------------------------------------------------------
 
-const benchRoot = resolve("examples/bench");
+const benchRoot = resolve(getArg("bench-dir") || "examples/bench-v2");
 
 function discoverTasks() {
   const dirs = readdirSync(benchRoot, { withFileTypes: true })
