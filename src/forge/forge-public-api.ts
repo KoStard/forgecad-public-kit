@@ -133,6 +133,7 @@ export {
   spline3d,
   star,
   stroke,
+  surfacePatch,
   sweep,
   TrackedShape,
   variableSweep,

@@ -116,6 +116,7 @@ export type GeometrySource =
   | 'level-set'
   | 'loft'
   | 'sweep'
+  | 'surface-patch'
   | 'deform'
   | 'draft'
   | 'offset-solid'
