@@ -10,6 +10,9 @@
  */
 
 import type { SdfNode, Vec3 } from './sdfNode';
+import { simplex3, seededSimplex3 } from './noise';
+import { gyroid, schwarzP, diamond } from './tpms';
+import { worley3, seededWorley3 } from './voronoi';
 
 const { abs, cos, max, min, sin, sqrt, PI } = Math;
 const TAU = 2 * PI;
@@ -81,30 +84,6 @@ function smin(a: number, b: number, k: number): number {
 
 function smax(a: number, b: number, k: number): number {
   return -smin(-a, -b, k);
-}
-
-// ─── TPMS primitives ─────────────────────────────────────────────────────────
-
-function gyroid(x: number, y: number, z: number, cellSize: number, thickness: number): number {
-  const s = TAU / cellSize;
-  return abs(sin(x * s) * cos(y * s) + sin(y * s) * cos(z * s) + sin(z * s) * cos(x * s)) - thickness;
-}
-
-function schwarzP(x: number, y: number, z: number, cellSize: number, thickness: number): number {
-  const s = TAU / cellSize;
-  return abs(cos(x * s) + cos(y * s) + cos(z * s)) - thickness;
-}
-
-function diamond(x: number, y: number, z: number, cellSize: number, thickness: number): number {
-  const s = TAU / cellSize;
-  return (
-    abs(
-      sin(x * s) * sin(y * s) * sin(z * s) +
-        sin(x * s) * cos(y * s) * cos(z * s) +
-        cos(x * s) * sin(y * s) * cos(z * s) +
-        cos(x * s) * cos(y * s) * sin(z * s),
-    ) - thickness
-  );
 }
 
 // ─── Tree compiler ───────────────────────────────────────────────────────────
@@ -320,6 +299,39 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
       return (p) => diamond(p[0], p[1], p[2], cellSize, thickness);
     }
 
+    // ── Noise / patterns ──
+    case 'sdf:noise': {
+      const { scale: sc, amplitude: amp, octaves, seed } = node;
+      const noiseFn = seed !== 0 ? seededSimplex3(seed) : simplex3;
+      return (p) => {
+        let value = 0;
+        let freq = sc;
+        let a = amp;
+        for (let o = 0; o < octaves; o++) {
+          value += a * noiseFn(p[0] * freq, p[1] * freq, p[2] * freq);
+          freq *= 2;
+          a *= 0.5;
+        }
+        return value;
+      };
+    }
+    case 'sdf:voronoi': {
+      const { cellSize, wallThickness, seed } = node;
+      const invCell = 1 / cellSize;
+      const halfWall = wallThickness * 0.5;
+      const wFn = seed !== 0 ? seededWorley3(seed) : worley3;
+      // Voronoi as SDF: distance to nearest cell edge, thickened to wallThickness.
+      // worley3 returns distance to nearest feature point. The cell walls are at
+      // the Voronoi edges — midpoints between feature points. A good approximation:
+      // the distance to the nearest edge is roughly (d2 - d1)/2 where d1, d2 are
+      // the two closest distances. For simplicity we use |d1 - threshold| which
+      // gives a uniform-thickness shell around each cell.
+      return (p) => {
+        const d = wFn(p[0] * invCell, p[1] * invCell, p[2] * invCell) * cellSize;
+        return d - halfWall;
+      };
+    }
+
     // ── Custom ──
     case 'sdf:custom': {
       // eslint-disable-next-line no-new-func
@@ -447,6 +459,17 @@ export function estimateSdfBounds(node: SdfNode): SdfBounds {
     case 'sdf:schwarzP':
     case 'sdf:diamond': {
       const s = node.cellSize * 3; // 3 cells in each direction
+      return { min: [-s, -s, -s], max: [s, s, s] };
+    }
+
+    // Noise / patterns — infinite fields, use a sensible default
+    case 'sdf:noise': {
+      // Noise is an infinite field; default to ~6 wavelengths
+      const extent = 6 / node.scale;
+      return { min: [-extent, -extent, -extent], max: [extent, extent, extent] };
+    }
+    case 'sdf:voronoi': {
+      const s = node.cellSize * 5; // 5 cells in each direction
       return { min: [-s, -s, -s], max: [s, s, s] };
     }
 

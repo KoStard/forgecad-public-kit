@@ -173,6 +173,30 @@ export interface SdfDiamondNode {
   thickness: number;
 }
 
+// ─── Noise / pattern nodes ──────────────────────────────────────────────────
+
+export interface SdfNoiseNode {
+  kind: 'sdf:noise';
+  /** Spatial frequency — smaller = larger features. */
+  scale: number;
+  /** Peak displacement amplitude. */
+  amplitude: number;
+  /** Number of octaves for fractal Brownian motion (1 = plain simplex). */
+  octaves: number;
+  /** Seed for deterministic variation. 0 = default permutation. */
+  seed: number;
+}
+
+export interface SdfVoronoiNode {
+  kind: 'sdf:voronoi';
+  /** Size of each Voronoi cell in world units. */
+  cellSize: number;
+  /** Wall thickness between cells. */
+  wallThickness: number;
+  /** Seed for deterministic variation. */
+  seed: number;
+}
+
 // ─── Custom SDF function ─────────────────────────────────────────────────────
 
 export interface SdfCustomNode {
@@ -214,6 +238,9 @@ export type SdfNode =
   | SdfGyroidNode
   | SdfSchwarzPNode
   | SdfDiamondNode
+  // Noise / patterns
+  | SdfNoiseNode
+  | SdfVoronoiNode
   // Custom
   | SdfCustomNode;
 
@@ -277,6 +304,12 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
       return { kind: 'sdf:schwarzP', cellSize: node.cellSize, thickness: node.thickness };
     case 'sdf:diamond':
       return { kind: 'sdf:diamond', cellSize: node.cellSize, thickness: node.thickness };
+
+    // Noise / patterns
+    case 'sdf:noise':
+      return { kind: 'sdf:noise', scale: node.scale, amplitude: node.amplitude, octaves: node.octaves, seed: node.seed };
+    case 'sdf:voronoi':
+      return { kind: 'sdf:voronoi', cellSize: node.cellSize, wallThickness: node.wallThickness, seed: node.seed };
 
     // Custom
     case 'sdf:custom':

@@ -328,6 +328,42 @@ schwarzP(options: TpmsOptions): SdfShape
 diamond(options: TpmsOptions): SdfShape
 ```
 
+#### `noise()`
+
+```ts
+noise(options?: NoiseOptions): SdfShape
+```
+
+#### `voronoi()`
+
+```ts
+voronoi(options?: VoronoiOptions): SdfShape
+```
+
+#### `honeycomb()`
+
+```ts
+honeycomb(options?: HoneycombOptions): SdfShape
+```
+
+#### `waves()`
+
+```ts
+waves(options?: WavesOptions): SdfShape
+```
+
+#### `knurl()`
+
+```ts
+knurl(options?: KnurlOptions): SdfShape
+```
+
+#### `perforated()`
+
+```ts
+perforated(options?: PerforatedOptions): SdfShape
+```
+
 #### `fromFunction()`
 
 ```ts
@@ -384,6 +420,22 @@ offsetSolid(shape: ShapeArg$1, thickness: number): Shape
 
 Uniformly offset all surfaces of a solid inward or outward by a thickness value. Unlike shell(), which hollows a solid, offsetSolid() produces a new solid whose surfaces are all shifted by the given thickness. Positive = outward, negative = inward. Requires the OCCT backend. Throws on Manifold. // Grow a box outward by 1mm on all sides offsetSolid(myBox, 1) // Shrink a shape inward by 0.5mm offsetSolid(myShape, -0.5)
 
+#### `loftAlongSpine()`
+
+```ts
+loftAlongSpine(profiles: Sketch[], spine: Curve3D | Vec3$3[], tValues: number[], options?: LoftAlongSpineOptions): Shape
+```
+
+Loft between multiple profiles positioned along an arbitrary 3D spine curve. Unlike loft() which only supports Z heights, loftAlongSpine() places each profile at a position along a 3D spine, oriented perpendicular to the spine tangent. This enables lofting along curved paths — e.g., a wing root-to-tip transition that follows a swept-back leading edge. The tValues array specifies where each profile sits along the spine (0 = start, 1 = end). Must have the same length as profiles and be in [0, 1]. Internally uses variableSweep infrastructure with SDF interpolation. Performance note: uses level-set meshing, heavier than simple loft().
+
+#### `variableSweep()`
+
+```ts
+variableSweep(spine: Curve3D | Vec3$3[], sections: VariableSweepSection[], options?: VariableSweepOptions): Shape
+```
+
+Sweep a variable cross-section along a 3D spine curve. Unlike sweep(), which uses a single constant profile, variableSweep() interpolates between multiple profiles at different stations along the spine. This enables organic shapes like tapering tubes, bone-like structures, and sculptural forms. Each section specifies a t parameter (0 = start, 1 = end of spine) and a 2D profile sketch. The SDF-based level-set mesher smoothly blends between profiles at intermediate positions. Performance note: like sweep(), this uses level-set meshing internally.
+
 #### `loadFont()`
 
 ```ts
@@ -424,6 +476,14 @@ circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: num
 
 Repeat a sketch in a circular pattern around a center point
 
+#### `surfacePatch()`
+
+```ts
+surfacePatch(curves: { ... }, options?: SurfacePatchOptions): Shape
+```
+
+Create a smooth surface patch from 4 boundary curves (Coons patch). The four curves form the boundary of a quadrilateral patch: - bottom: u=0..1 at v=0 (from corner00 to corner10) - top: u=0..1 at v=1 (from corner01 to corner11) - left: v=0..1 at u=0 (from corner00 to corner01) - right: v=0..1 at u=1 (from corner10 to corner11) The interior is filled using bilinear Coons patch interpolation: P(u,v) = Lc(u,v) + Ld(u,v) - B(u,v) The result is a thin solid created by offsetting the surface mesh along its normals by the specified thickness. Note: curves should meet at corners. Small gaps are tolerated.
+
 #### `transitionCurve()`
 
 ```ts
@@ -443,7 +503,7 @@ Create a solid transition surface between two edges by sweeping a profile along 
 #### `transitionCurveFromPoints()`
 
 ```ts
-transitionCurveFromPoints(startPoint: Vec3$5, startTangent: Vec3$5, endPoint: Vec3$5, endTangent: Vec3$5, options?: TransitionCurveOptions): HermiteCurve3D
+transitionCurveFromPoints(startPoint: Vec3$6, startTangent: Vec3$6, endPoint: Vec3$6, endTangent: Vec3$6, options?: TransitionCurveOptions): HermiteCurve3D
 ```
 
 Convenience: create a transition curve from raw coordinate data. Useful when you have endpoints and directions as plain arrays without constructing TransitionEdge objects.

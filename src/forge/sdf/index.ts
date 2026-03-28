@@ -5,7 +5,16 @@
  * are imported directly by the backend lowering code.
  */
 
-export type { SdfToShapeOptions, TpmsOptions } from './sdf';
+export type {
+  HoneycombOptions,
+  KnurlOptions,
+  NoiseOptions,
+  PerforatedOptions,
+  SdfToShapeOptions,
+  TpmsOptions,
+  VoronoiOptions,
+  WavesOptions,
+} from './sdf';
 export {
   bend,
   box,
@@ -17,7 +26,13 @@ export {
   fromFunction,
   // TPMS
   gyroid,
+  // Patterns
+  honeycomb,
+  knurl,
   morph,
+  // Noise
+  noise,
+  perforated,
   repeat,
   // Builder class
   SdfShape,
@@ -31,4 +46,6 @@ export {
   torus,
   // Domain ops
   twist,
+  voronoi,
+  waves,
 } from './sdf';
