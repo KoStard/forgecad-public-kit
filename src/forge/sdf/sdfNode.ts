@@ -214,8 +214,6 @@ export interface SdfVoronoiNode {
   wallThickness: number;
   /** Seed for deterministic variation. */
   seed: number;
-  /** '2d' = vertical walls only (no horizontal membranes), '3d' = full 3D cells. Default: '2d'. */
-  mode: '2d' | '3d';
 }
 
 // ─── Custom SDF function ─────────────────────────────────────────────────────
@@ -347,7 +345,7 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
     case 'sdf:noise':
       return { kind: 'sdf:noise', scale: node.scale, amplitude: node.amplitude, octaves: node.octaves, seed: node.seed };
     case 'sdf:voronoi':
-      return { kind: 'sdf:voronoi', cellSize: node.cellSize, wallThickness: node.wallThickness, seed: node.seed, mode: node.mode };
+      return { kind: 'sdf:voronoi', cellSize: node.cellSize, wallThickness: node.wallThickness, seed: node.seed };
 
     // Custom
     case 'sdf:custom':

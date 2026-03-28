@@ -2425,8 +2425,6 @@ interface SdfVoronoiNode {
 	wallThickness: number;
 	/** Seed for deterministic variation. */
 	seed: number;
-	/** '2d' = vertical walls only (no horizontal membranes), '3d' = full 3D cells. Default: '2d'. */
-	mode: "2d" | "3d";
 }
 interface SdfCustomNode {
 	kind: "sdf:custom";
@@ -2645,13 +2643,6 @@ interface VoronoiOptions {
 	wallThickness?: number;
 	/** Seed for deterministic variation. Default: 0 */
 	seed?: number;
-	/**
-	 * '2d' (default): vertical walls only — no horizontal membranes.
-	 *   Ideal for shells, vases, lampshades, and surface patterns.
-	 * '3d': full 3D Voronoi — cells are closed polyhedra with walls in all directions.
-	 *   Use for volumetric infill or fully enclosed lattice structures.
-	 */
-	mode?: "2d" | "3d";
 }
 declare function voronoi(options?: VoronoiOptions): SdfShape;
 interface HoneycombOptions {

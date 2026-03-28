@@ -286,24 +286,14 @@ export interface VoronoiOptions {
   wallThickness?: number;
   /** Seed for deterministic variation. Default: 0 */
   seed?: number;
-  /**
-   * '2d' (default): vertical walls only — no horizontal membranes.
-   *   Ideal for shells, vases, lampshades, and surface patterns.
-   * '3d': full 3D Voronoi — cells are closed polyhedra with walls in all directions.
-   *   Use for volumetric infill or fully enclosed lattice structures.
-   */
-  mode?: '2d' | '3d';
 }
 
 /**
- * Voronoi pattern — organic cellular structures like bone, coral, or soap bubbles.
+ * 3D Voronoi pattern — organic cellular structures like bone, coral, or soap bubbles.
  * Returns an SDF where the walls between Voronoi cells are solid.
  *
- * By default uses 2D mode (vertical walls, no horizontal membranes) which is
- * ideal for surface patterns on shells. Use `mode: '3d'` for volumetric infill.
- *
  * ```js
- * // Voronoi vase — clean open cells
+ * // Voronoi vase
  * sdf.cylinder(80, 30).shell(2)
  *   .intersect(sdf.voronoi({ cellSize: 8, wallThickness: 1.5 }))
  *   .toShape()
@@ -315,7 +305,6 @@ export function voronoi(options?: VoronoiOptions): SdfShape {
     cellSize: options?.cellSize ?? 10,
     wallThickness: options?.wallThickness ?? 1,
     seed: options?.seed ?? 0,
-    mode: options?.mode ?? '2d',
   });
 }
 
