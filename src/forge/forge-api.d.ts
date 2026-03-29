@@ -2371,6 +2371,21 @@ interface SdfDisplaceNode {
 	/** Named constants injected as additional function parameters (avoids closure serialization issues). */
 	constants?: Record<string, number>;
 }
+interface SdfSurfaceDisplaceNode {
+	kind: "sdf:surfaceDisplace";
+	child: SdfNode;
+	/**
+	 * Function body string: receives (u, v) in surface millimeters and returns a height
+	 * displacement value. Negative = into surface, positive = outward.
+	 */
+	patternBody: string;
+	/** Named constants injected as additional function parameters. */
+	constants?: Record<string, number>;
+	/** Override auto-detected UV mode. Undefined or 'auto' = auto-detect from child tree. */
+	uvMode?: "auto" | "sphere" | "cylinder" | "torus" | "triplanar";
+	/** Triplanar blend sharpness (only used when UV mode is triplanar). Default: 4. */
+	triplanarSharpness?: number;
+}
 interface SdfOnionNode {
 	kind: "sdf:onion";
 	child: SdfNode;
@@ -2449,7 +2464,7 @@ interface SdfCustomNode {
 	/** Named constants injected as additional function parameters (avoids closure serialization issues). */
 	constants?: Record<string, number>;
 }
-type SdfNode = SdfSphereNode | SdfBoxNode | SdfCylinderNode | SdfTorusNode | SdfCapsuleNode | SdfConeNode | SdfUnionNode | SdfDifferenceNode | SdfIntersectionNode | SdfSmoothUnionNode | SdfSmoothDifferenceNode | SdfSmoothIntersectionNode | SdfMorphNode | SdfTranslateNode | SdfRotateNode | SdfScaleNode | SdfTwistNode | SdfBendNode | SdfRepeatNode | SdfShellNode | SdfDisplaceNode | SdfOnionNode | SdfGyroidNode | SdfSchwarzPNode | SdfDiamondNode | SdfLidinoidNode | SdfSpatialBlendNode | SdfNoiseNode | SdfVoronoiNode | SdfCustomNode;
+type SdfNode = SdfSphereNode | SdfBoxNode | SdfCylinderNode | SdfTorusNode | SdfCapsuleNode | SdfConeNode | SdfUnionNode | SdfDifferenceNode | SdfIntersectionNode | SdfSmoothUnionNode | SdfSmoothDifferenceNode | SdfSmoothIntersectionNode | SdfMorphNode | SdfTranslateNode | SdfRotateNode | SdfScaleNode | SdfTwistNode | SdfBendNode | SdfRepeatNode | SdfShellNode | SdfDisplaceNode | SdfSurfaceDisplaceNode | SdfOnionNode | SdfGyroidNode | SdfSchwarzPNode | SdfDiamondNode | SdfLidinoidNode | SdfSpatialBlendNode | SdfNoiseNode | SdfVoronoiNode | SdfCustomNode;
 declare const SHEET_METAL_EDGES: readonly [
 	"top",
 	"right",
@@ -2559,6 +2574,19 @@ interface PlacementReferenceInput {
 	objects?: Record<string, PlacementObjectInput>;
 }
 type PlacementAnchorLike = Anchor3D | string;
+declare class SurfacePattern {
+	/** Function body: receives (u, v) in surface mm, returns height displacement. */
+	readonly body: string;
+	/** Named constants injected into the function. */
+	readonly constants?: Record<string, number>;
+	constructor(body: string, constants?: Record<string, number>);
+}
+interface SurfaceDisplaceOptions {
+	/** Override auto-detected UV mode. Default: 'auto' (detects from SDF tree). */
+	uv?: "auto" | "sphere" | "cylinder" | "torus" | "triplanar";
+	/** Triplanar blend sharpness — higher = crisper transitions. Default: 4. Only used in triplanar mode. */
+	triplanarSharpness?: number;
+}
 interface SdfToShapeOptions {
 	/** Target mesh edge length. Smaller = finer mesh. Default: auto-computed from bounds. */
 	edgeLength?: number;
@@ -2595,7 +2623,7 @@ declare class SdfShape {
 	translate(x: number, y: number, z: number): SdfShape;
 	rotate(xDeg: number, yDeg: number, zDeg: number): SdfShape;
 	scale(factor: number): SdfShape;
-	/** Twist around the Y axis. */
+	/** Twist around the Z axis. */
 	twist(degreesPerUnit: number): SdfShape;
 	/** Bend around the Z axis with given radius. */
 	bend(radius: number): SdfShape;
@@ -2615,6 +2643,26 @@ declare class SdfShape {
 	 * ```
 	 */
 	displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape;
+	/**
+	 * Displace the surface using a 2D pattern in surface-local UV coordinates.
+	 *
+	 * Automatically detects the shape's UV parametrization (sphere, cylinder, torus)
+	 * from the SDF tree. Falls back to triplanar mapping for arbitrary shapes.
+	 *
+	 * UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3`
+	 * always produce 3mm spacing, regardless of shape size.
+	 *
+	 * ```js
+	 * // Surface-following basket weave — auto-detects sphere UV
+	 * sdf.sphere(27).shell(3)
+	 *   .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
+	 *   .toShape()
+	 *
+	 * // Custom 2D pattern via function
+	 * shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3)
+	 * ```
+	 */
+	surfaceDisplace(pattern: SurfacePattern | ((u: number, v: number) => number), options?: SurfaceDisplaceOptions): SdfShape;
 	/** Create concentric onion layers. */
 	onion(layers: number, thickness: number): SdfShape;
 }
@@ -2733,16 +2781,14 @@ interface WeaveOptions {
 }
 declare function weave(options?: WeaveOptions): SdfShape;
 interface BasketWeaveOptions {
-	/** Number of vertical stakes (threads around circumference). Default: 16 */
-	threads?: number;
-	/** Spacing between horizontal weavers in mm. Default: 3 */
+	/** Spacing between threads in mm (both directions). Default: 3 */
 	spacing?: number;
 	/** Thread width in mm. Default: 1.5 */
 	threadWidth?: number;
 	/** Thread protrusion depth in mm. Default: 0.8 */
 	depth?: number;
 }
-declare function basketWeave(options?: BasketWeaveOptions): SdfShape;
+declare function basketWeave(options?: BasketWeaveOptions): SurfacePattern;
 declare function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: {
 	min: Vec3$1;
 	max: Vec3$1;
@@ -6474,7 +6520,7 @@ declare function highlight(face: FaceRef, opts?: HighlightOptions): void;
 declare function highlight(edge: EdgeRef, opts?: HighlightOptions): void;
 
 declare namespace sdf {
-	export { BasketWeaveOptions, BlendOptions, BrickOptions, HoneycombOptions, KnurlOptions, NoiseOptions, PerforatedOptions, ScalesOptions, SdfShape, SdfToShapeOptions, TpmsOptions, VoronoiOptions, WavesOptions, WeaveOptions, basketWeave, bend, blend, box, brick, capsule, cone, cylinder, diamond, fromFunction, gyroid, honeycomb, knurl, lidinoid, morph, noise, perforated, repeat, scales, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist, voronoi, waves, weave };
+	export { BasketWeaveOptions, BlendOptions, BrickOptions, HoneycombOptions, KnurlOptions, NoiseOptions, PerforatedOptions, ScalesOptions, SdfShape, SdfToShapeOptions, SurfaceDisplaceOptions, SurfacePattern, TpmsOptions, VoronoiOptions, WavesOptions, WeaveOptions, basketWeave, bend, blend, box, brick, capsule, cone, cylinder, diamond, fromFunction, gyroid, honeycomb, knurl, lidinoid, morph, noise, perforated, repeat, scales, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist, voronoi, waves, weave };
 }
 /** All library parts. Access via `lib.xxx()` in scripts. */
 declare const lib: typeof partLibrary;

@@ -25,7 +25,7 @@ export function computeGradient(
   const gz = evalFn([p[0], p[1], p[2] + eps]) - evalFn([p[0], p[1], p[2] - eps]);
   const glen = sqrt(gx * gx + gy * gy + gz * gz);
   if (glen < 1e-10) {
-    return { nx: 0, ny: 1, nz: 0, length: 0 };
+    return { nx: 0, ny: 0, nz: 1, length: 0 };
   }
   const inv = 1 / glen;
   return { nx: gx * inv, ny: gy * inv, nz: gz * inv, length: glen };
