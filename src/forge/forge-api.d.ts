@@ -2593,7 +2593,7 @@ type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
 type GeometryFidelity = "kernel-native" | "exact" | "sampled" | "deformed" | "mixed" | "unknown";
 type GeometryTopology = "none" | "synthetic" | "kernel";
-type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "level-set" | "loft" | "sweep" | "deform" | "draft" | "offset-solid" | "imported" | "sdf" | "unknown";
+type GeometrySource = "primitive" | "extrude" | "revolve" | "boolean" | "sheet-metal" | "shell" | "fillet" | "chamfer" | "level-set" | "loft" | "sweep" | "surface-patch" | "deform" | "draft" | "offset-solid" | "imported" | "sdf" | "unknown";
 interface GeometryInfo {
 	backend: GeometryBackend;
 	representation: GeometryRepresentation;
@@ -3338,6 +3338,24 @@ interface ToJointsViewOptions {
 	defaultAnimation?: string;
 	enabled?: boolean;
 }
+interface ToDisassemblyViewOptions {
+	/** Angle (degrees) revolute joints swing open during disassembly. Default: 90 */
+	swingAngle?: number;
+	/** Angle (degrees) fastener-named parts rotate (unscrewing). Default: 720 */
+	unscrewAngle?: number;
+	/** Distance (mm) prismatic joints extend during disassembly. Default: 60 */
+	separationDistance?: number;
+	/** Total animation duration in seconds. Default: max(3, numSteps * 1.0) */
+	duration?: number;
+	/** Additional animation clips to include alongside "Disassemble". */
+	animations?: JointViewAnimationInput[];
+	/** Joint couplings override. */
+	couplings?: JointViewCouplingInput[];
+	/** Which animation to play by default. Default: "Disassemble" */
+	defaultAnimation?: string;
+	/** Enable/disable jointsView. Default: true */
+	enabled?: boolean;
+}
 declare class Assembly {
 	readonly name: string;
 	private readonly parts;
@@ -3418,6 +3436,20 @@ declare class Assembly {
 	 * have to manually restate joint kinematics for the viewport runtime.
 	 */
 	toJointsView(options?: ToJointsViewOptions): void;
+	/**
+	 * Generate a cinematic disassembly animation from the assembly's joint graph.
+	 *
+	 * Creates a `jointsView()` configuration with a "Disassemble" animation that
+	 * sequences joint motions in reverse topological order (leaves first):
+	 * - Revolute joints swing open to their max angle
+	 * - Prismatic joints extend to their max distance
+	 * - Fastener-named parts get extra rotation (unscrewing effect)
+	 *
+	 * Translation/separation is handled by the explode system (auto-configured
+	 * by `solve()` with joint-derived directions). Use the explode slider in
+	 * combination with this animation for the full disassembly effect.
+	 */
+	toDisassemblyView(options?: ToDisassemblyViewOptions): void;
 	describe(): AssemblyDefinition;
 }
 /**
@@ -5106,6 +5138,25 @@ interface SweepOptions {
 	 */
 	up?: Vec3$3;
 }
+interface VariableSweepSection {
+	/** Parameter along the spine (0 = start, 1 = end). */
+	t: number;
+	/** Cross-section profile at this station. */
+	profile: Sketch;
+}
+interface VariableSweepOptions {
+	/** Number of samples when spine is a Curve3D. Default 48. */
+	samples?: number;
+	/** Marching-grid edge length for level-set meshing. Smaller = finer. */
+	edgeLength?: number;
+	/** Optional extra bounds padding. */
+	boundsPadding?: number;
+	/**
+	 * Preferred "up" vector for local profile frame.
+	 * Auto fallback is used near parallel segments.
+	 */
+	up?: Vec3$3;
+}
 declare class Curve3D {
 	readonly points: Vec3$3[];
 	readonly closed: boolean;
@@ -5143,6 +5194,35 @@ declare function spline3d(points: Vec3$3[], options?: Spline3DOptions): Curve3D;
  * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
  */
 declare function loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape;
+interface LoftAlongSpineOptions {
+	/** Number of samples when spine is a Curve3D. Default 48. */
+	samples?: number;
+	/** Marching-grid edge length for level-set meshing. Smaller = finer. */
+	edgeLength?: number;
+	/** Optional extra bounds padding. */
+	boundsPadding?: number;
+	/**
+	 * Preferred "up" vector for local profile frame.
+	 * Auto fallback is used near parallel segments.
+	 */
+	up?: Vec3$3;
+}
+/**
+ * Loft between multiple profiles positioned along an arbitrary 3D spine curve.
+ *
+ * Unlike loft() which only supports Z heights, loftAlongSpine() places each
+ * profile at a position along a 3D spine, oriented perpendicular to the spine
+ * tangent. This enables lofting along curved paths — e.g., a wing root-to-tip
+ * transition that follows a swept-back leading edge.
+ *
+ * The tValues array specifies where each profile sits along the spine (0 = start,
+ * 1 = end). Must have the same length as profiles and be in [0, 1].
+ *
+ * Internally uses variableSweep infrastructure with SDF interpolation.
+ *
+ * Performance note: uses level-set meshing, heavier than simple loft().
+ */
+declare function loftAlongSpine(profiles: Sketch[], spine: Curve3D | Vec3$3[], tValues: number[], options?: LoftAlongSpineOptions): Shape;
 /**
  * Sweep a 2D profile along a 3D path to create a solid.
  *
@@ -5154,6 +5234,21 @@ declare function loft(profiles: Sketch[], heights: number[], options?: LoftOptio
  * primitives/extrude/revolve when they can express the same shape.
  */
 declare function sweep(profile: Sketch, path: Curve3D | Vec3$3[], options?: SweepOptions): Shape;
+/**
+ * Sweep a variable cross-section along a 3D spine curve.
+ *
+ * Unlike sweep(), which uses a single constant profile, variableSweep()
+ * interpolates between multiple profiles at different stations along the spine.
+ * This enables organic shapes like tapering tubes, bone-like structures, and
+ * sculptural forms.
+ *
+ * Each section specifies a t parameter (0 = start, 1 = end of spine) and a
+ * 2D profile sketch. The SDF-based level-set mesher smoothly blends between
+ * profiles at intermediate positions.
+ *
+ * Performance note: like sweep(), this uses level-set meshing internally.
+ */
+declare function variableSweep(spine: Curve3D | Vec3$3[], sections: VariableSweepSection[], options?: VariableSweepOptions): Shape;
 type PointArg$1 = [
 	number,
 	number
@@ -5549,6 +5644,40 @@ declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
 declare function slot(length: number, width: number): Sketch;
 /** Create a star shape with alternating outer and inner radii. */
 declare function star(points: number, outerR: number, innerR: number): Sketch;
+type Vec3$5 = [
+	number,
+	number,
+	number
+];
+interface SurfacePatchOptions {
+	/** Number of samples along each direction. Default 24. */
+	resolution?: number;
+	/** Thickness of the generated solid. Default 0.5. */
+	thickness?: number;
+}
+/**
+ * Create a smooth surface patch from 4 boundary curves (Coons patch).
+ *
+ * The four curves form the boundary of a quadrilateral patch:
+ * - bottom: u=0..1 at v=0 (from corner00 to corner10)
+ * - top: u=0..1 at v=1 (from corner01 to corner11)
+ * - left: v=0..1 at u=0 (from corner00 to corner01)
+ * - right: v=0..1 at u=1 (from corner10 to corner11)
+ *
+ * The interior is filled using bilinear Coons patch interpolation:
+ * P(u,v) = Lc(u,v) + Ld(u,v) - B(u,v)
+ *
+ * The result is a thin solid created by offsetting the surface mesh
+ * along its normals by the specified thickness.
+ *
+ * Note: curves should meet at corners. Small gaps are tolerated.
+ */
+declare function surfacePatch(curves: {
+	bottom: Curve3D | Vec3$5[];
+	top: Curve3D | Vec3$5[];
+	left: Curve3D | Vec3$5[];
+	right: Curve3D | Vec3$5[];
+}, options?: SurfacePatchOptions): Shape;
 interface SvgImportOptions {
 	/**
 	 * Which geometry channels to include:
@@ -5664,7 +5793,7 @@ interface TextOptions {
 declare function text2d(content: string, options?: TextOptions): Sketch;
 /** Returns the rendered width of a string in model units (same options as text2d). */
 declare function textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number;
-type Vec3$5 = [
+type Vec3$6 = [
 	number,
 	number,
 	number
@@ -5712,7 +5841,7 @@ interface TransitionSurfaceOptions extends TransitionCurveOptions {
 	/**
 	 * Preferred up vector for the sweep frame. Default: auto-detected.
 	 */
-	up?: Vec3$5;
+	up?: Vec3$6;
 	/** Edge length for level-set meshing. Smaller = finer. */
 	edgeLength?: number;
 	/** Extra bounds padding for level-set meshing. */
@@ -5723,19 +5852,19 @@ interface TransitionEdge {
 	 * Connection point on the edge.
 	 * Can be any point along the edge where the transition should connect.
 	 */
-	point: Vec3$5;
+	point: Vec3$6;
 	/**
 	 * Tangent direction at the connection point.
 	 * This is the direction the curve should initially follow when leaving this edge.
 	 * For a straight edge, this is typically the edge direction pointing "outward"
 	 * (away from the body of the edge, toward the other edge).
 	 */
-	tangent: Vec3$5;
+	tangent: Vec3$6;
 	/**
 	 * Surface normal at the connection point (optional).
 	 * Used as a hint for the sweep frame's up vector.
 	 */
-	normal?: Vec3$5;
+	normal?: Vec3$6;
 }
 /**
  * Create a smooth transition curve between two edges.
@@ -5794,7 +5923,7 @@ declare function transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge,
  * Useful when you have endpoints and directions as plain arrays
  * without constructing TransitionEdge objects.
  */
-declare function transitionCurveFromPoints(startPoint: Vec3$5, startTangent: Vec3$5, endPoint: Vec3$5, endTangent: Vec3$5, options?: TransitionCurveOptions): HermiteCurve3D;
+declare function transitionCurveFromPoints(startPoint: Vec3$6, startTangent: Vec3$6, endPoint: Vec3$6, endTangent: Vec3$6, options?: TransitionCurveOptions): HermiteCurve3D;
 type EdgeEnd = "start" | "end" | "mid";
 type TangentMode = "along" | "outward" | "auto";
 interface EdgePickOptions {
@@ -5808,7 +5937,7 @@ interface EdgePickOptions {
 	 */
 	tangentMode?: TangentMode;
 	/** Explicit tangent override (ignores tangentMode). */
-	tangent?: Vec3$5;
+	tangent?: Vec3$6;
 	/** Flip the computed tangent direction (useful for 'along' mode). */
 	flip?: boolean;
 }
@@ -5860,9 +5989,9 @@ interface ConnectEdgesOptions extends TransitionSurfaceOptions {
 	/** Tangent mode for edge B. Default: 'along'. */
 	tangentModeB?: TangentMode;
 	/** Explicit tangent for edge A. */
-	tangentA?: Vec3$5;
+	tangentA?: Vec3$6;
 	/** Explicit tangent for edge B. */
-	tangentB?: Vec3$5;
+	tangentB?: Vec3$6;
 	/** Flip tangent A. */
 	flipA?: boolean;
 	/** Flip tangent B. */
