@@ -28,6 +28,7 @@ import { HoveredJointOverlay } from './viewport/HoveredJointOverlay';
 import { LabeledAxes } from './viewport/LabeledAxes';
 import { MeasureInfoPanel, MeasureTool } from './viewport/MeasureTool';
 import { PerformanceInfoPanel, PerformanceInfoSampler } from './viewport/PerformanceInfo';
+import { SectionExplorerGizmo } from './viewport/SectionExplorerGizmo';
 import { SectionPlaneGuides } from './viewport/SectionPlane';
 import { SketchObject } from './viewport/SketchObject';
 import { ToolpathObject } from './viewport/ToolpathObject';
@@ -78,10 +79,12 @@ export function Viewport() {
     sectionPlaneFillOpacity,
     sectionPlaneBorderEnabled,
     sectionPlaneAxisEnabled,
+    sectionExplorerEnabled,
     drawFlagEnabled,
     drawModeActive,
     shapeHighlightByIndex,
     activeCutPlaneDefs,
+    scriptCutPlaneDefs,
     objectCutPlanesById,
     objectClippingPlanesById,
     hasAnyObjectCutPlanes,
@@ -226,9 +229,10 @@ export function Viewport() {
         )}
 
         <ClippingManager active={hasAnyObjectCutPlanes} />
+        {sectionExplorerEnabled && <SectionExplorerGizmo size={sectionGuideSize} />}
         {sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 && (
           <SectionPlaneGuides
-            cutPlanes={activeCutPlaneDefs}
+            cutPlanes={scriptCutPlaneDefs}
             sectionSize={sectionGuideSize}
             style={{
               showFill: sectionPlaneFillEnabled,

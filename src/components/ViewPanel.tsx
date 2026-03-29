@@ -8,6 +8,12 @@ import { useViewPanelState } from './viewport/useViewPanelState';
 
 const btn = (active = false) => `fc-btn${active ? ' active' : ''}`;
 
+const AXIS_PRESETS: { label: string; normal: [number, number, number] }[] = [
+  { label: 'X', normal: [1, 0, 0] },
+  { label: 'Y', normal: [0, 1, 0] },
+  { label: 'Z', normal: [0, 0, 1] },
+];
+
 const sectionStyle: CSSProperties = {
   borderTop: '1px solid var(--fc-borderLight)',
   padding: '10px 12px',
@@ -110,6 +116,12 @@ export function ViewPanel() {
     setSectionPlaneBorderEnabled,
     sectionPlaneAxisEnabled,
     setSectionPlaneAxisEnabled,
+    sectionExplorerEnabled,
+    setSectionExplorerEnabled,
+    sectionExplorerNormal,
+    resetSectionExplorerPlane,
+    sectionExplorerFlip,
+    setSectionExplorerFlip,
     cutPlanes,
     joints,
     animationClips,
@@ -414,6 +426,52 @@ export function ViewPanel() {
             style={inputStyle}
           />
         </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={labelStyle}>Section Explorer</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+            <input
+              type="checkbox"
+              checked={sectionExplorerEnabled}
+              onChange={(e) => setSectionExplorerEnabled(e.target.checked)}
+            />
+            Enable clipping plane
+          </label>
+        </div>
+        {sectionExplorerEnabled && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--fc-textDim)', minWidth: 36 }}>Axis</span>
+              {AXIS_PRESETS.map(({ label, normal }) => {
+                const isActive = sectionExplorerNormal[0] === normal[0]
+                  && sectionExplorerNormal[1] === normal[1]
+                  && sectionExplorerNormal[2] === normal[2];
+                return (
+                  <button
+                    key={label}
+                    className={btn(isActive)}
+                    style={{ padding: '2px 8px', fontSize: 11, minWidth: 28 }}
+                    onClick={() => resetSectionExplorerPlane(normal)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
+                <input
+                  type="checkbox"
+                  checked={sectionExplorerFlip}
+                  onChange={(e) => setSectionExplorerFlip(e.target.checked)}
+                />
+                Flip direction
+              </label>
+            </div>
+          </>
+        )}
       </div>
 
       {cutPlanes.length > 0 && (

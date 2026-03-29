@@ -12,6 +12,9 @@ import {
   SECTION_SURFACE_LIFT_SCALE,
 } from './types';
 
+/** Sentinel name for the interactive section-explorer plane (not script-defined). */
+export const SECTION_EXPLORER_PLANE_NAME = '__section_explorer__';
+
 // ---------------------------------------------------------------------------
 // Section plane utility functions
 // ---------------------------------------------------------------------------
