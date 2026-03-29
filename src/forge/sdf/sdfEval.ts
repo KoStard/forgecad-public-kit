@@ -46,33 +46,33 @@ function sdBox(px: number, py: number, pz: number, hx: number, hy: number, hz: n
 }
 
 function sdCylinder(px: number, py: number, pz: number, h: number, r: number): number {
-  // Cylinder centered at origin, axis along Y, height h
-  const dx = length2(px, pz) - r;
-  const dy = abs(py) - h * 0.5;
-  return length2(max(dx, 0), max(dy, 0)) + min(max(dx, dy), 0);
+  // Cylinder centered at origin, axis along Z, height h
+  const dx = length2(px, py) - r;
+  const dz = abs(pz) - h * 0.5;
+  return length2(max(dx, 0), max(dz, 0)) + min(max(dx, dz), 0);
 }
 
 function sdTorus(px: number, py: number, pz: number, R: number, r: number): number {
-  // Torus centered at origin, lying in XZ plane
-  const qx = length2(px, pz) - R;
-  return length2(qx, py) - r;
+  // Torus centered at origin, lying in XY plane
+  const qx = length2(px, py) - R;
+  return length2(qx, pz) - r;
 }
 
 function sdCapsule(px: number, py: number, pz: number, h: number, r: number): number {
-  // Capsule along Y axis, total height h (between sphere centers)
+  // Capsule along Z axis, total height h (between sphere centers)
   const halfH = h * 0.5;
-  const cy = clamp(py, -halfH, halfH);
-  return length3(px, py - cy, pz) - r;
+  const cz = clamp(pz, -halfH, halfH);
+  return length3(px, py, pz - cz) - r;
 }
 
 function sdCone(px: number, py: number, pz: number, h: number, r: number): number {
-  // Cone with tip at top (y = h), base at y = 0, base radius r
-  const q = length2(px, pz);
+  // Cone with tip at top (z = h), base at z = 0, base radius r
+  const q = length2(px, py);
   // Normalize cone surface direction
   const cLen = length2(h, r);
   const nx = h / cLen;
-  const ny = -r / cLen;
-  const d = max(nx * q + ny * (py - h), -py, py - h);
+  const nz = -r / cLen;
+  const d = max(nx * q + nz * (pz - h), -pz, pz - h);
   return d;
 }
 
@@ -224,10 +224,10 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
       const fn = compileSdfNode(node.child);
       const k = node.degreesPerUnit * DEG;
       return (p) => {
-        const angle = k * p[1]; // twist around Y axis
+        const angle = k * p[2]; // twist around Z axis
         const c = cos(angle),
           s = sin(angle);
-        return fn([c * p[0] - s * p[2], p[1], s * p[0] + c * p[2]]);
+        return fn([c * p[0] - s * p[1], s * p[0] + c * p[1], p[2]]);
       };
     }
     case 'sdf:bend': {
@@ -464,21 +464,21 @@ export function estimateSdfBounds(node: SdfNode): SdfBounds {
     case 'sdf:cylinder': {
       const { height: h, radius: r } = node;
       const hh = h * 0.5;
-      return { min: [-r, -hh, -r], max: [r, hh, r] };
+      return { min: [-r, -r, -hh], max: [r, r, hh] };
     }
     case 'sdf:torus': {
       const R = node.majorRadius + node.minorRadius;
       const r = node.minorRadius;
-      return { min: [-R, -r, -R], max: [R, r, R] };
+      return { min: [-R, -R, -r], max: [R, R, r] };
     }
     case 'sdf:capsule': {
       const { height: h, radius: r } = node;
       const hh = h * 0.5 + r;
-      return { min: [-r, -hh, -r], max: [r, hh, r] };
+      return { min: [-r, -r, -hh], max: [r, r, hh] };
     }
     case 'sdf:cone': {
       const { height: h, radius: r } = node;
-      return { min: [-r, 0, -r], max: [r, h, r] };
+      return { min: [-r, -r, 0], max: [r, r, h] };
     }
 
     // Combinators — union of child bounds

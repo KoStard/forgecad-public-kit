@@ -144,7 +144,7 @@ function clampUnit(v: number): number {
  *
  * UV coordinates are in surface millimeters:
  * - Sphere: u = θ·R (circumference), v = φ·R (latitude arc)
- * - Cylinder: u = θ·r (circumference), v = y (height)
+ * - Cylinder: u = θ·r (circumference), v = z (height)
  * - Torus: u = θ·R (around ring), v = φ·r (around tube)
  */
 export function compileUVFunction(analysis: UVAnalysis): UVFn | null {
@@ -157,9 +157,9 @@ export function compileUVFunction(analysis: UVAnalysis): UVFn | null {
       const R = analysis.radius!;
       return (p) => {
         const lp = toLocal(p);
-        const u = atan2(lp[2], lp[0]) * R;
+        const u = atan2(lp[1], lp[0]) * R;
         const len = sqrt(lp[0] * lp[0] + lp[1] * lp[1] + lp[2] * lp[2]);
-        const v = acos(clampUnit(lp[1] / (len || 1))) * R;
+        const v = acos(clampUnit(lp[2] / (len || 1))) * R;
         return [u, v];
       };
     }
@@ -168,8 +168,8 @@ export function compileUVFunction(analysis: UVAnalysis): UVFn | null {
       const r = analysis.radius!;
       return (p) => {
         const lp = toLocal(p);
-        const u = atan2(lp[2], lp[0]) * r;
-        const v = lp[1];
+        const u = atan2(lp[1], lp[0]) * r;
+        const v = lp[2];
         return [u, v];
       };
     }
@@ -179,9 +179,9 @@ export function compileUVFunction(analysis: UVAnalysis): UVFn | null {
       const r = analysis.radius!;
       return (p) => {
         const lp = toLocal(p);
-        const u = atan2(lp[2], lp[0]) * R;
-        const xzDist = sqrt(lp[0] * lp[0] + lp[2] * lp[2]) - R;
-        const v = atan2(lp[1], xzDist) * r;
+        const u = atan2(lp[1], lp[0]) * R;
+        const xyDist = sqrt(lp[0] * lp[0] + lp[1] * lp[1]) - R;
+        const v = atan2(lp[2], xyDist) * r;
         return [u, v];
       };
     }

@@ -138,7 +138,7 @@ export class SdfShape {
 
   // ── Domain operations ──
 
-  /** Twist around the Y axis. */
+  /** Twist around the Z axis. */
   twist(degreesPerUnit: number): SdfShape {
     return new SdfShape({ kind: 'sdf:twist', child: this._node, degreesPerUnit });
   }
@@ -241,22 +241,22 @@ export function box(x: number, y: number, z: number): SdfShape {
   return new SdfShape({ kind: 'sdf:box', halfExtents: [x / 2, y / 2, z / 2] });
 }
 
-/** Create an SDF cylinder centered at the origin, axis along Y. */
+/** Create an SDF cylinder centered at the origin, axis along Z. */
 export function cylinder(height: number, radius: number): SdfShape {
   return new SdfShape({ kind: 'sdf:cylinder', height, radius });
 }
 
-/** Create an SDF torus centered at the origin, lying in the XZ plane. */
+/** Create an SDF torus centered at the origin, lying in the XY plane. */
 export function torus(majorRadius: number, minorRadius: number): SdfShape {
   return new SdfShape({ kind: 'sdf:torus', majorRadius, minorRadius });
 }
 
-/** Create an SDF capsule centered at the origin, axis along Y. */
+/** Create an SDF capsule centered at the origin, axis along Z. */
 export function capsule(height: number, radius: number): SdfShape {
   return new SdfShape({ kind: 'sdf:capsule', height, radius });
 }
 
-/** Create an SDF cone with base at y=0 and tip at y=height. */
+/** Create an SDF cone with base at z=0 and tip at z=height. */
 export function cone(height: number, radius: number): SdfShape {
   return new SdfShape({ kind: 'sdf:cone', height, radius });
 }
@@ -300,7 +300,7 @@ export interface BlendOptions {
  * sdf.blend(
  *   sdf.schwarzP({ cellSize: 6, thickness: 1 }),
  *   sdf.gyroid({ cellSize: 8, thickness: 1 }),
- *   (x, y, z) => Math.max(0, Math.min(1, y / 30))
+ *   (x, y, z) => Math.max(0, Math.min(1, z / 30))
  * ).intersect(sdf.sphere(20)).toShape()
  * ```
  */
@@ -445,14 +445,14 @@ export function honeycomb(options?: HoneycombOptions): SdfShape {
     var hw = ${halfWall};
     var k = ${Math.PI / 3};
     var c = Math.cos(k), si = Math.sin(k);
-    // Hex distance in XZ plane
-    var px = Math.abs(x), pz = Math.abs(z);
+    // Hex distance in XY plane
+    var px = Math.abs(x), py = Math.abs(y);
     // Rotate to align hex grid
-    var qx = px * c - pz * si;
-    var qz = px * si + pz * c;
-    qx = ((qx % s) + s) % s; qz = ((qz % s) + s) % s;
-    qx = qx - s * 0.5; qz = qz - s * 0.5;
-    var d = Math.max(Math.abs(qx), Math.abs(qz) * 0.866 + Math.abs(qx) * 0.5) - s * 0.5 + hw;
+    var qx = px * c - py * si;
+    var qy = px * si + py * c;
+    qx = ((qx % s) + s) % s; qy = ((qy % s) + s) % s;
+    qx = qx - s * 0.5; qy = qy - s * 0.5;
+    var d = Math.max(Math.abs(qx), Math.abs(qy) * 0.866 + Math.abs(qx) * 0.5) - s * 0.5 + hw;
     return d;
   })()`;
   return new SdfShape({
@@ -521,10 +521,10 @@ export function knurl(options?: KnurlOptions): SdfShape {
   return new SdfShape({
     kind: 'sdf:custom',
     functionBody: `(function() {
-      var r = Math.sqrt(x * x + z * z);
-      var theta = Math.atan2(z, x);
-      var u1 = r * theta * ${cosA} + y * ${sinA};
-      var u2 = r * theta * ${cosA} - y * ${sinA};
+      var r = Math.sqrt(x * x + y * y);
+      var theta = Math.atan2(y, x);
+      var u1 = r * theta * ${cosA} + z * ${sinA};
+      var u2 = r * theta * ${cosA} - z * ${sinA};
       return Math.min(Math.sin(u1 * ${freq}), Math.sin(u2 * ${freq})) * ${depth};
     })()`,
     bounds: { min: [-50, -50, -50], max: [50, 50, 50] },
@@ -551,8 +551,8 @@ export interface PerforatedOptions {
 export function perforated(options?: PerforatedOptions): SdfShape {
   const r = options?.radius ?? 3;
   const sp = options?.spacing ?? 8;
-  // A cylinder repeated in XZ
-  return cylinder(1000, r).repeat([sp, 0, sp], [0, 0, 0]);
+  // A cylinder repeated in XY
+  return cylinder(1000, r).repeat([sp, sp, 0], [0, 0, 0]);
 }
 
 // ─── Surface pattern presets ────────────────────────────────────────────────
@@ -580,18 +580,18 @@ export function scales(options?: ScalesOptions): SdfShape {
   const functionBody = `(function() {
   var s = ${size};
   var rh = ${rowHeight};
-  var row = Math.floor(z / rh);
+  var row = Math.floor(y / rh);
   var offset = (row & 1) * s * 0.5;
   var col = Math.round((x - offset) / s);
   var cx = col * s + offset;
-  var cz = row * rh;
-  var dx = x - cx, dz = z - cz;
-  var dist = Math.sqrt(dx * dx + dz * dz);
+  var cy = row * rh;
+  var dx = x - cx, dy = y - cy;
+  var dist = Math.sqrt(dx * dx + dy * dy);
   var profile = Math.max(0, 1 - dist / ${halfSize});
-  var overlap = (z - cz) / ${halfRowHeight} * ${halfDepth};
+  var overlap = (y - cy) / ${halfRowHeight} * ${halfDepth};
   return -(profile * profile * ${depth} + overlap);
 })()`;
-  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -depth * 2, -ext], max: [ext, depth * 2, ext] } });
+  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -ext, -depth * 2], max: [ext, ext, depth * 2] } });
 }
 
 export interface BrickOptions {
@@ -607,7 +607,7 @@ export interface BrickOptions {
 
 /**
  * Brick/stone wall pattern — running bond with mortar grooves.
- * Oriented in XY plane. Intersect with a bounding shape.
+ * Oriented in XZ plane (X = columns, Z = rows). Intersect with a bounding shape.
  */
 export function brick(options?: BrickOptions): SdfShape {
   const width = options?.width ?? 10;
@@ -618,16 +618,16 @@ export function brick(options?: BrickOptions): SdfShape {
   const ext = Math.max(width, height) * 8;
   const functionBody = `(function() {
   var w = ${width}, h = ${height}, m = ${halfMortar};
-  var row = Math.floor(y / h);
+  var row = Math.floor(z / h);
   var offset = (row & 1) * w * 0.5;
   var bx = ((x - offset) % w + w) % w;
-  var by = (y % h + h) % h;
+  var bz = (z % h + h) % h;
   var dx = Math.min(bx, w - bx);
-  var dy = Math.min(by, h - by);
-  var d = Math.min(dx, dy);
+  var dz = Math.min(bz, h - bz);
+  var d = Math.min(dx, dz);
   return d < m ? ${depth} : -${depth};
 })()`;
-  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -ext, -depth * 2], max: [ext, ext, depth * 2] } });
+  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -depth * 2, -ext], max: [ext, depth * 2, ext] } });
 }
 
 export interface WeaveOptions {
@@ -655,7 +655,7 @@ export function weave(options?: WeaveOptions): SdfShape {
   const k = r * 0.5;
   const functionBody = `(function() {
   var sp = ${sp}, r = ${r}, k = ${k};
-  var dA = Math.abs(z - Math.round(z / sp) * sp) - r;
+  var dA = Math.abs(y - Math.round(y / sp) * sp) - r;
   var dB = Math.abs(x - Math.round(x / sp) * sp) - r;
   var h = Math.max(k - Math.abs(dA - dB), 0) / k;
   return Math.min(dA, dB) - h * h * k * 0.25;
@@ -728,7 +728,7 @@ export function fromFunction(fn: (x: number, y: number, z: number) => number, bo
 
 // ─── Domain operation factories ──────────────────────────────────────────────
 
-/** Twist an SDF shape around the Y axis. */
+/** Twist an SDF shape around the Z axis. */
 export function twist(shape: SdfShape, degreesPerUnit: number): SdfShape {
   return shape.twist(degreesPerUnit);
 }

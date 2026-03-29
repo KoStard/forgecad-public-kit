@@ -397,7 +397,7 @@ weave(options?: WeaveOptions): SdfShape
 #### `basketWeave()`
 
 ```ts
-basketWeave(options?: BasketWeaveOptions): SdfShape
+basketWeave(options?: BasketWeaveOptions): SurfacePattern
 ```
 
 #### `fromFunction()`
@@ -821,6 +821,15 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `referencePoint()` — Resolve a named placement reference or built-in Anchor3D to a 3D point. Named refs take priority over built-in anchors.
 - `placeReference()` — Translate the group so the given reference lands on the target coordinate. ```javascript const placed = require('./bracket-assembly.forge.js').group .placeReference('mountCenter', [0, 0, 50]); ```
 
+### `SurfacePattern`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `body` | `string` | Function body: receives (u, v) in surface mm, returns height displacement. |
+| `constants` | `Record<string, number>` | Named constants injected into the function. |
+
 ### `SdfShape`
 
 **Methods:**
@@ -836,11 +845,12 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `translate()` — translate(x: number, y: number, z: number): SdfShape
 - `rotate()` — rotate(xDeg: number, yDeg: number, zDeg: number): SdfShape
 - `scale()` — scale(factor: number): SdfShape
-- `twist()` — Twist around the Y axis.
+- `twist()` — Twist around the Z axis.
 - `bend()` — Bend around the Z axis with given radius.
 - `repeat()` — Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite.
 - `shell()` — Hollow out, keeping only a shell of given thickness.
 - `displace()` — Displace the surface by a function of position, or by a pattern SdfShape. ```js // Function displacement shape.displace((x, y, z) => Math.sin(x) * 0.5) // Pattern displacement (e.g. basketWeave) shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 })) ```
+- `surfaceDisplace()` — Displace the surface using a 2D pattern in surface-local UV coordinates. Automatically detects the shape's UV parametrization (sphere, cylinder, torus) from the SDF tree. Falls back to triplanar mapping for arbitrary shapes. UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3` always produce 3mm spacing, regardless of shape size. ```js // Surface-following basket weave — auto-detects sphere UV sdf.sphere(27).shell(3) .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 })) .toShape() // Custom 2D pattern via function shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3) ```
 - `onion()` — Create concentric onion layers.
 
 ---
