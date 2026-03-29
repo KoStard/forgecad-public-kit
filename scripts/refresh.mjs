@@ -10,8 +10,9 @@
  * Independent branches run in parallel. Exits non-zero if any step fails.
  *
  * Usage:
- *   node scripts/refresh.mjs            # full refresh
- *   node scripts/refresh.mjs --no-cli   # skip CLI rebuild
+ *   node scripts/refresh.mjs              # full refresh + type-check
+ *   node scripts/refresh.mjs --no-cli     # skip CLI rebuild
+ *   node scripts/refresh.mjs --no-check   # skip tsc type-check
  *   npm run refresh
  */
 
@@ -69,7 +70,13 @@ async function main() {
   );
 
   const results = await Promise.all(parallel);
-  const allOk = results.every((r) => r !== false);
+  let allOk = results.every((r) => r !== false);
+
+  // Type-check after all artifacts are rebuilt — catches the same errors CI would
+  if (allOk && !process.argv.includes('--no-check')) {
+    console.log('');
+    if (!run('tsc --noEmit', 'npx tsc --noEmit')) allOk = false;
+  }
 
   const totalMs = Math.round(performance.now() - t0);
   console.log(`\n${allOk ? 'Done' : 'Completed with errors'} (${totalMs}ms)`);
