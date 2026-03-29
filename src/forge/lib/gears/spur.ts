@@ -13,6 +13,7 @@ import {
   EPSILON,
   GearMeta,
   addArcPoints,
+  addRootFilletPoints,
   attachGearMeta,
   flankAngleAtRadius,
   isFinitePositive,
@@ -141,6 +142,11 @@ export function createSpurToothSketch(meta: GearMeta, segmentsPerTooth: number):
   const flankSteps = Math.max(4, segmentsPerTooth);
   const arcSteps = Math.max(3, Math.ceil(segmentsPerTooth * 0.6));
 
+  // Root fillet per ISO 53: 0.38 × module, capped to available radial gap
+  const radialGap = flankStartRadius - meta.rootRadius;
+  const filletRadius = Math.min(0.38 * meta.module, radialGap * 0.9);
+  const hasFillets = filletRadius > EPSILON;
+
   const leftFlank: [number, number][] = [];
   const rightFlank: [number, number][] = [];
 
@@ -161,7 +167,19 @@ export function createSpurToothSketch(meta: GearMeta, segmentsPerTooth: number):
   for (let i = rightFlank.length - 1; i >= 0; i--) {
     pts.push(rightFlank[i]);
   }
-  addArcPoints(pts, meta.rootRadius, -thetaStart, thetaStart, arcSteps);
+
+  if (hasFillets) {
+    // Right fillet: flank base → root circle (center offset to negative angles)
+    const rightRootAngle = addRootFilletPoints(
+      pts, meta.rootRadius, filletRadius, -thetaStart, -1, true, 2);
+    // Root arc between fillet tangent points
+    const leftRootAngle = thetaStart + Math.asin(filletRadius / (meta.rootRadius + filletRadius));
+    addArcPoints(pts, meta.rootRadius, rightRootAngle, leftRootAngle, arcSteps);
+    // Left fillet: root circle → flank base (center offset to positive angles)
+    addRootFilletPoints(pts, meta.rootRadius, filletRadius, thetaStart, 1, false, 2);
+  } else {
+    addArcPoints(pts, meta.rootRadius, -thetaStart, thetaStart, arcSteps);
+  }
 
   return polygon(pts);
 }
