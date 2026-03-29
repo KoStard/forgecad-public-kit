@@ -16,7 +16,6 @@ import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
 import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import { compileSdfNode } from '../../sdf/sdfEval';
-import { smoothSdfMesh } from '../../sdf/sdfSmooth';
 import { isMeshoptimizerReady, simplifyMesh } from './meshSimplify';
 import { surfaceNets } from './sdfSurfaceNets';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput, buildVariableSweepLevelSetInput } from '../../sketch/loftSweepLowering';
@@ -455,13 +454,11 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
 }
 
 /**
- * SDF → Manifold pipeline: Surface Nets + meshoptimizer simplification.
+ * SDF → Manifold pipeline: Surface Nets + SDF projection + meshoptimizer.
  *
  * Surface Nets produces well-shaped triangles with uniform edge lengths (avg aspect
  * ratio ~1.6 vs ~3.0 for Marching Tetrahedra). meshoptimizer then reduces triangle
- * count by up to 75% using quadric error decimation while preserving surface accuracy.
- *
- * Falls back to Manifold.levelSet() if Surface Nets produces a degenerate mesh.
+ * count by ~50% using quadric error decimation while preserving surface accuracy.
  */
 function lowerSdfToManifold(
   evalFn: (p: Vec3) => number,
@@ -470,15 +467,6 @@ function lowerSdfToManifold(
   wasm: ManifoldToplevel,
 ): Manifold {
   const snMesh = surfaceNets(evalFn, bounds, edgeLength);
-
-  if (snMesh.numTris === 0) {
-    // Surface Nets found no isosurface — fall back to Manifold.levelSet()
-    // which is more tolerant of edge cases (very thin features, etc.)
-    const negated = (p: Vec3) => -evalFn(p);
-    const raw = wasm.Manifold.levelSet(negated as any, bounds, edgeLength, 0);
-    return smoothSdfMesh(raw, evalFn, wasm);
-  }
-
   const { vertProperties } = snMesh;
   let { triVerts } = snMesh;
 
@@ -499,15 +487,7 @@ function lowerSdfToManifold(
     triVerts,
   });
 
-  try {
-    return new wasm.Manifold(wasmMesh);
-  } catch {
-    // Surface Nets can produce non-manifold vertices (two cones sharing a tip).
-    // Fall back to Manifold.levelSet() which guarantees manifold output.
-    const negated = (p: Vec3) => -evalFn(p);
-    const raw = wasm.Manifold.levelSet(negated as any, bounds, edgeLength, 0);
-    return smoothSdfMesh(raw, evalFn, wasm);
-  }
+  return new wasm.Manifold(wasmMesh);
 }
 
 /**
