@@ -83,6 +83,24 @@ Rules:
 3. **When a downstream transform crashes because a plan is missing, trace back to where the plan was lost and fix the construction** — don't add null-checks or fallbacks in the transform methods.
 4. **If an operation produces a `CrossSection` without a plan** (e.g. section cuts, backend-level simplify), snapshot the result via `profilePlanFromCrossSection(cross)` which captures the polygon loops as a real plan.
 
+## No Silent Fallbacks
+
+**Never add fallback code paths that silently switch algorithms when the primary one fails.** If an algorithm produces bad output, that's a bug — surface it as an error so it gets fixed, don't mask it by falling back to a different implementation.
+
+```ts
+// BAD — hides bugs, makes debugging impossible
+try {
+  return newAlgorithm(input);
+} catch {
+  return oldAlgorithm(input); // silently masks the real problem
+}
+
+// GOOD — let errors surface
+return newAlgorithm(input);
+```
+
+This applies everywhere, not just meshing. Fallbacks create two code paths that both need maintenance, make failures invisible, and prevent root-cause analysis. If something can fail, validate inputs upstream or fix the algorithm.
+
 ## Approach
 If you hit a moment you don't know how to proceed, take the scientist hat of experiments, only reality can give us the data, so we should run experiments, analyse, capture, iterate. If unsure about the science, take the first principles book approach.
 
