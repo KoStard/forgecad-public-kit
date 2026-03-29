@@ -16,6 +16,35 @@ import { estimateSdfBounds } from './sdfEval';
 import type { SdfNode, SdfVoronoiNode, Vec3 } from './sdfNode';
 import { cloneSdfNode } from './sdfNode';
 
+// ─── SurfacePattern: a 2D heightmap for surface displacement ────────────────
+
+/**
+ * A 2D surface pattern — a heightmap function `(u, v) → height` where u and v
+ * are in surface millimeters. Used with `.surfaceDisplace()` to create patterns
+ * that follow the shape's surface.
+ *
+ * Unlike 3D SDF patterns (which exist in world space), surface patterns are
+ * inherently 2D — they describe relief on a surface, like texture on fabric.
+ */
+export class SurfacePattern {
+  /** Function body: receives (u, v) in surface mm, returns height displacement. */
+  readonly body: string;
+  /** Named constants injected into the function. */
+  readonly constants?: Record<string, number>;
+
+  constructor(body: string, constants?: Record<string, number>) {
+    this.body = body;
+    this.constants = constants;
+  }
+}
+
+export interface SurfaceDisplaceOptions {
+  /** Override auto-detected UV mode. Default: 'auto' (detects from SDF tree). */
+  uv?: 'auto' | 'sphere' | 'cylinder' | 'torus' | 'triplanar';
+  /** Triplanar blend sharpness — higher = crisper transitions. Default: 4. Only used in triplanar mode. */
+  triplanarSharpness?: number;
+}
+
 // ─── SdfShape: the builder ───────────────────────────────────────────────────
 
 export interface SdfToShapeOptions {
@@ -141,6 +170,9 @@ export class SdfShape {
    * ```
    */
   displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape {
+    if (fn instanceof SurfacePattern) {
+      throw new Error('displace() does not accept SurfacePattern — use .surfaceDisplace() instead');
+    }
     if (fn instanceof SdfShape) {
       if (fn._node.kind !== 'sdf:custom') {
         throw new Error('displace(SdfShape) only supports pattern presets (sdf:custom nodes)');
@@ -148,6 +180,47 @@ export class SdfShape {
       return new SdfShape({ kind: 'sdf:displace', child: this._node, functionBody: fn._node.functionBody, constants: fn._node.constants });
     }
     return new SdfShape({ kind: 'sdf:displace', child: this._node, functionBody: extractFunctionBody(fn), constants });
+  }
+
+  /**
+   * Displace the surface using a 2D pattern in surface-local UV coordinates.
+   *
+   * Automatically detects the shape's UV parametrization (sphere, cylinder, torus)
+   * from the SDF tree. Falls back to triplanar mapping for arbitrary shapes.
+   *
+   * UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3`
+   * always produce 3mm spacing, regardless of shape size.
+   *
+   * ```js
+   * // Surface-following basket weave — auto-detects sphere UV
+   * sdf.sphere(27).shell(3)
+   *   .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
+   *   .toShape()
+   *
+   * // Custom 2D pattern via function
+   * shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3)
+   * ```
+   */
+  surfaceDisplace(
+    pattern: SurfacePattern | ((u: number, v: number) => number),
+    options?: SurfaceDisplaceOptions,
+  ): SdfShape {
+    let body: string;
+    let constants: Record<string, number> | undefined;
+    if (pattern instanceof SurfacePattern) {
+      body = pattern.body;
+      constants = pattern.constants;
+    } else {
+      body = extractFunctionBody(pattern as Function);
+    }
+    return new SdfShape({
+      kind: 'sdf:surfaceDisplace',
+      child: this._node,
+      patternBody: body,
+      constants,
+      ...(options?.uv ? { uvMode: options.uv } : {}),
+      ...(options?.triplanarSharpness !== undefined ? { triplanarSharpness: options.triplanarSharpness } : {}),
+    });
   }
 
   /** Create concentric onion layers. */
@@ -595,9 +668,7 @@ export function weave(options?: WeaveOptions): SdfShape {
 }
 
 export interface BasketWeaveOptions {
-  /** Number of vertical stakes (threads around circumference). Default: 16 */
-  threads?: number;
-  /** Spacing between horizontal weavers in mm. Default: 3 */
+  /** Spacing between threads in mm (both directions). Default: 3 */
   spacing?: number;
   /** Thread width in mm. Default: 1.5 */
   threadWidth?: number;
@@ -606,43 +677,40 @@ export interface BasketWeaveOptions {
 }
 
 /**
- * Basket weave displacement pattern — surface-following threads with over-under
- * crossings. Works in cylindrical coordinates, ideal for bowls, vases, and
- * other surfaces of revolution. Use with `.displace()`.
+ * Basket weave surface pattern — threads with over-under crossings in UV space.
+ * Returns a `SurfacePattern` for use with `.surfaceDisplace()`.
  *
- * Vertical stakes maintain constant width; horizontal weavers maintain constant
- * spacing. Stakes naturally converge toward the axis (like real basket weaving).
+ * The pattern is defined in surface millimeters — `spacing: 3` means 3mm between
+ * threads regardless of shape size. The UV parametrization (sphere, cylinder, etc.)
+ * is handled automatically by `.surfaceDisplace()`.
  *
  * ```js
- * // Woven bowl
+ * // Woven bowl — auto-detects sphere UV
  * sdf.sphere(27).shell(3)
- *   .displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+ *   .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
  *   .toShape()
  * ```
  */
-export function basketWeave(options?: BasketWeaveOptions): SdfShape {
-  const N = options?.threads ?? 16;
+export function basketWeave(options?: BasketWeaveOptions): SurfacePattern {
   const SP = options?.spacing ?? 3;
   const TW = options?.threadWidth ?? 1.5;
   const D = options?.depth ?? 0.8;
   const hw = TW * 0.5;
-  const functionBody = `(function() {
-  var theta = Math.atan2(z, x);
-  var r = Math.sqrt(x * x + z * z);
-  var u = theta * ${N / (2 * Math.PI)};
-  var v = y / ${SP};
-  var du = Math.abs(u - Math.round(u)) * (${2 * Math.PI} * r / ${N});
-  var dv = Math.abs(v - Math.round(v)) * ${SP};
+  // Pure 2D pattern: (u, v) in surface mm → height
+  const body = `(function() {
+  var su = u / ${SP};
+  var sv = v / ${SP};
+  var du = Math.abs(su - Math.round(su)) * ${SP};
+  var dv = Math.abs(sv - Math.round(sv)) * ${SP};
   var hw = ${hw};
   var pU = Math.max(0, 1 - du / hw); pU *= pU;
   var pV = Math.max(0, 1 - dv / hw); pV *= pV;
-  var checker = ((Math.round(u) & 65535) + (Math.round(v) & 65535)) & 1;
+  var checker = ((Math.round(su) & 65535) + (Math.round(sv) & 65535)) & 1;
   var top = checker ? pV : pU;
   var bot = checker ? pU : pV;
   return -(top > bot * 0.15 ? top : bot * 0.15) * ${D};
 })()`;
-  // Bounds are irrelevant — this is meant for displacement, not standalone
-  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-200, -200, -200], max: [200, 200, 200] } });
+  return new SurfacePattern(body);
 }
 
 // ─── Custom SDF ──────────────────────────────────────────────────────────────

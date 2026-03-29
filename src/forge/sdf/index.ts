@@ -6,6 +6,7 @@
  */
 
 export type {
+  BasketWeaveOptions,
   BlendOptions,
   BrickOptions,
   HoneycombOptions,
@@ -14,8 +15,8 @@ export type {
   PerforatedOptions,
   ScalesOptions,
   SdfToShapeOptions,
+  SurfaceDisplaceOptions,
   TpmsOptions,
-  BasketWeaveOptions,
   VoronoiOptions,
   WavesOptions,
   WeaveOptions,
@@ -55,6 +56,8 @@ export {
   smoothUnion,
   // Primitives
   sphere,
+  // Surface pattern type
+  SurfacePattern,
   torus,
   // Domain ops
   twist,

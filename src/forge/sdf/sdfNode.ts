@@ -147,6 +147,22 @@ export interface SdfDisplaceNode {
   constants?: Record<string, number>;
 }
 
+export interface SdfSurfaceDisplaceNode {
+  kind: 'sdf:surfaceDisplace';
+  child: SdfNode;
+  /**
+   * Function body string: receives (u, v) in surface millimeters and returns a height
+   * displacement value. Negative = into surface, positive = outward.
+   */
+  patternBody: string;
+  /** Named constants injected as additional function parameters. */
+  constants?: Record<string, number>;
+  /** Override auto-detected UV mode. Undefined or 'auto' = auto-detect from child tree. */
+  uvMode?: 'auto' | 'sphere' | 'cylinder' | 'torus' | 'triplanar';
+  /** Triplanar blend sharpness (only used when UV mode is triplanar). Default: 4. */
+  triplanarSharpness?: number;
+}
+
 export interface SdfOnionNode {
   kind: 'sdf:onion';
   child: SdfNode;
@@ -266,6 +282,7 @@ export type SdfNode =
   | SdfRepeatNode
   | SdfShellNode
   | SdfDisplaceNode
+  | SdfSurfaceDisplaceNode
   | SdfOnionNode
   // TPMS
   | SdfGyroidNode
@@ -330,6 +347,15 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
       return { kind: 'sdf:shell', child: cloneSdfNode(node.child), thickness: node.thickness };
     case 'sdf:displace':
       return { kind: 'sdf:displace', child: cloneSdfNode(node.child), functionBody: node.functionBody, ...(node.constants ? { constants: { ...node.constants } } : {}) };
+    case 'sdf:surfaceDisplace':
+      return {
+        kind: 'sdf:surfaceDisplace',
+        child: cloneSdfNode(node.child),
+        patternBody: node.patternBody,
+        ...(node.constants ? { constants: { ...node.constants } } : {}),
+        ...(node.uvMode ? { uvMode: node.uvMode } : {}),
+        ...(node.triplanarSharpness !== undefined ? { triplanarSharpness: node.triplanarSharpness } : {}),
+      };
     case 'sdf:onion':
       return { kind: 'sdf:onion', child: cloneSdfNode(node.child), layers: node.layers, thickness: node.thickness };
 
