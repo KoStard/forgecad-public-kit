@@ -92,21 +92,21 @@ if (libBlockMatch) {
   const libMembers = new Set(
     [...libBlockMatch[1].matchAll(/^\s{1,4}(\w+):/gm)].map(m => m[1])
   );
-  // Collect signatures before removing — handles optional generics <T extends ...>
+  // Collect signatures before removing — uses findTopLevelDecl to handle
+  // multi-line declarations (e.g. inline object-type parameters spanning lines)
   const signatures = new Map();
   for (const name of libMembers) {
-    const fnMatch = content.match(
-      new RegExp(`^declare function (${name})(<[^>]*>)?(\\([^)]*(?:\\([^)]*\\)[^)]*)*\\)[^;\\n]*);`, 'm')
-    );
-    if (fnMatch) {
-      const generics = fnMatch[2] ?? '';
-      signatures.set(name, `${name}${generics}${fnMatch[3]}`);
+    const fnDecls = findTopLevelDecl(content, 'declare function', name);
+    if (fnDecls.length > 0) {
+      // Extract the signature (everything after 'declare function ')
+      const decl = fnDecls[0];
+      const sig = decl.replace(/^declare function /, '').replace(/;$/, '');
+      signatures.set(name, sig);
     }
-    // Always remove the standalone top-level declaration
-    content = content.replace(
-      new RegExp(`^declare function ${name}\\b[^\\n]*\\n`, 'gm'),
-      '',
-    );
+    // Remove all standalone top-level declarations (may be multi-line)
+    for (const decl of findTopLevelDecl(content, 'declare function', name)) {
+      content = content.replace(decl + '\n', '');
+    }
   }
   // Replace `name: typeof name` with the inlined method signature
   for (const [name, sig] of signatures) {

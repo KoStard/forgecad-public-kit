@@ -4122,40 +4122,6 @@ interface ExplodeNamedItem {
 type ExplodeItem = Shape | Sketch | TrackedShape | ShapeGroup | ExplodeNamedItem;
 interface ExplodeOptions extends ExplodeConfigOptions {
 }
-	number,
-	number,
-	number
-][], radius: number, options?: {
-	bendRadius?: number;
-	wall?: number;
-	segments?: number;
-}): Shape;
-	from?: [
-		number,
-		number,
-		number
-	];
-	to?: [
-		number,
-		number,
-		number
-	];
-	wall?: number;
-	segments?: number;
-}, options?: {
-	wall?: number;
-	segments?: number;
-	from?: [
-		number,
-		number,
-		number
-	];
-	to?: [
-		number,
-		number,
-		number
-	];
-}): Shape;
 interface SpurGearOptions {
 	module: number;
 	teeth: number;
@@ -4363,24 +4329,7 @@ interface FaceGearPairResult {
 	diagnostics: GearPairDiagnostic[];
 	status: "ok" | "warn" | "error";
 }
-	depth?: number;
-	segments?: number;
-}): Shape;
-	pitch?: number;
-	headHeight?: number;
-	headAcrossFlats?: number;
-	threadLength?: number;
-	segments?: number;
-}): Shape;
-	pitch?: number;
-	height?: number;
-	acrossFlats?: number;
-	segments?: number;
-}): Shape;
 type WasherStandard = "din-125-a";
-	standard?: WasherStandard;
-	segments?: number;
-}): Shape;
 interface FastenerSetDimensions {
 	size: MetricSize;
 	nominalDiameter: number;

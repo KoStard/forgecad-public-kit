@@ -73,7 +73,7 @@ function SectionGizmoInner({ size, initialNormal, initialOffset }: {
 
       <lineLoop renderOrder={20}>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" array={borderPositions} count={4} itemSize={3} />
+          <bufferAttribute attach="attributes-position" args={[borderPositions, 3]} />
         </bufferGeometry>
         <lineBasicMaterial color={PLANE_COLOR} transparent opacity={0.5} depthTest={false} />
       </lineLoop>
