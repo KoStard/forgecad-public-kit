@@ -44,6 +44,11 @@ export interface ViewPreferencesState {
   disableRunCache: boolean;
   /** Active geometry backend for evaluation. */
   activeBackend: 'occt' | 'manifold';
+  /** Interactive section explorer state. */
+  sectionExplorerEnabled: boolean;
+  sectionExplorerNormal: [number, number, number];
+  sectionExplorerOffset: number;
+  sectionExplorerFlip: boolean;
 }
 
 export const clampJointValue = (value: number, min?: number, max?: number): number => {

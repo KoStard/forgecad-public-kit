@@ -283,6 +283,21 @@ interface ForgeStore {
   setSectionPlaneBorderEnabled: (enabled: boolean) => void;
   setSectionPlaneAxisEnabled: (enabled: boolean) => void;
 
+  sectionExplorerEnabled: boolean;
+  sectionExplorerNormal: [number, number, number];
+  sectionExplorerOffset: number;
+  sectionExplorerFlip: boolean;
+  sectionExplorerResetKey: number;
+  setSectionExplorerEnabled: (enabled: boolean) => void;
+  /** Update normal without persisting (called on every drag frame). */
+  setSectionExplorerNormal: (normal: [number, number, number]) => void;
+  /** Update offset without persisting (called on every drag frame). */
+  setSectionExplorerOffset: (offset: number) => void;
+  setSectionExplorerFlip: (flip: boolean) => void;
+  resetSectionExplorerPlane: (normal: [number, number, number]) => void;
+  /** Persist current section explorer state to localStorage (call on drag end). */
+  persistSectionExplorer: () => void;
+
   newProject: () => void;
   saveFile: () => Promise<void>;
   saveFileAs: () => Promise<void>;
@@ -1098,6 +1113,30 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
   setSectionPlaneAxisEnabled: (enabled) => {
     writeViewPreferences({ sectionPlaneAxisEnabled: enabled });
     set({ sectionPlaneAxisEnabled: enabled });
+  },
+
+  sectionExplorerEnabled: initialViewPreferences.sectionExplorerEnabled ?? false,
+  sectionExplorerNormal: initialViewPreferences.sectionExplorerNormal ?? [0, 1, 0],
+  sectionExplorerOffset: initialViewPreferences.sectionExplorerOffset ?? 0,
+  sectionExplorerFlip: initialViewPreferences.sectionExplorerFlip ?? false,
+  sectionExplorerResetKey: 0,
+  setSectionExplorerEnabled: (enabled) => {
+    writeViewPreferences({ sectionExplorerEnabled: enabled });
+    set({ sectionExplorerEnabled: enabled });
+  },
+  setSectionExplorerNormal: (normal) => set({ sectionExplorerNormal: normal }),
+  setSectionExplorerOffset: (offset) => set({ sectionExplorerOffset: offset }),
+  setSectionExplorerFlip: (flip) => {
+    writeViewPreferences({ sectionExplorerFlip: flip });
+    set({ sectionExplorerFlip: flip });
+  },
+  resetSectionExplorerPlane: (normal) => {
+    writeViewPreferences({ sectionExplorerNormal: normal, sectionExplorerOffset: 0 });
+    set((s) => ({ sectionExplorerNormal: normal, sectionExplorerOffset: 0, sectionExplorerResetKey: s.sectionExplorerResetKey + 1 }));
+  },
+  persistSectionExplorer: () => {
+    const { sectionExplorerNormal, sectionExplorerOffset } = get();
+    writeViewPreferences({ sectionExplorerNormal, sectionExplorerOffset });
   },
 
   newProject: () => {

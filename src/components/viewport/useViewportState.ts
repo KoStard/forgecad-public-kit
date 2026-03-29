@@ -13,7 +13,7 @@ import { useForgeStore } from '../../store/forgeStore';
 import { buildExplodeTree, computeExplodeTreeOffsets } from './explodeTree';
 import { expandBoundsByTransformedAabb } from './geometryUtils';
 import { computeJointNodeMatrices } from './jointUtils';
-import { isObjectExcludedFromCutPlane, toClippingPlane } from './sectionUtils';
+import { isObjectExcludedFromCutPlane, SECTION_EXPLORER_PLANE_NAME, toClippingPlane } from './sectionUtils';
 import {
   type HoveredJointOverlayState,
   IDENTITY_MATRIX,
@@ -59,6 +59,10 @@ export function useViewportState() {
   const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
   const _surfacesVisible = useForgeStore((s) => s.surfacesVisible);
   const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
+  const sectionExplorerEnabled = useForgeStore((s) => s.sectionExplorerEnabled);
+  const sectionExplorerNormal = useForgeStore((s) => s.sectionExplorerNormal);
+  const sectionExplorerOffset = useForgeStore((s) => s.sectionExplorerOffset);
+  const sectionExplorerFlip = useForgeStore((s) => s.sectionExplorerFlip);
   const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
   const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);
   const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
@@ -114,10 +118,30 @@ export function useViewportState() {
   }, [debugHighlights3D]);
 
   const activeCutPlaneDefs = useMemo(() => {
-    return cutPlaneDefs
+    const scriptPlanes = cutPlaneDefs
       .filter((cp) => cutPlaneEnabled[cp.name])
       .filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
-  }, [cutPlaneDefs, cutPlaneEnabled]);
+
+    if (!sectionExplorerEnabled) return scriptPlanes;
+
+    // Merge the interactive section explorer plane into active cut planes.
+    // The flip flag reverses which side gets clipped.
+    const n = sectionExplorerFlip
+      ? ([-sectionExplorerNormal[0], -sectionExplorerNormal[1], -sectionExplorerNormal[2]] as [number, number, number])
+      : sectionExplorerNormal;
+    const explorerPlane: CutPlaneDef = {
+      name: SECTION_EXPLORER_PLANE_NAME,
+      normal: n,
+      offset: sectionExplorerFlip ? -sectionExplorerOffset : sectionExplorerOffset,
+    };
+    return [...scriptPlanes, explorerPlane];
+  }, [cutPlaneDefs, cutPlaneEnabled, sectionExplorerEnabled, sectionExplorerNormal, sectionExplorerOffset, sectionExplorerFlip]);
+
+  // Script-defined planes only (excluding interactive explorer) — used for guide visuals.
+  const scriptCutPlaneDefs = useMemo(
+    () => activeCutPlaneDefs.filter((cp) => cp.name !== SECTION_EXPLORER_PLANE_NAME),
+    [activeCutPlaneDefs],
+  );
 
   const { objectCutPlanesById, objectClippingPlanesById, hasAnyObjectCutPlanes } = useMemo(() => {
     const cutPlanesById: Record<string, CutPlaneDef[]> = {};
@@ -126,7 +150,10 @@ export function useViewportState() {
 
     objects.forEach((obj) => {
       const applicable = activeCutPlaneDefs.filter((cp) => !isObjectExcludedFromCutPlane(obj, cp));
-      cutPlanesById[obj.id] = applicable;
+      // CPU boolean trimming only for script-defined planes (skip interactive explorer
+      // to keep drag smooth — it uses GPU-only clipping).
+      cutPlanesById[obj.id] = applicable.filter((cp) => cp.name !== SECTION_EXPLORER_PLANE_NAME);
+      // GPU clipping includes ALL planes (script + explorer).
       clippingPlanesById[obj.id] = applicable.map(toClippingPlane);
       if (applicable.length > 0) hasAnyCutPlanes = true;
     });
@@ -228,10 +255,11 @@ export function useViewportState() {
     };
   }, [activeJointAnimation, jointAnimationPlaying, jointAnimationSpeed, setJointAnimationPlaying, setJointAnimationProgress]);
 
-  const sectionGuideBoundsKey = sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 ? objectMatrices : null;
+  const anySectionActive = activeCutPlaneDefs.length > 0;
+  const sectionGuideBoundsKey = (sectionPlaneGuidesEnabled || sectionExplorerEnabled) && anySectionActive ? objectMatrices : null;
 
   const sectionGuideSize = useMemo(() => {
-    if (!sectionPlaneGuidesEnabled || activeCutPlaneDefs.length === 0) {
+    if (!anySectionActive) {
       return Math.max(60, gridSize * 8);
     }
 
@@ -273,7 +301,7 @@ export function useViewportState() {
     bounds.getSize(size);
     const diagonal = Math.max(1, size.length());
     return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [activeCutPlaneDefs.length, gridSize, objects, sectionGuideBoundsKey, sectionPlaneGuidesEnabled]);
+  }, [anySectionActive, gridSize, objects, sectionGuideBoundsKey]);
 
   const jointOverlayBaseSize = useMemo(() => {
     const bounds = new THREE.Box3();
@@ -443,10 +471,12 @@ export function useViewportState() {
     sectionPlaneFillOpacity,
     sectionPlaneBorderEnabled,
     sectionPlaneAxisEnabled,
+    sectionExplorerEnabled,
     drawFlagEnabled,
     drawModeActive,
     shapeHighlightByIndex,
     activeCutPlaneDefs,
+    scriptCutPlaneDefs,
     objectCutPlanesById,
     objectClippingPlanesById,
     hasAnyObjectCutPlanes,

@@ -111,6 +111,12 @@ export function useViewPanelState() {
   const setSectionPlaneBorderEnabled = useForgeStore((s) => s.setSectionPlaneBorderEnabled);
   const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
   const setSectionPlaneAxisEnabled = useForgeStore((s) => s.setSectionPlaneAxisEnabled);
+  const sectionExplorerEnabled = useForgeStore((s) => s.sectionExplorerEnabled);
+  const setSectionExplorerEnabled = useForgeStore((s) => s.setSectionExplorerEnabled);
+  const sectionExplorerNormal = useForgeStore((s) => s.sectionExplorerNormal);
+  const resetSectionExplorerPlane = useForgeStore((s) => s.resetSectionExplorerPlane);
+  const sectionExplorerFlip = useForgeStore((s) => s.sectionExplorerFlip);
+  const setSectionExplorerFlip = useForgeStore((s) => s.setSectionExplorerFlip);
 
   const cutPlanes = useMemo((): CutPlaneDef[] => result?.cutPlanes ?? [], [result]);
   const joints = useMemo(
@@ -301,6 +307,12 @@ export function useViewPanelState() {
     setSectionPlaneBorderEnabled,
     sectionPlaneAxisEnabled,
     setSectionPlaneAxisEnabled,
+    sectionExplorerEnabled,
+    setSectionExplorerEnabled,
+    sectionExplorerNormal,
+    resetSectionExplorerPlane,
+    sectionExplorerFlip,
+    setSectionExplorerFlip,
     cutPlanes,
     joints,
     jointCouplings,

@@ -65,14 +65,14 @@ export function ForgeObject({
 }) {
   const hasCutPlanes = (cutPlanes?.length ?? 0) > 0;
   const clippingTransformKey = hasCutPlanes ? matrix : null;
-  const { solidGeo, edgesGeo, hasSmoothNormals, cutSurfaces, useFallbackClipping } = useMemo(() => {
+  const { solidGeo, edgesGeo, hasSmoothNormals, cutSurfaces } = useMemo(() => {
     if (!obj.shape) {
       return {
         solidGeo: null,
         edgesGeo: null,
         hasSmoothNormals: false,
         cutSurfaces: [] as CutSurfaceDef[],
-        useFallbackClipping: false,
+
       };
     }
     let shapeForRender = obj.shape;
@@ -155,7 +155,7 @@ export function ForgeObject({
         edgesGeo: edges,
         hasSmoothNormals: smooth,
         cutSurfaces: fallbackToGpuClip ? [] : nextCutSurfaces,
-        useFallbackClipping: fallbackToGpuClip,
+
       };
     } catch {
       if (!fallbackToGpuClip && hasCutPlanes) {
@@ -170,7 +170,7 @@ export function ForgeObject({
             edgesGeo: edges,
             hasSmoothNormals: smooth,
             cutSurfaces: [] as CutSurfaceDef[],
-            useFallbackClipping: true,
+
           };
         } catch {
           nextCutSurfaces.forEach((surface) => {
@@ -182,7 +182,7 @@ export function ForgeObject({
             edgesGeo: null,
             hasSmoothNormals: false,
             cutSurfaces: [] as CutSurfaceDef[],
-            useFallbackClipping: false,
+    
           };
         }
       }
@@ -195,7 +195,7 @@ export function ForgeObject({
         edgesGeo: null,
         hasSmoothNormals: false,
         cutSurfaces: [] as CutSurfaceDef[],
-        useFallbackClipping: false,
+
       };
     }
   }, [clippingTransformKey, cutPlanes, hasCutPlanes, obj.name, obj.shape]);
@@ -218,7 +218,7 @@ export function ForgeObject({
   const showSolid = effectiveRenderMode !== 'wireframe';
   const showEdges = effectiveRenderMode === 'overlay';
   const showWire = effectiveRenderMode === 'wireframe';
-  const fallbackSolidClippingPlanes = useFallbackClipping ? (clippingPlanes ?? []) : [];
+  const effectiveClippingPlanes = clippingPlanes ?? [];
 
   return (
     <group
@@ -246,7 +246,7 @@ export function ForgeObject({
             emissive={isHovered ? settings.color : (obj.materialProps?.emissive ?? '#000000')}
             emissiveIntensity={isHovered ? 0.3 : (obj.materialProps?.emissiveIntensity ?? 0)}
             wireframe={obj.materialProps?.wireframe ?? false}
-            clippingPlanes={fallbackSolidClippingPlanes}
+            clippingPlanes={effectiveClippingPlanes}
           />
         </mesh>
       )}
@@ -268,7 +268,7 @@ export function ForgeObject({
             color={settings.color}
             transparent={meshOpacity < 1}
             opacity={meshOpacity}
-            clippingPlanes={fallbackSolidClippingPlanes}
+            clippingPlanes={effectiveClippingPlanes}
           />
         </lineSegments>
       )}
@@ -279,7 +279,7 @@ export function ForgeObject({
             linewidth={1}
             transparent
             opacity={Math.min(1, meshOpacity + 0.1)}
-            clippingPlanes={fallbackSolidClippingPlanes}
+            clippingPlanes={effectiveClippingPlanes}
           />
         </lineSegments>
       )}
