@@ -32,6 +32,7 @@ import { SectionExplorerGizmo } from './viewport/SectionExplorerGizmo';
 import { SectionPlaneGuides } from './viewport/SectionPlane';
 import { SketchObject } from './viewport/SketchObject';
 import { ToolpathObject } from './viewport/ToolpathObject';
+import { ZoomIndicatorPanel, ZoomSampler } from './viewport/ZoomIndicator';
 import {
   FOCUS_MODE_DIM_OPACITY,
   OBJECT_CONTEXT_MENU_MARGIN,
@@ -117,6 +118,7 @@ export function Viewport() {
 
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
+  const [zoomMmPerPx, setZoomMmPerPx] = useState<number | null>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
   const prevPreviewFileRef = useRef<string | null | undefined>(undefined);
@@ -333,6 +335,7 @@ export function Viewport() {
           reactRenderCountRef={reactRenderCountRef}
           onStatsChange={handlePerformanceInfoChange}
         />
+        <ZoomSampler onZoomChange={setZoomMmPerPx} />
 
         {gridEnabled && !isSketchOnly && (
           <Grid
@@ -448,6 +451,7 @@ export function Viewport() {
       })()}
 
       <PerformanceInfoPanel enabled={showPerformanceInfo} stats={performanceInfo} />
+      <ZoomIndicatorPanel mmPerPx={zoomMmPerPx} />
 
       {drawFlagEnabled && <DrawToolbar />}
 
