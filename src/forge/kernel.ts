@@ -9,6 +9,7 @@ import { type Anchor3D, isAnchor3D, normalizeAnchor3D, resolveAnchor3D } from '.
 import { describeApiArg, normalizeVariadicArgs } from './apiArgs';
 import type { Manifold } from './backends/manifold';
 import { getWasm, initManifoldWasm, lowerShapeCompilePlanToShapeBackend, wrapManifoldShapeBackend } from './backends/manifold';
+import { initMeshoptimizer } from './backends/manifold/meshSimplify';
 import { initOCCT, lowerShapeCompilePlanToOCCTBackend } from './backends/occt';
 import type { ShapeCompilePlan, ShapeCompileTransformStep } from './compilePlan';
 import {
@@ -72,9 +73,9 @@ export type {
 } from './placement';
 
 export async function initKernel() {
-  // Initialize Manifold and OCCT WASM modules in parallel.
-  // Both are cached as singletons — subsequent calls are instant.
-  const [manifoldModule] = await Promise.all([initManifoldWasm(), initOCCT()]);
+  // Initialize Manifold, OCCT, and meshoptimizer WASM modules in parallel.
+  // All are cached as singletons — subsequent calls are instant.
+  const [manifoldModule] = await Promise.all([initManifoldWasm(), initOCCT(), initMeshoptimizer()]);
   return manifoldModule;
 }
 
@@ -83,7 +84,8 @@ export async function initKernel() {
  * Used on mobile devices where memory is constrained.
  */
 export async function initKernelManifoldOnly() {
-  return initManifoldWasm();
+  const [manifoldModule] = await Promise.all([initManifoldWasm(), initMeshoptimizer()]);
+  return manifoldModule;
 }
 
 // TODO: Remove getWasm re-export from kernel once all callers import from backends/manifold/wasm

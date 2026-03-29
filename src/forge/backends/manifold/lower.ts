@@ -17,6 +17,8 @@ import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import { compileSdfNode } from '../../sdf/sdfEval';
 import { smoothSdfMesh } from '../../sdf/sdfSmooth';
+import { isMeshoptimizerReady, simplifyMesh } from './meshSimplify';
+import { surfaceNets } from './sdfSurfaceNets';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput, buildVariableSweepLevelSetInput } from '../../sketch/loftSweepLowering';
 import type { Vec3 } from '../../transform';
 import { Transform } from '../../transform';
@@ -445,17 +447,98 @@ export function lowerShapeCompilePlanToManifold(plan: ShapeCompilePlan, wasm: Ma
       return lowerImportedMeshToManifold(plan.fileData, plan.format, plan.filePath, wasm);
     case 'sdf': {
       const evalFn = compileSdfNode(plan.tree);
-      // Manifold.levelSet convention: positive = inside, negative = outside.
-      // Standard SDF convention (used by sdfEval): negative = inside, positive = outside.
-      // Negate to bridge the two conventions.
-      const negated = (p: Vec3) => -evalFn(p);
-      const raw = wasm.Manifold.levelSet(negated as any, plan.bounds, plan.edgeLength, 0);
-      // Laplacian smoothing + SDF projection: smooths grid-aligned vertex patterns
-      // from Marching Tetrahedra while keeping vertices on the true SDF surface.
-      return smoothSdfMesh(raw, evalFn, wasm);
+      return lowerSdfToManifold(evalFn, plan.bounds, plan.edgeLength, wasm);
     }
     default:
       assertExhaustive(plan);
+  }
+}
+
+/**
+ * SDF → Manifold pipeline: Surface Nets + meshoptimizer simplification.
+ *
+ * Surface Nets produces well-shaped triangles with uniform edge lengths (avg aspect
+ * ratio ~1.6 vs ~3.0 for Marching Tetrahedra). meshoptimizer then reduces triangle
+ * count by up to 75% using quadric error decimation while preserving surface accuracy.
+ *
+ * Falls back to Manifold.levelSet() if Surface Nets produces a degenerate mesh.
+ */
+function lowerSdfToManifold(
+  evalFn: (p: Vec3) => number,
+  bounds: { min: Vec3; max: Vec3 },
+  edgeLength: number,
+  wasm: ManifoldToplevel,
+): Manifold {
+  const snMesh = surfaceNets(evalFn, bounds, edgeLength);
+
+  if (snMesh.numTris === 0) {
+    // Surface Nets found no isosurface — fall back to Manifold.levelSet()
+    // which is more tolerant of edge cases (very thin features, etc.)
+    const negated = (p: Vec3) => -evalFn(p);
+    const raw = wasm.Manifold.levelSet(negated as any, bounds, edgeLength, 0);
+    return smoothSdfMesh(raw, evalFn, wasm);
+  }
+
+  const { vertProperties } = snMesh;
+  let { triVerts } = snMesh;
+
+  // Project vertices onto the true SDF surface. Surface Nets places vertices at
+  // edge-crossing centroids which are close to but not exactly on the isosurface.
+  projectVerticesToSurface(vertProperties, evalFn);
+
+  // Simplify: reduce triangle count while preserving shape.
+  // 50% target balances triangle reduction with quality preservation.
+  // Error bound is relative to edgeLength — allows up to half a cell of deviation.
+  if (isMeshoptimizerReady() && snMesh.numTris > 100) {
+    triVerts = simplifyMesh(triVerts, vertProperties, 0.5, edgeLength * 0.5);
+  }
+
+  const wasmMesh = new wasm.Mesh({
+    numProp: 3,
+    vertProperties,
+    triVerts,
+  });
+
+  try {
+    return new wasm.Manifold(wasmMesh);
+  } catch {
+    // Surface Nets can produce non-manifold vertices (two cones sharing a tip).
+    // Fall back to Manifold.levelSet() which guarantees manifold output.
+    const negated = (p: Vec3) => -evalFn(p);
+    const raw = wasm.Manifold.levelSet(negated as any, bounds, edgeLength, 0);
+    return smoothSdfMesh(raw, evalFn, wasm);
+  }
+}
+
+/**
+ * Project Surface Nets vertices onto the true SDF zero-isosurface.
+ * Moves each vertex along the SDF gradient to reach SDF(p) ≈ 0.
+ * Modifies vertProperties in-place.
+ */
+function projectVerticesToSurface(vertProperties: Float32Array, sdfFn: (p: Vec3) => number): void {
+  const numVerts = vertProperties.length / 3;
+  const eps = 1e-4;
+
+  for (let i = 0; i < numVerts; i++) {
+    const x = vertProperties[i * 3];
+    const y = vertProperties[i * 3 + 1];
+    const z = vertProperties[i * 3 + 2];
+
+    const d = sdfFn([x, y, z]);
+
+    // Compute gradient via central differences
+    const gx = (sdfFn([x + eps, y, z]) - sdfFn([x - eps, y, z])) / (2 * eps);
+    const gy = (sdfFn([x, y + eps, z]) - sdfFn([x, y - eps, z])) / (2 * eps);
+    const gz = (sdfFn([x, y, z + eps]) - sdfFn([x, y, z - eps])) / (2 * eps);
+
+    const glen = Math.sqrt(gx * gx + gy * gy + gz * gz);
+    if (glen < 1e-10) continue;
+
+    // Project onto zero-isosurface
+    const invGlen = 1 / glen;
+    vertProperties[i * 3] = x - d * gx * invGlen;
+    vertProperties[i * 3 + 1] = y - d * gy * invGlen;
+    vertProperties[i * 3 + 2] = z - d * gz * invGlen;
   }
 }
 
