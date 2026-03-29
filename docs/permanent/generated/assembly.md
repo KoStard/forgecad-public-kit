@@ -67,6 +67,7 @@ Create a revolute (hinge) joint. Auto-creates a param slider and rotates the sha
 - `solve()` — solve(state?: JointState): SolvedAssembly
 - `sweepJoint()` — sweepJoint(jointName: string, from: number, to: number, steps: number, baseState
 - `toJointsView()` — Derive `jointsView()` configuration from this assembly's joint graph and call it. Computes world-space pivots and axes from the solved rest pose, so you don't have to manually restate joint kinematics for the viewport runtime.
+- `toDisassemblyView()` — Generate a cinematic disassembly animation from the assembly's joint graph. Creates a `jointsView()` configuration with a "Disassemble" animation that sequences joint motions in reverse topological order (leaves first): - Revolute joints swing open to their max angle - Prismatic joints extend to their max distance - Fastener-named parts get extra rotation (unscrewing effect) Translation/separation is handled by the explode system (auto-configured by `solve()` with joint-derived directions). Use the explode slider in combination with this animation for the full disassembly effect.
 - `describe()` — describe(): AssemblyDefinition
 
 ### `ImportedAssembly`

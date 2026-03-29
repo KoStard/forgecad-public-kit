@@ -3471,6 +3471,24 @@ interface ToJointsViewOptions {
 	defaultAnimation?: string;
 	enabled?: boolean;
 }
+interface ToDisassemblyViewOptions {
+	/** Angle (degrees) revolute joints swing open during disassembly. Default: 90 */
+	swingAngle?: number;
+	/** Angle (degrees) fastener-named parts rotate (unscrewing). Default: 720 */
+	unscrewAngle?: number;
+	/** Distance (mm) prismatic joints extend during disassembly. Default: 60 */
+	separationDistance?: number;
+	/** Total animation duration in seconds. Default: max(3, numSteps * 1.0) */
+	duration?: number;
+	/** Additional animation clips to include alongside "Disassemble". */
+	animations?: JointViewAnimationInput[];
+	/** Joint couplings override. */
+	couplings?: JointViewCouplingInput[];
+	/** Which animation to play by default. Default: "Disassemble" */
+	defaultAnimation?: string;
+	/** Enable/disable jointsView. Default: true */
+	enabled?: boolean;
+}
 declare class Assembly {
 	readonly name: string;
 	private readonly parts;
@@ -3551,6 +3569,20 @@ declare class Assembly {
 	 * have to manually restate joint kinematics for the viewport runtime.
 	 */
 	toJointsView(options?: ToJointsViewOptions): void;
+	/**
+	 * Generate a cinematic disassembly animation from the assembly's joint graph.
+	 *
+	 * Creates a `jointsView()` configuration with a "Disassemble" animation that
+	 * sequences joint motions in reverse topological order (leaves first):
+	 * - Revolute joints swing open to their max angle
+	 * - Prismatic joints extend to their max distance
+	 * - Fastener-named parts get extra rotation (unscrewing effect)
+	 *
+	 * Translation/separation is handled by the explode system (auto-configured
+	 * by `solve()` with joint-derived directions). Use the explode slider in
+	 * combination with this animation for the full disassembly effect.
+	 */
+	toDisassemblyView(options?: ToDisassemblyViewOptions): void;
 	describe(): AssemblyDefinition;
 }
 /**

@@ -16,6 +16,7 @@ import {
   type JointViewInput,
   type JointViewType,
   type JointViewAnimationInput,
+  type JointViewAnimationKeyframeInput,
   type JointViewCouplingInput,
 } from './jointsView';
 import {
@@ -238,6 +239,25 @@ function collisionShape(part: AssemblyPart): Shape | null {
   if (shapes.length === 0) return null;
   if (shapes.length === 1) return shapes[0];
   return union(...shapes);
+}
+
+// ─── Explode heuristic helpers ────────────────────────────────────────────────
+
+const FASTENER_PATTERN = /\b(bolt|screw|nut|washer|pin|rivet|fastener|standoff|insert)\b/i;
+
+function isFastenerName(name: string): boolean {
+  return FASTENER_PATTERN.test(name);
+}
+
+type ExplodeAxisType = 'x' | 'y' | 'z';
+
+function dominantAxis(dir: [number, number, number]): ExplodeAxisType {
+  const ax = Math.abs(dir[0]);
+  const ay = Math.abs(dir[1]);
+  const az = Math.abs(dir[2]);
+  if (ax >= ay && ax >= az) return 'x';
+  if (ay >= az) return 'y';
+  return 'z';
 }
 
 function motionTransform(joint: JointRecord, value: number): Transform {
@@ -617,6 +637,25 @@ export interface ToJointsViewOptions {
   animations?: JointViewAnimationInput[];
   couplings?: JointViewCouplingInput[];
   defaultAnimation?: string;
+  enabled?: boolean;
+}
+
+export interface ToDisassemblyViewOptions {
+  /** Angle (degrees) revolute joints swing open during disassembly. Default: 90 */
+  swingAngle?: number;
+  /** Angle (degrees) fastener-named parts rotate (unscrewing). Default: 720 */
+  unscrewAngle?: number;
+  /** Distance (mm) prismatic joints extend during disassembly. Default: 60 */
+  separationDistance?: number;
+  /** Total animation duration in seconds. Default: max(3, numSteps * 1.0) */
+  duration?: number;
+  /** Additional animation clips to include alongside "Disassemble". */
+  animations?: JointViewAnimationInput[];
+  /** Joint couplings override. */
+  couplings?: JointViewCouplingInput[];
+  /** Which animation to play by default. Default: "Disassemble" */
+  defaultAnimation?: string;
+  /** Enable/disable jointsView. Default: true */
   enabled?: boolean;
 }
 
@@ -1157,6 +1196,70 @@ export class Assembly {
       throw new Error(`Assembly graph unresolved for parts: ${missing.join(', ')}`);
     }
 
+    // ── Auto-inject joint-derived explode directions ──────────────────────
+    if (this.joints.size > 0) {
+      const jointExplodeHints: Record<string, ExplodeViewDirective> = {};
+
+      // Compute max depth for topological staging
+      const depths = new Map<string, number>();
+      for (const rootName of roots) depths.set(rootName, 0);
+      const computeDepths = (partName: string, depth: number) => {
+        depths.set(partName, depth);
+        for (const joint of jointsByParent.get(partName) ?? []) {
+          computeDepths(joint.child, depth + 1);
+        }
+      };
+      for (const rootName of roots) computeDepths(rootName, 0);
+      const maxDepth = Math.max(1, ...depths.values());
+
+      for (const joint of this.joints.values()) {
+        if (joint.type === 'fixed') continue;
+
+        const parentWorld = world.get(joint.parent);
+        if (!parentWorld) continue;
+
+        // Compute world-space joint axis
+        const axisWorld = parentWorld.vector(joint.frame.vector(joint.axis));
+        const axisLen = Math.hypot(axisWorld[0], axisWorld[1], axisWorld[2]);
+        if (axisLen <= 1e-8) continue;
+
+        const dir: [number, number, number] = [axisWorld[0] / axisLen, axisWorld[1] / axisLen, axisWorld[2] / axisLen];
+
+        // For revolute joints, separation is along the axis (pulling the pin out)
+        // For prismatic joints, separation is along the slide axis
+        const childName = joint.child;
+        if (!jointExplodeHints[childName]) {
+          const childDepth = depths.get(childName) ?? 1;
+          // Topological staging: leaves get stage=1.0, root gets stage=0
+          const topoStage = childDepth / maxDepth;
+
+          const hint: ExplodeViewDirective = {
+            direction: dir,
+            stage: Math.max(0.15, topoStage),
+          };
+
+          // Fastener heuristics: detect by name
+          if (isFastenerName(childName)) {
+            hint.stage = 1.2; // Fasteners separate first/furthest
+            hint.axisLock = dominantAxis(dir);
+          }
+
+          jointExplodeHints[childName] = hint;
+        }
+      }
+
+      // Also apply topological staging to root parts (anchor them)
+      for (const rootName of roots) {
+        if (!jointExplodeHints[rootName]) {
+          jointExplodeHints[rootName] = { stage: 0 };
+        }
+      }
+
+      if (Object.keys(jointExplodeHints).length > 0) {
+        explodeView({ byName: jointExplodeHints });
+      }
+    }
+
     return new SolvedAssembly(this.name, this.parts, world, jointValues, warnings, mateMetadata);
   }
 
@@ -1273,6 +1376,273 @@ export class Assembly {
       animations: options.animations,
       defaultAnimation: options.defaultAnimation,
     });
+  }
+
+  /**
+   * Generate a cinematic disassembly animation from the assembly's joint graph.
+   *
+   * Creates a `jointsView()` configuration with a "Disassemble" animation that
+   * sequences joint motions in reverse topological order (leaves first):
+   * - Revolute joints swing open to their max angle
+   * - Prismatic joints extend to their max distance
+   * - Fastener-named parts get extra rotation (unscrewing effect)
+   *
+   * Translation/separation is handled by the explode system (auto-configured
+   * by `solve()` with joint-derived directions). Use the explode slider in
+   * combination with this animation for the full disassembly effect.
+   */
+  toDisassemblyView(options: ToDisassemblyViewOptions = {}): void {
+    const solved = this.solve({});
+    const def = this.describe();
+
+    // ── Build joint tree ──────────────────────────────────────────────────────
+    const incoming = new Map<string, AssemblyJointDef>();
+    const childrenOf = new Map<string, AssemblyJointDef[]>();
+    for (const j of def.joints) {
+      incoming.set(j.child, j);
+      const list = childrenOf.get(j.parent) ?? [];
+      list.push(j);
+      childrenOf.set(j.parent, list);
+    }
+    const roots = def.parts.map((p) => p.name).filter((name) => !incoming.has(name));
+
+    // Compute depths
+    const depths = new Map<string, number>();
+    const computeDepths = (name: string, d: number) => {
+      depths.set(name, d);
+      for (const j of childrenOf.get(name) ?? []) computeDepths(j.child, d + 1);
+    };
+    for (const r of roots) computeDepths(r, 0);
+
+    // ── Build jointsView joints with auto-synthesized separation carriers ─────
+    // For each assembly joint, emit:
+    //   parent → __sep_<child> (prismatic, hidden) → child (original joint)
+    // This gives every part both separation (translation) and its original
+    // kinematic motion (rotation/slide) without requiring manual carrier frames.
+    const viewJoints: JointViewInput[] = [];
+    const sepDist = options.separationDistance ?? 30;
+
+    for (const j of def.joints) {
+      const parentWorld = solved.getTransform(j.parent);
+      const pivot = parentWorld.point(j.frame.point([0, 0, 0]));
+      const carrierName = `__sep_${j.child}`;
+      const sepJointName = `__sep_${j.name}`;
+
+      // ── Separation direction ────────────────────────────────────────────
+      // Fasteners (bolts/screws): pull out along joint axis.
+      // Hinged parts (revolute non-fastener): separate perpendicular to the
+      //   rotation axis, away from the parent — not along the hinge axis.
+      // Fixed/prismatic: direction from parent center toward child center.
+      const pCenter = solved.getTransform(j.parent).point([0, 0, 0]);
+      const cCenter = solved.getTransform(j.child).point([0, 0, 0]);
+      let sepAxis: [number, number, number];
+
+      if (j.type === 'revolute' && isFastenerName(j.child)) {
+        // Fasteners: pull out along shaft (= joint axis)
+        const aw = parentWorld.vector(j.frame.vector(j.axis));
+        const al = Math.hypot(aw[0], aw[1], aw[2]);
+        sepAxis = al > 1e-10 ? [aw[0] / al, aw[1] / al, aw[2] / al] : [0, 0, 1];
+      } else if (j.type === 'revolute') {
+        // Hinged parts: separate in the "swing outward" direction.
+        // cross(axis, pivot→childCenter) gives the direction the part swings into.
+        const aw = parentWorld.vector(j.frame.vector(j.axis));
+        const al = Math.hypot(aw[0], aw[1], aw[2]);
+        const ax: [number, number, number] = al > 1e-10 ? [aw[0] / al, aw[1] / al, aw[2] / al] : [0, 0, 1];
+        const pivotWorld = pivot as [number, number, number];
+        const dx = cCenter[0] - pivotWorld[0];
+        const dy = cCenter[1] - pivotWorld[1];
+        const dz = cCenter[2] - pivotWorld[2];
+        // cross(axis, pivot→center) = swing-outward direction
+        const cx = ax[1] * dz - ax[2] * dy;
+        const cy = ax[2] * dx - ax[0] * dz;
+        const cz = ax[0] * dy - ax[1] * dx;
+        const cl = Math.hypot(cx, cy, cz);
+        if (cl > 1e-6) {
+          sepAxis = [cx / cl, cy / cl, cz / cl];
+        } else {
+          // Child center is on the axis — fall back to perpendicular
+          // Pick a vector not parallel to axis and cross with it
+          const ref: [number, number, number] = Math.abs(ax[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+          const px = ax[1] * ref[2] - ax[2] * ref[1];
+          const py = ax[2] * ref[0] - ax[0] * ref[2];
+          const pz = ax[0] * ref[1] - ax[1] * ref[0];
+          const pl = Math.hypot(px, py, pz);
+          sepAxis = pl > 1e-10 ? [px / pl, py / pl, pz / pl] : [0, 0, 1];
+        }
+      } else if (j.type === 'prismatic') {
+        // Prismatic: separate along slide axis
+        const aw = parentWorld.vector(j.frame.vector(j.axis));
+        const al = Math.hypot(aw[0], aw[1], aw[2]);
+        sepAxis = al > 1e-10 ? [aw[0] / al, aw[1] / al, aw[2] / al] : [0, 0, 1];
+      } else {
+        // Fixed: direction from parent center toward child center
+        const dx = cCenter[0] - pCenter[0];
+        const dy = cCenter[1] - pCenter[1];
+        const dz = cCenter[2] - pCenter[2];
+        const dl = Math.hypot(dx, dy, dz);
+        if (dl > 1e-6) {
+          sepAxis = [dx / dl, dy / dl, dz / dl];
+        } else {
+          const up = parentWorld.vector([0, 0, 1]);
+          const ul = Math.hypot(up[0], up[1], up[2]);
+          sepAxis = ul > 1e-10 ? [up[0] / ul, up[1] / ul, up[2] / ul] : [0, 0, 1];
+        }
+      }
+
+      // ── Prismatic separation: parent → carrier ──────────────────────────
+      viewJoints.push({
+        name: sepJointName,
+        child: carrierName,
+        parent: j.parent,
+        type: 'prismatic',
+        axis: sepAxis,
+        pivot: pivot as [number, number, number],
+        min: 0,
+        max: sepDist,
+        default: 0,
+        hidden: true,
+      });
+
+      // ── Original kinematic joint: carrier → child ───────────────────────
+      if (j.type === 'fixed') {
+        // Zero-range revolute so the child follows its carrier
+        viewJoints.push({
+          name: j.name,
+          child: j.child,
+          parent: carrierName,
+          type: 'revolute',
+          axis: [0, 0, 1],
+          pivot: pivot as [number, number, number],
+          min: 0,
+          max: 0,
+          default: 0,
+          hidden: true,
+        });
+      } else {
+        const aw = parentWorld.vector(j.frame.vector(j.axis));
+        const al = Math.hypot(aw[0], aw[1], aw[2]);
+        const normalizedAxis: Vec3 = al > 1e-10
+          ? [aw[0] / al, aw[1] / al, aw[2] / al]
+          : j.axis;
+
+        const isFastener = isFastenerName(j.child);
+        let max = j.max;
+        if (j.type === 'revolute') {
+          max = isFastener
+            ? Math.max(max ?? 720, options.unscrewAngle ?? 720)
+            : Math.max(max ?? 90, options.swingAngle ?? 90);
+        } else if (j.type === 'prismatic') {
+          max = Math.max(max ?? 60, sepDist);
+        }
+
+        viewJoints.push({
+          name: j.name,
+          child: j.child,
+          parent: carrierName,
+          type: j.type as JointViewType,
+          axis: normalizedAxis as [number, number, number],
+          pivot: pivot as [number, number, number],
+          min: j.min ?? 0,
+          max,
+          default: j.defaultValue,
+          unit: j.unit,
+        });
+      }
+    }
+
+    // ── Generate animation keyframes ──────────────────────────────────────────
+    // Group parts by assembly tree depth (deepest first = leaves disassemble first).
+    // Each depth stage animates BOTH separation and rotation simultaneously.
+    interface DisassemblyItem {
+      sepJointName: string;
+      rotJointName: string | undefined;
+      joint: AssemblyJointDef;
+    }
+
+    const depthGroups = new Map<number, DisassemblyItem[]>();
+    for (const j of def.joints) {
+      const d = depths.get(j.child) ?? 0;
+      if (d === 0) continue; // roots stay anchored
+      const group = depthGroups.get(d) ?? [];
+      group.push({
+        sepJointName: `__sep_${j.name}`,
+        rotJointName: j.type !== 'fixed' ? j.name : undefined,
+        joint: j,
+      });
+      depthGroups.set(d, group);
+    }
+
+    const sortedDepths = [...depthGroups.keys()].sort((a, b) => b - a);
+    const numStages = sortedDepths.length;
+
+    if (numStages > 0) {
+      const duration = options.duration ?? Math.max(3, numStages * 1.5);
+      const keyframes: JointViewAnimationKeyframeInput[] = [];
+
+      // Start: everything at rest
+      const startValues: Record<string, number> = {};
+      for (const items of depthGroups.values()) {
+        for (const item of items) {
+          startValues[item.sepJointName] = 0;
+          if (item.rotJointName) startValues[item.rotJointName] = item.joint.defaultValue;
+        }
+      }
+      keyframes.push({ at: 0, values: { ...startValues } });
+
+      // Each depth level gets a time slice
+      const sliceDuration = 1 / numStages;
+      for (let i = 0; i < numStages; i++) {
+        const items = depthGroups.get(sortedDepths[i])!;
+        const sliceEnd = (i + 1) * sliceDuration;
+
+        const values: Record<string, number> = {};
+        for (const item of items) {
+          // Separation
+          values[item.sepJointName] = sepDist;
+
+          // Rotation / kinematic motion
+          if (item.rotJointName) {
+            const isFastener = isFastenerName(item.joint.child);
+            if (item.joint.type === 'revolute') {
+              values[item.rotJointName] = isFastener
+                ? (options.unscrewAngle ?? 720)
+                : Math.max(item.joint.max ?? 90, options.swingAngle ?? 90);
+            } else {
+              values[item.rotJointName] = Math.max(item.joint.max ?? 60, sepDist);
+            }
+          }
+        }
+        keyframes.push({ at: Math.min(sliceEnd, 0.999), values });
+      }
+
+      // End: hold final state
+      const endValues: Record<string, number> = {};
+      for (const kf of keyframes) Object.assign(endValues, kf.values);
+      keyframes.push({ at: 1, values: endValues });
+
+      const couplings: JointViewCouplingInput[] = options.couplings ?? def.jointCouplings.map((c) => ({
+        joint: c.joint,
+        terms: c.terms.map((t) => ({ joint: t.joint, ratio: t.ratio })),
+        offset: c.offset,
+      }));
+
+      jointsViewFn({
+        enabled: options.enabled ?? true,
+        joints: viewJoints,
+        couplings: couplings.length > 0 ? couplings : undefined,
+        animations: [
+          ...(options.animations ?? []),
+          {
+            name: 'Disassemble',
+            duration,
+            loop: false,
+            continuous: false,
+            keyframes,
+          },
+        ],
+        defaultAnimation: options.defaultAnimation ?? 'Disassemble',
+      });
+    }
   }
 
   describe(): AssemblyDefinition {

@@ -21,6 +21,7 @@ export {
   type MergeIntoOptions,
   type ConnectOptions,
   type ToJointsViewOptions,
+  type ToDisassemblyViewOptions,
   bomToCsv,
   SolvedAssembly,
   Assembly,
