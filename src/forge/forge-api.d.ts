@@ -2574,228 +2574,20 @@ interface PlacementReferenceInput {
 	objects?: Record<string, PlacementObjectInput>;
 }
 type PlacementAnchorLike = Anchor3D | string;
-declare class SurfacePattern {
-	/** Function body: receives (u, v) in surface mm, returns height displacement. */
-	readonly body: string;
-	/** Named constants injected into the function. */
-	readonly constants?: Record<string, number>;
-	constructor(body: string, constants?: Record<string, number>);
-}
-interface SurfaceDisplaceOptions {
-	/** Override auto-detected UV mode. Default: 'auto' (detects from SDF tree). */
-	uv?: "auto" | "sphere" | "cylinder" | "torus" | "triplanar";
-	/** Triplanar blend sharpness — higher = crisper transitions. Default: 4. Only used in triplanar mode. */
-	triplanarSharpness?: number;
-}
-interface SdfToShapeOptions {
-	/** Target mesh edge length. Smaller = finer mesh. Default: auto-computed from bounds. */
-	edgeLength?: number;
-	/** Override auto-computed bounds. */
-	bounds?: {
-		min: Vec3$1;
-		max: Vec3$1;
-	};
-}
-declare class SdfShape {
-	/** @internal */
-	readonly _node: SdfNode;
-	/** @internal */
-	constructor(node: SdfNode);
-	/**
-	 * Mesh this SDF into a ForgeCAD Shape via Manifold.levelSet().
-	 * Once converted, the result is a regular Shape — booleans, transforms, export all work.
-	 */
-	toShape(options?: SdfToShapeOptions): Shape;
-	/** SDF union (sharp). */
-	union(...others: SdfShape[]): SdfShape;
-	/** SDF difference (sharp) — subtracts others from this. */
-	subtract(...others: SdfShape[]): SdfShape;
-	/** SDF intersection (sharp). */
-	intersect(...others: SdfShape[]): SdfShape;
-	/** Smooth union — blends shapes together with a smooth radius. */
-	smoothUnion(other: SdfShape, radius: number): SdfShape;
-	/** Smooth difference — smoothly carves other from this. */
-	smoothSubtract(other: SdfShape, radius: number): SdfShape;
-	/** Smooth intersection — smoothly intersects. */
-	smoothIntersect(other: SdfShape, radius: number): SdfShape;
-	/** Morph between this shape and another. t=0 → this, t=1 → other. */
-	morph(other: SdfShape, t: number): SdfShape;
-	translate(x: number, y: number, z: number): SdfShape;
-	rotate(xDeg: number, yDeg: number, zDeg: number): SdfShape;
-	scale(factor: number): SdfShape;
-	/** Twist around the Z axis. */
-	twist(degreesPerUnit: number): SdfShape;
-	/** Bend around the Z axis with given radius. */
-	bend(radius: number): SdfShape;
-	/** Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite. */
-	repeat(spacing: Vec3$1, count?: Vec3$1): SdfShape;
-	/** Hollow out, keeping only a shell of given thickness. */
-	shell(thickness: number): SdfShape;
-	/**
-	 * Displace the surface by a function of position, or by a pattern SdfShape.
-	 *
-	 * ```js
-	 * // Function displacement
-	 * shape.displace((x, y, z) => Math.sin(x) * 0.5)
-	 *
-	 * // Pattern displacement (e.g. basketWeave)
-	 * shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
-	 * ```
-	 */
-	displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape;
-	/**
-	 * Displace the surface using a 2D pattern in surface-local UV coordinates.
-	 *
-	 * Automatically detects the shape's UV parametrization (sphere, cylinder, torus)
-	 * from the SDF tree. Falls back to triplanar mapping for arbitrary shapes.
-	 *
-	 * UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3`
-	 * always produce 3mm spacing, regardless of shape size.
-	 *
-	 * ```js
-	 * // Surface-following basket weave — auto-detects sphere UV
-	 * sdf.sphere(27).shell(3)
-	 *   .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
-	 *   .toShape()
-	 *
-	 * // Custom 2D pattern via function
-	 * shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3)
-	 * ```
-	 */
-	surfaceDisplace(pattern: SurfacePattern | ((u: number, v: number) => number), options?: SurfaceDisplaceOptions): SdfShape;
-	/** Create concentric onion layers. */
-	onion(layers: number, thickness: number): SdfShape;
-}
-declare function sphere(radius: number): SdfShape;
-declare function box(x: number, y: number, z: number): SdfShape;
-declare function cylinder(height: number, radius: number): SdfShape;
-declare function torus(majorRadius: number, minorRadius: number): SdfShape;
-declare function capsule(height: number, radius: number): SdfShape;
-declare function cone(height: number, radius: number): SdfShape;
-declare function smoothUnion(a: SdfShape, b: SdfShape, options: {
-	radius: number;
-}): SdfShape;
-declare function smoothDifference(a: SdfShape, b: SdfShape, options: {
-	radius: number;
-}): SdfShape;
-declare function smoothIntersection(a: SdfShape, b: SdfShape, options: {
-	radius: number;
-}): SdfShape;
-declare function morph(a: SdfShape, b: SdfShape, t: number): SdfShape;
-interface BlendOptions {
-	/** Optional named constants accessible in the blend function. */
-	constants?: Record<string, number>;
-}
-declare function blend(a: SdfShape, b: SdfShape, fn: (x: number, y: number, z: number) => number, options?: BlendOptions): SdfShape;
-interface TpmsOptions {
-	cellSize: number;
-	thickness: number;
-}
-declare function gyroid(options: TpmsOptions): SdfShape;
-declare function schwarzP(options: TpmsOptions): SdfShape;
-declare function diamond(options: TpmsOptions): SdfShape;
-declare function lidinoid(options: TpmsOptions): SdfShape;
-interface NoiseOptions {
-	/** Spatial frequency — smaller = larger features. Default: 0.1 */
-	scale?: number;
-	/** Peak displacement amplitude. Default: 1 */
-	amplitude?: number;
-	/** fBm octaves (1 = plain simplex, higher = more detail). Default: 1 */
-	octaves?: number;
-	/** Seed for deterministic variation. Default: 0 */
-	seed?: number;
-}
-declare function noise(options?: NoiseOptions): SdfShape;
-interface VoronoiOptions {
-	/** Size of each Voronoi cell in world units. Default: 10 */
-	cellSize?: number;
-	/** Wall thickness between cells. Default: 1 */
-	wallThickness?: number;
-	/** Seed for deterministic variation. Default: 0 */
-	seed?: number;
-	/**
-	 * Projection weight for membrane suppression (0..1). Controls how much of
-	 * the surface-normal distance component is removed from Voronoi cell distances.
-	 * 0 = no projection (classic 3D voronoi with membranes).
-	 * 1 = full tangent-plane projection (pure 2D pattern on surface).
-	 * Default: 0.85. Only active when voronoi is intersected with another shape.
-	 */
-	suppressionThreshold?: number;
-}
-declare function voronoi(options?: VoronoiOptions): SdfShape;
-interface HoneycombOptions {
-	/** Size of each hex cell. Default: 8 */
-	cellSize?: number;
-	/** Wall thickness. Default: 1 */
-	wallThickness?: number;
-}
-declare function honeycomb(options?: HoneycombOptions): SdfShape;
-interface WavesOptions {
-	/** Distance between wave peaks. Default: 10 */
-	wavelength?: number;
-	/** Height of waves. Default: 1 */
-	amplitude?: number;
-	/** Axis along which waves propagate: 'x', 'y', or 'z'. Default: 'x' */
-	axis?: "x" | "y" | "z";
-}
-declare function waves(options?: WavesOptions): SdfShape;
-interface KnurlOptions {
-	/** Distance between knurl ridges. Default: 3 */
-	pitch?: number;
-	/** Depth of knurl grooves. Default: 0.5 */
-	depth?: number;
-	/** Helix angle in degrees. Default: 30 */
-	angle?: number;
-}
-declare function knurl(options?: KnurlOptions): SdfShape;
-interface PerforatedOptions {
-	/** Hole radius. Default: 3 */
-	radius?: number;
-	/** Center-to-center spacing. Default: 8 */
-	spacing?: number;
-}
-declare function perforated(options?: PerforatedOptions): SdfShape;
-interface ScalesOptions {
-	/** Scale diameter. Default: 5 */
-	size?: number;
-	/** How much scales protrude. Default: 0.8 */
-	depth?: number;
-}
-declare function scales(options?: ScalesOptions): SdfShape;
-interface BrickOptions {
-	/** Brick width. Default: 10 */
-	width?: number;
-	/** Brick height. Default: 5 */
-	height?: number;
-	/** Mortar groove depth. Default: 0.5 */
-	depth?: number;
-	/** Mortar gap width. Default: 1 */
-	mortar?: number;
-}
-declare function brick(options?: BrickOptions): SdfShape;
-interface WeaveOptions {
-	/** Thread center-to-center spacing (for intersection patterns). Default: 5 */
-	spacing?: number;
-	/** Thread half-width. Default: 1 */
-	threadRadius?: number;
-}
-declare function weave(options?: WeaveOptions): SdfShape;
-interface BasketWeaveOptions {
-	/** Spacing between threads in mm (both directions). Default: 3 */
-	spacing?: number;
-	/** Thread width in mm. Default: 1.5 */
-	threadWidth?: number;
-	/** Thread protrusion depth in mm. Default: 0.8 */
-	depth?: number;
-}
-declare function basketWeave(options?: BasketWeaveOptions): SurfacePattern;
-declare function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: {
-	min: Vec3$1;
-	max: Vec3$1;
-}, constants?: Record<string, number>): SdfShape;
-declare function twist(shape: SdfShape, degreesPerUnit: number): SdfShape;
-declare function bend(shape: SdfShape, radius: number): SdfShape;
-declare function repeat(shape: SdfShape, spacing: Vec3$1, count?: Vec3$1): SdfShape;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 type GeometryBackend = "manifold" | "occt" | "hybrid" | "unknown";
 type GeometryRepresentation = "mesh-solid" | "brep-solid" | "surface" | "mixed";
 type GeometryFidelity = "kernel-native" | "exact" | "sampled" | "deformed" | "mixed" | "unknown";
@@ -6520,7 +6312,228 @@ declare function highlight(face: FaceRef, opts?: HighlightOptions): void;
 declare function highlight(edge: EdgeRef, opts?: HighlightOptions): void;
 
 declare namespace sdf {
-	export { BasketWeaveOptions, BlendOptions, BrickOptions, HoneycombOptions, KnurlOptions, NoiseOptions, PerforatedOptions, ScalesOptions, SdfShape, SdfToShapeOptions, SurfaceDisplaceOptions, SurfacePattern, TpmsOptions, VoronoiOptions, WavesOptions, WeaveOptions, basketWeave, bend, blend, box, brick, capsule, cone, cylinder, diamond, fromFunction, gyroid, honeycomb, knurl, lidinoid, morph, noise, perforated, repeat, scales, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist, voronoi, waves, weave };
+  export interface BasketWeaveOptions {
+  	/** Spacing between threads in mm (both directions). Default: 3 */
+  	spacing?: number;
+  	/** Thread width in mm. Default: 1.5 */
+  	threadWidth?: number;
+  	/** Thread protrusion depth in mm. Default: 0.8 */
+  	depth?: number;
+  }
+  export interface BlendOptions {
+  	/** Optional named constants accessible in the blend function. */
+  	constants?: Record<string, number>;
+  }
+  export interface BrickOptions {
+  	/** Brick width. Default: 10 */
+  	width?: number;
+  	/** Brick height. Default: 5 */
+  	height?: number;
+  	/** Mortar groove depth. Default: 0.5 */
+  	depth?: number;
+  	/** Mortar gap width. Default: 1 */
+  	mortar?: number;
+  }
+  export interface HoneycombOptions {
+  	/** Size of each hex cell. Default: 8 */
+  	cellSize?: number;
+  	/** Wall thickness. Default: 1 */
+  	wallThickness?: number;
+  }
+  export interface KnurlOptions {
+  	/** Distance between knurl ridges. Default: 3 */
+  	pitch?: number;
+  	/** Depth of knurl grooves. Default: 0.5 */
+  	depth?: number;
+  	/** Helix angle in degrees. Default: 30 */
+  	angle?: number;
+  }
+  export interface NoiseOptions {
+  	/** Spatial frequency — smaller = larger features. Default: 0.1 */
+  	scale?: number;
+  	/** Peak displacement amplitude. Default: 1 */
+  	amplitude?: number;
+  	/** fBm octaves (1 = plain simplex, higher = more detail). Default: 1 */
+  	octaves?: number;
+  	/** Seed for deterministic variation. Default: 0 */
+  	seed?: number;
+  }
+  export interface PerforatedOptions {
+  	/** Hole radius. Default: 3 */
+  	radius?: number;
+  	/** Center-to-center spacing. Default: 8 */
+  	spacing?: number;
+  }
+  export interface ScalesOptions {
+  	/** Scale diameter. Default: 5 */
+  	size?: number;
+  	/** How much scales protrude. Default: 0.8 */
+  	depth?: number;
+  }
+  export class SdfShape {
+  	/** @internal */
+  	readonly _node: SdfNode;
+  	/** @internal */
+  	constructor(node: SdfNode);
+  	/**
+  	 * Mesh this SDF into a ForgeCAD Shape via Manifold.levelSet().
+  	 * Once converted, the result is a regular Shape — booleans, transforms, export all work.
+  	 */
+  	toShape(options?: SdfToShapeOptions): Shape;
+  	/** SDF union (sharp). */
+  	union(...others: SdfShape[]): SdfShape;
+  	/** SDF difference (sharp) — subtracts others from this. */
+  	subtract(...others: SdfShape[]): SdfShape;
+  	/** SDF intersection (sharp). */
+  	intersect(...others: SdfShape[]): SdfShape;
+  	/** Smooth union — blends shapes together with a smooth radius. */
+  	smoothUnion(other: SdfShape, radius: number): SdfShape;
+  	/** Smooth difference — smoothly carves other from this. */
+  	smoothSubtract(other: SdfShape, radius: number): SdfShape;
+  	/** Smooth intersection — smoothly intersects. */
+  	smoothIntersect(other: SdfShape, radius: number): SdfShape;
+  	/** Morph between this shape and another. t=0 → this, t=1 → other. */
+  	morph(other: SdfShape, t: number): SdfShape;
+  	translate(x: number, y: number, z: number): SdfShape;
+  	rotate(xDeg: number, yDeg: number, zDeg: number): SdfShape;
+  	scale(factor: number): SdfShape;
+  	/** Twist around the Z axis. */
+  	twist(degreesPerUnit: number): SdfShape;
+  	/** Bend around the Z axis with given radius. */
+  	bend(radius: number): SdfShape;
+  	/** Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite. */
+  	repeat(spacing: Vec3$1, count?: Vec3$1): SdfShape;
+  	/** Hollow out, keeping only a shell of given thickness. */
+  	shell(thickness: number): SdfShape;
+  	/**
+  	 * Displace the surface by a function of position, or by a pattern SdfShape.
+  	 *
+  	 * ```js
+  	 * // Function displacement
+  	 * shape.displace((x, y, z) => Math.sin(x) * 0.5)
+  	 *
+  	 * // Pattern displacement (e.g. basketWeave)
+  	 * shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+  	 * ```
+  	 */
+  	displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape;
+  	/**
+  	 * Displace the surface using a 2D pattern in surface-local UV coordinates.
+  	 *
+  	 * Automatically detects the shape's UV parametrization (sphere, cylinder, torus)
+  	 * from the SDF tree. Falls back to triplanar mapping for arbitrary shapes.
+  	 *
+  	 * UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3`
+  	 * always produce 3mm spacing, regardless of shape size.
+  	 *
+  	 * ```js
+  	 * // Surface-following basket weave — auto-detects sphere UV
+  	 * sdf.sphere(27).shell(3)
+  	 *   .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
+  	 *   .toShape()
+  	 *
+  	 * // Custom 2D pattern via function
+  	 * shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3)
+  	 * ```
+  	 */
+  	surfaceDisplace(pattern: SurfacePattern | ((u: number, v: number) => number), options?: SurfaceDisplaceOptions): SdfShape;
+  	/** Create concentric onion layers. */
+  	onion(layers: number, thickness: number): SdfShape;
+  }
+  export interface SdfToShapeOptions {
+  	/** Target mesh edge length. Smaller = finer mesh. Default: auto-computed from bounds. */
+  	edgeLength?: number;
+  	/** Override auto-computed bounds. */
+  	bounds?: {
+  		min: Vec3$1;
+  		max: Vec3$1;
+  	};
+  }
+  export interface SurfaceDisplaceOptions {
+  	/** Override auto-detected UV mode. Default: 'auto' (detects from SDF tree). */
+  	uv?: "auto" | "sphere" | "cylinder" | "torus" | "triplanar";
+  	/** Triplanar blend sharpness — higher = crisper transitions. Default: 4. Only used in triplanar mode. */
+  	triplanarSharpness?: number;
+  }
+  export class SurfacePattern {
+  	/** Function body: receives (u, v) in surface mm, returns height displacement. */
+  	readonly body: string;
+  	/** Named constants injected into the function. */
+  	readonly constants?: Record<string, number>;
+  	constructor(body: string, constants?: Record<string, number>);
+  }
+  export interface TpmsOptions {
+  	cellSize: number;
+  	thickness: number;
+  }
+  export interface VoronoiOptions {
+  	/** Size of each Voronoi cell in world units. Default: 10 */
+  	cellSize?: number;
+  	/** Wall thickness between cells. Default: 1 */
+  	wallThickness?: number;
+  	/** Seed for deterministic variation. Default: 0 */
+  	seed?: number;
+  	/**
+  	 * Projection weight for membrane suppression (0..1). Controls how much of
+  	 * the surface-normal distance component is removed from Voronoi cell distances.
+  	 * 0 = no projection (classic 3D voronoi with membranes).
+  	 * 1 = full tangent-plane projection (pure 2D pattern on surface).
+  	 * Default: 0.85. Only active when voronoi is intersected with another shape.
+  	 */
+  	suppressionThreshold?: number;
+  }
+  export interface WavesOptions {
+  	/** Distance between wave peaks. Default: 10 */
+  	wavelength?: number;
+  	/** Height of waves. Default: 1 */
+  	amplitude?: number;
+  	/** Axis along which waves propagate: 'x', 'y', or 'z'. Default: 'x' */
+  	axis?: "x" | "y" | "z";
+  }
+  export interface WeaveOptions {
+  	/** Thread center-to-center spacing (for intersection patterns). Default: 5 */
+  	spacing?: number;
+  	/** Thread half-width. Default: 1 */
+  	threadRadius?: number;
+  }
+  export function basketWeave(options?: BasketWeaveOptions): SurfacePattern;
+  export function bend(shape: SdfShape, radius: number): SdfShape;
+  export function blend(a: SdfShape, b: SdfShape, fn: (x: number, y: number, z: number) => number, options?: BlendOptions): SdfShape;
+  export function box(x: number, y: number, z: number): SdfShape;
+  export function brick(options?: BrickOptions): SdfShape;
+  export function capsule(height: number, radius: number): SdfShape;
+  export function cone(height: number, radius: number): SdfShape;
+  export function cylinder(height: number, radius: number): SdfShape;
+  export function diamond(options: TpmsOptions): SdfShape;
+  export function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: {
+  	min: Vec3$1;
+  	max: Vec3$1;
+  }, constants?: Record<string, number>): SdfShape;
+  export function gyroid(options: TpmsOptions): SdfShape;
+  export function honeycomb(options?: HoneycombOptions): SdfShape;
+  export function knurl(options?: KnurlOptions): SdfShape;
+  export function lidinoid(options: TpmsOptions): SdfShape;
+  export function morph(a: SdfShape, b: SdfShape, t: number): SdfShape;
+  export function noise(options?: NoiseOptions): SdfShape;
+  export function perforated(options?: PerforatedOptions): SdfShape;
+  export function repeat(shape: SdfShape, spacing: Vec3$1, count?: Vec3$1): SdfShape;
+  export function scales(options?: ScalesOptions): SdfShape;
+  export function schwarzP(options: TpmsOptions): SdfShape;
+  export function smoothDifference(a: SdfShape, b: SdfShape, options: {
+  	radius: number;
+  }): SdfShape;
+  export function smoothIntersection(a: SdfShape, b: SdfShape, options: {
+  	radius: number;
+  }): SdfShape;
+  export function smoothUnion(a: SdfShape, b: SdfShape, options: {
+  	radius: number;
+  }): SdfShape;
+  export function sphere(radius: number): SdfShape;
+  export function torus(majorRadius: number, minorRadius: number): SdfShape;
+  export function twist(shape: SdfShape, degreesPerUnit: number): SdfShape;
+  export function voronoi(options?: VoronoiOptions): SdfShape;
+  export function waves(options?: WavesOptions): SdfShape;
+  export function weave(options?: WeaveOptions): SdfShape;
 }
 /** All library parts. Access via `lib.xxx()` in scripts. */
 declare const lib: typeof partLibrary;

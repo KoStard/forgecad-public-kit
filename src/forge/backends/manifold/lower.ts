@@ -466,19 +466,33 @@ function lowerSdfToManifold(
   edgeLength: number,
   wasm: ManifoldToplevel,
 ): Manifold {
-  const snMesh = surfaceNets(evalFn, bounds, edgeLength);
+  // Intersect the SDF with the bounding box so the isosurface is always closed.
+  // Without this, shapes extending past the bounds produce open meshes (boundary
+  // cells have no neighbors to form faces with), which Manifold rejects as non-manifold.
+  const inset = edgeLength;
+  const cappedEvalFn: typeof evalFn = (p) => {
+    const bx = Math.max(bounds.min[0] + inset - p[0], p[0] - bounds.max[0] + inset);
+    const by = Math.max(bounds.min[1] + inset - p[1], p[1] - bounds.max[1] + inset);
+    const bz = Math.max(bounds.min[2] + inset - p[2], p[2] - bounds.max[2] + inset);
+    const boxDist = Math.max(bx, by, bz);
+    return Math.max(evalFn(p), boxDist);
+  };
+
+  const snMesh = surfaceNets(cappedEvalFn, bounds, edgeLength);
   const { vertProperties } = snMesh;
   let { triVerts } = snMesh;
 
-  // Project vertices onto the true SDF surface. Surface Nets places vertices at
+  // Project vertices onto the capped SDF surface. Surface Nets places vertices at
   // edge-crossing centroids which are close to but not exactly on the isosurface.
-  projectVerticesToSurface(vertProperties, evalFn);
+  // Must use cappedEvalFn so boundary vertices don't get projected past bounds.
+  projectVerticesToSurface(vertProperties, cappedEvalFn);
 
   // Simplify: reduce triangle count while preserving shape.
-  // 50% target balances triangle reduction with quality preservation.
-  // Error bound is relative to edgeLength — allows up to half a cell of deviation.
+  // meshoptimizer doesn't guarantee manifold preservation — edge collapses on thin
+  // SDF features (e.g. basket weave) can create non-manifold edges. We validate
+  // the result and skip simplification if topology is broken.
   if (snMesh.numTris > 100) {
-    triVerts = simplifyMesh(triVerts, vertProperties, 0.5, edgeLength * 0.5);
+    triVerts = simplifySdfMesh(triVerts, vertProperties, edgeLength, wasm);
   }
 
   const wasmMesh = new wasm.Mesh({
@@ -488,6 +502,51 @@ function lowerSdfToManifold(
   });
 
   return new wasm.Manifold(wasmMesh);
+}
+
+/**
+ * Simplify an SDF mesh with manifold topology validation.
+ *
+ * meshoptimizer's quadric-error decimation doesn't preserve manifold topology —
+ * edge collapses on thin features can create non-manifold edges. We try
+ * progressively less aggressive ratios and validate each result. If no
+ * simplification level produces a valid manifold, we return the original mesh.
+ */
+function simplifySdfMesh(
+  triVerts: Uint32Array,
+  vertProperties: Float32Array,
+  edgeLength: number,
+  wasm: ManifoldToplevel,
+): Uint32Array {
+  const maxError = edgeLength * 0.25;
+  // Try 50%, then 75% retention
+  for (const ratio of [0.5, 0.75]) {
+    let simplified = simplifyMesh(triVerts, vertProperties, ratio, maxError);
+    simplified = filterDegenerateTriangles(simplified);
+    try {
+      new wasm.Manifold(new wasm.Mesh({ numProp: 3, vertProperties, triVerts: simplified }));
+      return simplified;
+    } catch {
+      // Non-manifold — try less aggressive ratio
+    }
+  }
+  // All simplification levels broke topology; use original mesh
+  return triVerts;
+}
+
+/**
+ * Remove degenerate triangles where two or more vertex indices are the same.
+ * meshoptimizer can collapse edges into zero-area triangles during decimation.
+ */
+function filterDegenerateTriangles(triVerts: Uint32Array): Uint32Array {
+  const out: number[] = [];
+  for (let i = 0; i < triVerts.length; i += 3) {
+    const a = triVerts[i], b = triVerts[i + 1], c = triVerts[i + 2];
+    if (a !== b && b !== c && a !== c) {
+      out.push(a, b, c);
+    }
+  }
+  return new Uint32Array(out);
 }
 
 /**

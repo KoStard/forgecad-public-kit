@@ -117,6 +117,85 @@ if (libBlockMatch) {
   }
 }
 
+// ── Expand namespace re-exports to inline declarations ──────────────────────
+// dts-bundle-generator produces `declare namespace X { export { ... } }` with
+// re-export syntax that Monaco's JS IntelliSense cannot resolve. We find ALL
+// such namespaces, expand re-exports into proper member declarations, and
+// remove the corresponding top-level globals so they're only accessible via
+// the namespace (e.g. `sdf.sphere()` instead of bare `sphere()`).
+
+/**
+ * Find a top-level declaration for `name` and return its full text.
+ * Handles multi-line declarations (inline object types) via brace counting.
+ * `endsAtBrace`: true for class/interface (ends at closing `}`),
+ *                false for function/type (ends at `;` when braces balanced).
+ */
+function findTopLevelDecl(src, prefix, name, { exactMatch = true, endsAtBrace = false } = {}) {
+  // exactMatch uses (?=[(<]) lookahead to avoid matching `name$1` variants
+  const suffix = exactMatch ? '(?=[(<])' : '\\b';
+  const startRegex = new RegExp(`^${prefix} ${name}${suffix}`, 'gm');
+  const starts = [...src.matchAll(startRegex)];
+  return starts.map((m) => {
+    let braces = 0;
+    let i = m.index;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') braces++;
+      else if (src[i] === '}') {
+        braces--;
+        if (endsAtBrace && braces === 0) { i++; break; }
+      }
+      else if (src[i] === ';' && braces === 0) { i++; break; }
+    }
+    return src.slice(m.index, i);
+  });
+}
+
+const nsReExportRegex = /declare namespace (\w+) \{\s*export \{([^}]+)\};\s*\}/gs;
+for (const nsMatch of [...content.matchAll(nsReExportRegex)]) {
+  const nsName = nsMatch[1];
+  const members = nsMatch[2].split(',').map(n => n.trim()).filter(Boolean);
+  const nsLines = [];
+  for (const name of members) {
+    // 1. Functions — use exact match to avoid `name$1` collisions
+    const fnDecls = findTopLevelDecl(content, 'declare function', name);
+    if (fnDecls.length > 0) {
+      for (const decl of fnDecls) {
+        nsLines.push('  ' + decl.replace('declare function', 'export function').replace(/\n/g, '\n  '));
+        content = content.replace(decl + '\n', '');
+      }
+      continue;
+    }
+    // 2. Interfaces — multi-line, ends with `^}`
+    const ifaceRegex = new RegExp(`^interface ${name}\\b[\\s\\S]*?^\\}`, 'gm');
+    const ifaceMatch = content.match(ifaceRegex);
+    if (ifaceMatch) {
+      nsLines.push('  export ' + ifaceMatch[0].replace(/^/gm, '  ').trimStart());
+      content = content.replace(ifaceRegex, '');
+      continue;
+    }
+    // 3. Classes
+    const classDecls = findTopLevelDecl(content, 'declare class', name, { exactMatch: false, endsAtBrace: true });
+    if (classDecls.length > 0) {
+      for (const decl of classDecls) {
+        nsLines.push('  export ' + decl.replace('declare class', 'class').replace(/\n/g, '\n  '));
+        content = content.replace(decl + '\n', '');
+      }
+      continue;
+    }
+    // 4. Type aliases
+    const typeRegex = new RegExp(`^type ${name}\\b[^\\n]*`, 'gm');
+    const typeMatch = content.match(typeRegex);
+    if (typeMatch) {
+      nsLines.push('  export ' + typeMatch[0]);
+      content = content.replace(new RegExp(`^type ${name}\\b[^\\n]*\\n`, 'gm'), '');
+      continue;
+    }
+    // Fallback: keep as re-export (shouldn't happen)
+    nsLines.push(`  export { ${name} };`);
+  }
+  content = content.replace(nsMatch[0], `declare namespace ${nsName} {\n${nsLines.join('\n')}\n}`);
+}
+
 // ── Alias `lib` → `partLibrary` ─────────────────────────────────────────────
 // The bundler loses the `export { partLibrary as lib }` rename. Add an
 // explicit alias so Monaco autocompletes `lib.*` in user scripts.
