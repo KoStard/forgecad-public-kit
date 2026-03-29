@@ -11,6 +11,8 @@
 
 import type { SdfNode, Vec3 } from './sdfNode';
 import { simplex3, seededSimplex3 } from './noise';
+import { computeGradient, triplanarWeights } from './sdfGradient';
+import { analyzeUV, compileUVFunction } from './sdfUV';
 import { gyroid, schwarzP, diamond, lidinoid } from './tpms';
 import { worley3, seededWorley3, worley3Surface, seededWorley3Surface } from './voronoi';
 
@@ -278,6 +280,45 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
       const displaceFn = new Function('x', 'y', 'z', ...constNames, `return (${node.functionBody});`) as Function;
       return (p) => fn(p) + (displaceFn as any)(p[0], p[1], p[2], ...constValues);
     }
+    case 'sdf:surfaceDisplace': {
+      const childFn = compileSdfNode(node.child);
+      const constEntries = Object.entries(node.constants ?? {});
+      const constNames = constEntries.map(([k]) => k);
+      const constValues = constEntries.map(([, v]) => v);
+      // eslint-disable-next-line no-new-func
+      const patternFn = new Function('u', 'v', ...constNames, `return (${node.patternBody});`) as Function;
+
+      // Analyze child tree for UV parametrization
+      const uvMode = node.uvMode && node.uvMode !== 'auto' ? node.uvMode : undefined;
+      const analysis = analyzeUV(node.child, uvMode);
+      const uvFn = compileUVFunction(analysis);
+
+      if (uvFn) {
+        // Primitive UV mode — analytic (u,v) in surface mm
+        return (p) => {
+          const d = childFn(p);
+          const [u, v] = uvFn(p);
+          return d + (patternFn as any)(u, v, ...constValues);
+        };
+      }
+
+      // Triplanar fallback — evaluate pattern 3x, blend by normal
+      const sharpness = node.triplanarSharpness ?? 4;
+      const gradEps = 0.05; // gradient step size in mm
+      return (p) => {
+        const d = childFn(p);
+        const { nx, ny, nz } = computeGradient(childFn, p, gradEps);
+        const { wx, wy, wz } = triplanarWeights(nx, ny, nz, sharpness);
+
+        // X-face → pattern(y, z), Y-face → pattern(x, z), Z-face → pattern(x, y)
+        const hX = (patternFn as any)(p[1], p[2], ...constValues) as number;
+        const hY = (patternFn as any)(p[0], p[2], ...constValues) as number;
+        const hZ = (patternFn as any)(p[0], p[1], ...constValues) as number;
+
+        return d + wx * hX + wy * hY + wz * hZ;
+      };
+    }
+
     case 'sdf:onion': {
       const fn = compileSdfNode(node.child);
       const { layers, thickness: t } = node;
@@ -507,7 +548,8 @@ export function estimateSdfBounds(node: SdfNode): SdfBounds {
       const t = node.thickness * 0.5;
       return padBounds(b, t);
     }
-    case 'sdf:displace': {
+    case 'sdf:displace':
+    case 'sdf:surfaceDisplace': {
       // Can't know displacement amplitude — add generous padding
       const b = estimateSdfBounds(node.child);
       return padBounds(b, 5);
