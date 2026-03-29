@@ -388,6 +388,18 @@ scales(options?: ScalesOptions): SdfShape
 brick(options?: BrickOptions): SdfShape
 ```
 
+#### `weave()`
+
+```ts
+weave(options?: WeaveOptions): SdfShape
+```
+
+#### `basketWeave()`
+
+```ts
+basketWeave(options?: BasketWeaveOptions): SdfShape
+```
+
 #### `fromFunction()`
 
 ```ts
@@ -828,7 +840,7 @@ A Shape that knows its topology — which faces and edges it has by name. Create
 - `bend()` — Bend around the Z axis with given radius.
 - `repeat()` — Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite.
 - `shell()` — Hollow out, keeping only a shell of given thickness.
-- `displace()` — Displace the surface by a function of position. Pass constants to inject named values into the function body (avoids closure serialization issues).
+- `displace()` — Displace the surface by a function of position, or by a pattern SdfShape. ```js // Function displacement shape.displace((x, y, z) => Math.sin(x) * 0.5) // Pattern displacement (e.g. basketWeave) shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 })) ```
 - `onion()` — Create concentric onion layers.
 
 ---
