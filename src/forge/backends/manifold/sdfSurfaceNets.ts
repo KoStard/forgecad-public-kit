@@ -80,7 +80,6 @@ export function surfaceNets(
   const vertices: number[] = [];
   const faces: number[] = [];
 
-  let n = 0;
   const x = [0, 0, 0];
   const R = [1, dims[0] + 1, (dims[0] + 1) * (dims[1] + 1)];
   const grid = new Float64Array(8);
@@ -91,11 +90,11 @@ export function surfaceNets(
   indexBuffer.fill(-1);
   let bufNo = 1;
 
-  for (x[2] = 0; x[2] < dims[2] - 1; ++x[2], n += dims[0], bufNo ^= 1, R[2] = -R[2]) {
+  for (x[2] = 0; x[2] < dims[2] - 1; ++x[2], bufNo ^= 1, R[2] = -R[2]) {
     let m = 1 + (dims[0] + 1) * (1 + bufNo * (dims[1] + 1));
 
-    for (x[1] = 0; x[1] < dims[1] - 1; ++x[1], ++n, m += 2) {
-      for (x[0] = 0; x[0] < dims[0] - 1; ++x[0], ++n, ++m) {
+    for (x[1] = 0; x[1] < dims[1] - 1; ++x[1], m += 2) {
+      for (x[0] = 0; x[0] < dims[0] - 1; ++x[0], ++m) {
         // Sample 8 corners of the cube
         let mask = 0;
         let g = 0;
@@ -132,19 +131,11 @@ export function surfaceNets(
           const t = g0 - g1;
           const interp = Math.abs(t) > 1e-6 ? g0 / t : 0.5;
 
-          for (let j = 0, bit = 1; j < 3; ++j, bit <<= 1) {
-            const a = e0 & bit;
-            const b = e1 & bit;
-            if (a !== b) {
-              vx += j === 0 ? (a ? 1.0 - interp : interp) : 0;
-              vy += j === 1 ? (a ? 1.0 - interp : interp) : 0;
-              vz += j === 2 ? (a ? 1.0 - interp : interp) : 0;
-            } else {
-              vx += j === 0 ? (a ? 1.0 : 0) : 0;
-              vy += j === 1 ? (a ? 1.0 : 0) : 0;
-              vz += j === 2 ? (a ? 1.0 : 0) : 0;
-            }
-          }
+          // Accumulate interpolated vertex position per axis
+          // Each axis: if the two cube corners differ on this bit, interpolate; otherwise take the corner value
+          vx += (e0 & 1) !== (e1 & 1) ? (e0 & 1 ? 1.0 - interp : interp) : (e0 & 1 ? 1.0 : 0);
+          vy += (e0 & 2) !== (e1 & 2) ? (e0 & 2 ? 1.0 - interp : interp) : (e0 & 2 ? 1.0 : 0);
+          vz += (e0 & 4) !== (e1 & 4) ? (e0 & 4 ? 1.0 - interp : interp) : (e0 & 4 ? 1.0 : 0);
         }
 
         // Average and transform to world coordinates

@@ -51,10 +51,3 @@ export function simplifyMesh(
 
   return simplified;
 }
-
-/**
- * Check if meshoptimizer is initialized and available.
- */
-export function isMeshoptimizerReady(): boolean {
-  return _simplifier !== null;
-}

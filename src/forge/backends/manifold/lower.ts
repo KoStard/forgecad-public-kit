@@ -16,7 +16,7 @@ import type { EdgeFeatureTarget, ShapeBackend } from '../../shapeBackend';
 import { lowerSheetMetalBasePlan } from '../../sheetMetalModel';
 import { lowerShellShapeCompilePlanToConcretePlan } from '../../shellCompilePlan';
 import { compileSdfNode } from '../../sdf/sdfEval';
-import { isMeshoptimizerReady, simplifyMesh } from './meshSimplify';
+import { simplifyMesh } from './meshSimplify';
 import { surfaceNets } from './sdfSurfaceNets';
 import { buildLoftLevelSetInput, buildSweepLevelSetInput, buildVariableSweepLevelSetInput } from '../../sketch/loftSweepLowering';
 import type { Vec3 } from '../../transform';
@@ -477,7 +477,7 @@ function lowerSdfToManifold(
   // Simplify: reduce triangle count while preserving shape.
   // 50% target balances triangle reduction with quality preservation.
   // Error bound is relative to edgeLength — allows up to half a cell of deviation.
-  if (isMeshoptimizerReady() && snMesh.numTris > 100) {
+  if (snMesh.numTris > 100) {
     triVerts = simplifyMesh(triVerts, vertProperties, 0.5, edgeLength * 0.5);
   }
 
