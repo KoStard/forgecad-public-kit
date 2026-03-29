@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, existsSy
 import { join, relative, basename, dirname, extname } from 'path';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
-import { indexMarkdownFile } from './docs-search-index.mjs';
+import { indexMarkdownFile, slugify } from './docs-search-index.mjs';
 
 // Configure marked to use highlight.js for code blocks via custom renderer
 const renderer = new marked.Renderer();
@@ -24,6 +24,11 @@ renderer.code = function({ text, lang }) {
     highlighted = hljs.highlightAuto(text).value;
   }
   return `<pre><code class="hljs language-${lang || ''}">${highlighted}</code></pre>`;
+};
+renderer.heading = function({ text, depth, tokens }) {
+  const id = slugify(text);
+  const html = this.parser.parseInline(tokens);
+  return `<h${depth} id="${id}">${html}<a class="anchor-link" href="#${id}" aria-label="Link to this section">#</a></h${depth}>\n`;
 };
 marked.use({ renderer });
 
@@ -545,6 +550,23 @@ html, body {
   margin: 20px 0 6px;
 }
 
+.anchor-link {
+  opacity: 0;
+  margin-left: 8px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 400;
+  font-size: 0.8em;
+  transition: opacity 0.15s;
+}
+
+.doc-content h1:hover .anchor-link,
+.doc-content h2:hover .anchor-link,
+.doc-content h3:hover .anchor-link,
+.doc-content h4:hover .anchor-link {
+  opacity: 1;
+}
+
 .doc-content p {
   margin: 0 0 12px;
   color: var(--text);
@@ -933,7 +955,29 @@ function getAppJs() {
     // Make internal doc links navigable
     content.querySelectorAll('a[href]').forEach(a => {
       const href = a.getAttribute('href');
-      if (href && !href.startsWith('http') && !href.startsWith('#')) {
+      if (!href) return;
+
+      // Anchor links — update URL to docId::anchor format and scroll
+      if (a.classList.contains('anchor-link')) {
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          const anchor = href.slice(1); // strip leading #
+          history.replaceState(null, '', '#' + currentDocId + '::' + anchor);
+          const target = content.querySelector('#' + CSS.escape(anchor));
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            target.classList.add('highlight-target');
+          }
+          // Copy permalink to clipboard
+          navigator.clipboard.writeText(location.href).then(() => {
+            a.textContent = '\\u2713';
+            setTimeout(() => { a.textContent = '#'; }, 1500);
+          });
+        });
+        return;
+      }
+
+      if (!href.startsWith('http') && !href.startsWith('#')) {
         a.addEventListener('click', e => {
           e.preventDefault();
           // Resolve relative path

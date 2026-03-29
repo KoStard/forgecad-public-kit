@@ -17,7 +17,7 @@ const DOCS_DIR = join(ROOT, 'docs', 'permanent');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function slugify(text) {
+export function slugify(text) {
   return text
     .toLowerCase()
     .replace(/`/g, '')
