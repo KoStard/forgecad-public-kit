@@ -15,14 +15,18 @@ export type {
   ScalesOptions,
   SdfToShapeOptions,
   TpmsOptions,
+  BasketWeaveOptions,
   VoronoiOptions,
   WavesOptions,
+  WeaveOptions,
 } from './sdf';
 export {
+  // Surface patterns (displacement)
+  basketWeave,
   bend,
   blend,
   box,
-  // Surface patterns
+  // Surface patterns (intersection)
   brick,
   capsule,
   cone,
@@ -56,4 +60,5 @@ export {
   twist,
   voronoi,
   waves,
+  weave,
 } from './sdf';

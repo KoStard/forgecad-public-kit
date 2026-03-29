@@ -129,8 +129,24 @@ export class SdfShape {
     return new SdfShape({ kind: 'sdf:shell', child: this._node, thickness });
   }
 
-  /** Displace the surface by a function of position. Pass constants to inject named values into the function body (avoids closure serialization issues). */
-  displace(fn: (x: number, y: number, z: number) => number, constants?: Record<string, number>): SdfShape {
+  /**
+   * Displace the surface by a function of position, or by a pattern SdfShape.
+   *
+   * ```js
+   * // Function displacement
+   * shape.displace((x, y, z) => Math.sin(x) * 0.5)
+   *
+   * // Pattern displacement (e.g. basketWeave)
+   * shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+   * ```
+   */
+  displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape {
+    if (fn instanceof SdfShape) {
+      if (fn._node.kind !== 'sdf:custom') {
+        throw new Error('displace(SdfShape) only supports pattern presets (sdf:custom nodes)');
+      }
+      return new SdfShape({ kind: 'sdf:displace', child: this._node, functionBody: fn._node.functionBody, constants: fn._node.constants });
+    }
     return new SdfShape({ kind: 'sdf:displace', child: this._node, functionBody: extractFunctionBody(fn), constants });
   }
 
@@ -539,6 +555,94 @@ export function brick(options?: BrickOptions): SdfShape {
   return d < m ? ${depth} : -${depth};
 })()`;
   return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-ext, -ext, -depth * 2], max: [ext, ext, depth * 2] } });
+}
+
+export interface WeaveOptions {
+  /** Thread center-to-center spacing (for intersection patterns). Default: 5 */
+  spacing?: number;
+  /** Thread half-width. Default: 1 */
+  threadRadius?: number;
+}
+
+/**
+ * Grid lattice pattern — two families of infinite slabs crossing at 90°.
+ * Creates a waffle/grid when intersected with a shell. For thread-like basket
+ * weave on curved surfaces, use `sdf.basketWeave()` with `.displace()` instead.
+ *
+ * ```js
+ * sdf.sphere(20).shell(2)
+ *   .intersect(sdf.weave({ spacing: 3, threadRadius: 1.2 }))
+ *   .toShape()
+ * ```
+ */
+export function weave(options?: WeaveOptions): SdfShape {
+  const sp = options?.spacing ?? 5;
+  const r = options?.threadRadius ?? 1;
+  const ext = 200;
+  const k = r * 0.5;
+  const functionBody = `(function() {
+  var sp = ${sp}, r = ${r}, k = ${k};
+  var dA = Math.abs(z - Math.round(z / sp) * sp) - r;
+  var dB = Math.abs(x - Math.round(x / sp) * sp) - r;
+  var h = Math.max(k - Math.abs(dA - dB), 0) / k;
+  return Math.min(dA, dB) - h * h * k * 0.25;
+})()`;
+  return new SdfShape({
+    kind: 'sdf:custom',
+    functionBody,
+    bounds: { min: [-ext, -ext, -ext], max: [ext, ext, ext] },
+  });
+}
+
+export interface BasketWeaveOptions {
+  /** Number of vertical stakes (threads around circumference). Default: 16 */
+  threads?: number;
+  /** Spacing between horizontal weavers in mm. Default: 3 */
+  spacing?: number;
+  /** Thread width in mm. Default: 1.5 */
+  threadWidth?: number;
+  /** Thread protrusion depth in mm. Default: 0.8 */
+  depth?: number;
+}
+
+/**
+ * Basket weave displacement pattern — surface-following threads with over-under
+ * crossings. Works in cylindrical coordinates, ideal for bowls, vases, and
+ * other surfaces of revolution. Use with `.displace()`.
+ *
+ * Vertical stakes maintain constant width; horizontal weavers maintain constant
+ * spacing. Stakes naturally converge toward the axis (like real basket weaving).
+ *
+ * ```js
+ * // Woven bowl
+ * sdf.sphere(27).shell(3)
+ *   .displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+ *   .toShape()
+ * ```
+ */
+export function basketWeave(options?: BasketWeaveOptions): SdfShape {
+  const N = options?.threads ?? 16;
+  const SP = options?.spacing ?? 3;
+  const TW = options?.threadWidth ?? 1.5;
+  const D = options?.depth ?? 0.8;
+  const hw = TW * 0.5;
+  const functionBody = `(function() {
+  var theta = Math.atan2(z, x);
+  var r = Math.sqrt(x * x + z * z);
+  var u = theta * ${N / (2 * Math.PI)};
+  var v = y / ${SP};
+  var du = Math.abs(u - Math.round(u)) * (${2 * Math.PI} * r / ${N});
+  var dv = Math.abs(v - Math.round(v)) * ${SP};
+  var hw = ${hw};
+  var pU = Math.max(0, 1 - du / hw); pU *= pU;
+  var pV = Math.max(0, 1 - dv / hw); pV *= pV;
+  var checker = ((Math.round(u) & 65535) + (Math.round(v) & 65535)) & 1;
+  var top = checker ? pV : pU;
+  var bot = checker ? pU : pV;
+  return -(top > bot * 0.15 ? top : bot * 0.15) * ${D};
+})()`;
+  // Bounds are irrelevant — this is meant for displacement, not standalone
+  return new SdfShape({ kind: 'sdf:custom', functionBody, bounds: { min: [-200, -200, -200], max: [200, 200, 200] } });
 }
 
 // ─── Custom SDF ──────────────────────────────────────────────────────────────

@@ -2603,8 +2603,18 @@ declare class SdfShape {
 	repeat(spacing: Vec3$1, count?: Vec3$1): SdfShape;
 	/** Hollow out, keeping only a shell of given thickness. */
 	shell(thickness: number): SdfShape;
-	/** Displace the surface by a function of position. Pass constants to inject named values into the function body (avoids closure serialization issues). */
-	displace(fn: (x: number, y: number, z: number) => number, constants?: Record<string, number>): SdfShape;
+	/**
+	 * Displace the surface by a function of position, or by a pattern SdfShape.
+	 *
+	 * ```js
+	 * // Function displacement
+	 * shape.displace((x, y, z) => Math.sin(x) * 0.5)
+	 *
+	 * // Pattern displacement (e.g. basketWeave)
+	 * shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+	 * ```
+	 */
+	displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape;
 	/** Create concentric onion layers. */
 	onion(layers: number, thickness: number): SdfShape;
 }
@@ -2715,6 +2725,24 @@ interface BrickOptions {
 	mortar?: number;
 }
 declare function brick(options?: BrickOptions): SdfShape;
+interface WeaveOptions {
+	/** Thread center-to-center spacing (for intersection patterns). Default: 5 */
+	spacing?: number;
+	/** Thread half-width. Default: 1 */
+	threadRadius?: number;
+}
+declare function weave(options?: WeaveOptions): SdfShape;
+interface BasketWeaveOptions {
+	/** Number of vertical stakes (threads around circumference). Default: 16 */
+	threads?: number;
+	/** Spacing between horizontal weavers in mm. Default: 3 */
+	spacing?: number;
+	/** Thread width in mm. Default: 1.5 */
+	threadWidth?: number;
+	/** Thread protrusion depth in mm. Default: 0.8 */
+	depth?: number;
+}
+declare function basketWeave(options?: BasketWeaveOptions): SdfShape;
 declare function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: {
 	min: Vec3$1;
 	max: Vec3$1;
@@ -6414,7 +6442,7 @@ declare function highlight(face: FaceRef, opts?: HighlightOptions): void;
 declare function highlight(edge: EdgeRef, opts?: HighlightOptions): void;
 
 declare namespace sdf {
-	export { BlendOptions, BrickOptions, HoneycombOptions, KnurlOptions, NoiseOptions, PerforatedOptions, ScalesOptions, SdfShape, SdfToShapeOptions, TpmsOptions, VoronoiOptions, WavesOptions, bend, blend, box, brick, capsule, cone, cylinder, diamond, fromFunction, gyroid, honeycomb, knurl, lidinoid, morph, noise, perforated, repeat, scales, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist, voronoi, waves };
+	export { BasketWeaveOptions, BlendOptions, BrickOptions, HoneycombOptions, KnurlOptions, NoiseOptions, PerforatedOptions, ScalesOptions, SdfShape, SdfToShapeOptions, TpmsOptions, VoronoiOptions, WavesOptions, WeaveOptions, basketWeave, bend, blend, box, brick, capsule, cone, cylinder, diamond, fromFunction, gyroid, honeycomb, knurl, lidinoid, morph, noise, perforated, repeat, scales, schwarzP, smoothDifference, smoothIntersection, smoothUnion, sphere, torus, twist, voronoi, waves, weave };
 }
 /** All library parts. Access via `lib.xxx()` in scripts. */
 declare const lib: typeof partLibrary;

@@ -444,12 +444,17 @@ export function estimateSdfBounds(node: SdfNode): SdfBounds {
     case 'sdf:union':
     case 'sdf:smoothUnion':
     case 'sdf:difference':
-    case 'sdf:smoothDifference':
-    case 'sdf:intersection':
-    case 'sdf:smoothIntersection': {
+    case 'sdf:smoothDifference': {
       const childBounds = node.children.map(estimateSdfBounds);
       const pad = 'radius' in node ? node.radius : 0;
       return unionBounds(childBounds, pad);
+    }
+    case 'sdf:intersection':
+    case 'sdf:smoothIntersection': {
+      // Intersection result is bounded by the overlap of child bounds
+      const childBounds = node.children.map(estimateSdfBounds);
+      const pad = 'radius' in node ? node.radius : 0;
+      return intersectBounds(childBounds, pad);
     }
     case 'sdf:morph': {
       return unionBounds([estimateSdfBounds(node.a), estimateSdfBounds(node.b)], 0);
@@ -551,6 +556,25 @@ function unionBounds(bounds: SdfBounds[], pad: number): SdfBounds {
       result.min[i] = min(result.min[i], b.min[i]);
       result.max[i] = max(result.max[i], b.max[i]);
     }
+  }
+  if (pad > 0) return padBounds(result, pad);
+  return result;
+}
+
+function intersectBounds(bounds: SdfBounds[], pad: number): SdfBounds {
+  const result: SdfBounds = {
+    min: [-Infinity, -Infinity, -Infinity],
+    max: [Infinity, Infinity, Infinity],
+  };
+  for (const b of bounds) {
+    for (let i = 0; i < 3; i++) {
+      result.min[i] = max(result.min[i], b.min[i]);
+      result.max[i] = min(result.max[i], b.max[i]);
+    }
+  }
+  // Ensure valid bounds (min < max); if degenerate, fall back to union
+  for (let i = 0; i < 3; i++) {
+    if (result.min[i] >= result.max[i]) return unionBounds(bounds, pad);
   }
   if (pad > 0) return padBounds(result, pad);
   return result;
