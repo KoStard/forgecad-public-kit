@@ -12,11 +12,6 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
   experimentalExample(
-    'examples/api/_test-curves-render.forge.js',
-    'Test/debug file for curve rendering features (arcTo, bezierTo, blendTo). Not a maintained example.',
-    'tasks/280-example-gap-recovery-and-legacy-fence.md',
-  ),
-  experimentalExample(
     'examples/api/curves-surfacing-basics.forge.js',
     'Uses loft/sweep geometry outside the current API surface. Needs rewrite to use supported methods.',
     'tasks/280-example-gap-recovery-and-legacy-fence.md',

@@ -539,14 +539,16 @@ function simplifySdfMesh(
  * meshoptimizer can collapse edges into zero-area triangles during decimation.
  */
 function filterDegenerateTriangles(triVerts: Uint32Array): Uint32Array {
-  const out: number[] = [];
+  let writeIdx = 0;
   for (let i = 0; i < triVerts.length; i += 3) {
     const a = triVerts[i], b = triVerts[i + 1], c = triVerts[i + 2];
     if (a !== b && b !== c && a !== c) {
-      out.push(a, b, c);
+      triVerts[writeIdx++] = a;
+      triVerts[writeIdx++] = b;
+      triVerts[writeIdx++] = c;
     }
   }
-  return new Uint32Array(out);
+  return triVerts.subarray(0, writeIdx);
 }
 
 /**
