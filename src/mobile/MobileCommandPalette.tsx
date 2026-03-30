@@ -47,9 +47,7 @@ export function MobileCommandPalette({ onClose }: Props) {
 
   const hasShapes = result?.objects?.some((obj) => Boolean(obj.shape)) ?? false;
   const hasSketches = result?.objects?.some((obj) => Boolean(obj.sketch)) ?? false;
-  const hiddenObjectCount = (result?.objects ?? []).filter(
-    (obj) => !(objectSettings[obj.id]?.visible ?? true),
-  ).length;
+  const hiddenObjectCount = (result?.objects ?? []).filter((obj) => !(objectSettings[obj.id]?.visible ?? true)).length;
 
   // ── Clipboard copy helper ──
   const copyToClipboard = useCallback(async (text: string, successMsg: string) => {
@@ -82,9 +80,7 @@ export function MobileCommandPalette({ onClose }: Props) {
   }, []);
 
   // ── Theme sub-commands ──
-  const themeChoices: Command[] = (
-    ['dark', 'light', 'gruvbox', 'tokyo-night', 'kanagawa-lotus'] as const
-  ).map((t) => ({
+  const themeChoices: Command[] = (['dark', 'light', 'gruvbox', 'tokyo-night', 'kanagawa-lotus'] as const).map((t) => ({
     id: `theme-${t}`,
     label: `${t.charAt(0).toUpperCase() + t.slice(1)}${theme === t ? '  \u2713' : ''}`,
     icon: theme === t ? '\u2713' : '\u25CB',
@@ -129,7 +125,11 @@ export function MobileCommandPalette({ onClose }: Props) {
       icon: '\u2712',
       action: () => {
         onClose();
-        try { exportSketchFromStore('svg'); } catch (e) { handleCommandError(e); }
+        try {
+          exportSketchFromStore('svg');
+        } catch (e) {
+          handleCommandError(e);
+        }
       },
     },
     {
@@ -138,7 +138,11 @@ export function MobileCommandPalette({ onClose }: Props) {
       icon: '\u2712',
       action: () => {
         onClose();
-        try { exportSketchFromStore('dxf'); } catch (e) { handleCommandError(e); }
+        try {
+          exportSketchFromStore('dxf');
+        } catch (e) {
+          handleCommandError(e);
+        }
       },
     },
   ];
@@ -227,9 +231,7 @@ export function MobileCommandPalette({ onClose }: Props) {
             icon: '\uD83D\uDCCE',
             action: () => {
               onClose();
-              void navigator.clipboard
-                .writeText(activeFile)
-                .catch(() => {});
+              void navigator.clipboard.writeText(activeFile).catch(() => {});
             },
           },
         ]
@@ -282,9 +284,7 @@ export function MobileCommandPalette({ onClose }: Props) {
   ];
 
   const commands = subCommands ?? rootCommands;
-  const filtered = commands.filter((c) =>
-    c.label.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filtered = commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()));
 
   // Focus input on open
   useEffect(() => {
@@ -296,18 +296,15 @@ export function MobileCommandPalette({ onClose }: Props) {
     setSelected(0);
   }, [query, subCommands]);
 
-  const select = useCallback(
-    (cmd: Command) => {
-      if (cmd.children) {
-        setSubCommands(cmd.children);
-        setSubTitle(cmd.label);
-        setQuery('');
-      } else {
-        cmd.action();
-      }
-    },
-    [],
-  );
+  const select = useCallback((cmd: Command) => {
+    if (cmd.children) {
+      setSubCommands(cmd.children);
+      setSubTitle(cmd.label);
+      setQuery('');
+    } else {
+      cmd.action();
+    }
+  }, []);
 
   const handleBack = useCallback(() => {
     setSubCommands(null);
@@ -317,36 +314,47 @@ export function MobileCommandPalette({ onClose }: Props) {
 
   return (
     <div className="fc-mobile-cmdpal-overlay" onClick={onClose}>
-      <div
-        className="fc-mobile-cmdpal-sheet"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="fc-mobile-cmdpal-sheet" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="fc-mobile-cmdpal-header">
           {subCommands ? (
             <button className="fc-mobile-cmdpal-back" onClick={handleBack}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
           ) : (
             <span className="fc-mobile-cmdpal-title">Commands</span>
           )}
-          {subTitle && subCommands && (
-            <span className="fc-mobile-cmdpal-title">{subTitle}</span>
-          )}
+          {subTitle && subCommands && <span className="fc-mobile-cmdpal-title">{subTitle}</span>}
           <div style={{ flex: 1 }} />
-          <button
-            className="fc-mobile-cmdpal-close"
-            onClick={onClose}
-          >
+          <button className="fc-mobile-cmdpal-close" onClick={onClose}>
             Done
           </button>
         </div>
 
         {/* Search */}
         <div className="fc-mobile-cmdpal-search">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.5 }}>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ flexShrink: 0, opacity: 0.5 }}
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -363,11 +371,17 @@ export function MobileCommandPalette({ onClose }: Props) {
             spellCheck={false}
           />
           {query && (
-            <button
-              className="fc-mobile-cmdpal-clear"
-              onClick={() => setQuery('')}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <button className="fc-mobile-cmdpal-clear" onClick={() => setQuery('')}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="10" />
                 <line x1="15" y1="9" x2="9" y2="15" />
                 <line x1="9" y1="9" x2="15" y2="15" />
@@ -378,9 +392,7 @@ export function MobileCommandPalette({ onClose }: Props) {
 
         {/* Command list */}
         <div className="fc-mobile-cmdpal-list" ref={listRef}>
-          {filtered.length === 0 && (
-            <div className="fc-mobile-cmdpal-empty">No matching commands</div>
-          )}
+          {filtered.length === 0 && <div className="fc-mobile-cmdpal-empty">No matching commands</div>}
           {filtered.map((cmd, i) => (
             <button
               key={cmd.id}
@@ -391,7 +403,17 @@ export function MobileCommandPalette({ onClose }: Props) {
               <span className="fc-mobile-cmdpal-item-icon">{cmd.icon}</span>
               <span className="fc-mobile-cmdpal-item-label">{cmd.label}</span>
               {cmd.children && (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.4 }}>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ flexShrink: 0, opacity: 0.4 }}
+                >
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               )}
