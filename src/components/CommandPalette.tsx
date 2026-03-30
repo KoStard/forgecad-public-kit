@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FLAG_DEFINITIONS, useFeatureFlagStore } from '../featureFlags';
 import { fileSystem } from '../fs';
-import { fetchGistModel, fetchUrlModel } from '../share';
+import { buildGistShareUrl, fetchGistModel, fetchUrlModel } from '../share';
 import { useForgeStore } from '../store/forgeStore';
 import { exportMeshFromStore, exportOrbitGifFromStore, exportReportFromStore, exportSketchFromStore } from './exportActions';
+import { showToast } from './Toast';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? '⌘' : 'Ctrl';
@@ -222,6 +223,21 @@ export function CommandPalette() {
             useForgeStore.getState().loadFromText(model.code, model.filename);
           })
           .catch(handleCommandError);
+      },
+    },
+    {
+      id: 'copy-gist-link',
+      label: 'Copy Gist Link',
+      action: () => {
+        close();
+        const input = window.prompt('Paste a GitHub Gist URL or ID:');
+        if (!input) return;
+        const match = input.match(/gist\.github\.com\/(?:[^/]+\/)?([a-f0-9]+)/i);
+        const gistId = match ? match[1] : input.trim();
+        const url = buildGistShareUrl(gistId);
+        navigator.clipboard.writeText(url).then(() => {
+          showToast('Gist link copied to clipboard', 'success', 2500);
+        });
       },
     },
     {

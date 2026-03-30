@@ -42,6 +42,7 @@ import { runStudioCli } from './forge-studio';
 import { runSvgCli } from './forge-svg';
 import { runUrdfCli } from './forge-urdf';
 import { runWebCli } from './forge-web';
+import { runLinkCli } from './forge-link';
 import { isDirectCliRun, resolvePackagePath } from './package-runtime';
 import { runParamCheckCli } from './param-check';
 import { runScriptCli } from './test-run';
@@ -757,6 +758,20 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: runCuttingLayoutCli,
+  },
+  {
+    group: 'Export',
+    path: ['link'],
+    summary: 'Generate a ForgeCAD share link from a GitHub Gist URL or ID and copy it to clipboard.',
+    usage: ['forgecad link <gist-url-or-id>'],
+    examples: [
+      'forgecad link https://gist.github.com/user/abc123',
+      'forgecad link abc123',
+    ],
+    completion: {
+      positionals: [{ description: 'GitHub Gist URL or ID' }],
+    },
+    run: runLinkCli,
   },
   {
     group: 'Checks',
