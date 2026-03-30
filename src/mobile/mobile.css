@@ -352,6 +352,184 @@
   }
 }
 
+/* ─── Command Palette ─── */
+
+.fc-mobile-cmdpal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  animation: fc-mobile-fade-in 0.15s ease-out;
+}
+
+@keyframes fc-mobile-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fc-mobile-cmdpal-sheet {
+  width: 100%;
+  max-height: 70vh;
+  background: var(--fc-bgPanel);
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+  animation: fc-mobile-slide-up 0.2s ease-out;
+}
+
+@keyframes fc-mobile-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.fc-mobile-cmdpal-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 8px;
+  gap: 8px;
+}
+
+.fc-mobile-cmdpal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fc-text);
+}
+
+.fc-mobile-cmdpal-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  color: var(--fc-accent);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.fc-mobile-cmdpal-back:active {
+  background: var(--fc-bgHover);
+}
+
+.fc-mobile-cmdpal-close {
+  background: none;
+  border: none;
+  color: var(--fc-accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.fc-mobile-cmdpal-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  background: var(--fc-bgInput, var(--fc-bg));
+  border: 1px solid var(--fc-border);
+  border-radius: 8px;
+}
+
+.fc-mobile-cmdpal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--fc-text);
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+  padding: 0;
+  min-width: 0;
+}
+
+.fc-mobile-cmdpal-input::placeholder {
+  color: var(--fc-textDim);
+}
+
+.fc-mobile-cmdpal-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  color: var(--fc-textMuted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.fc-mobile-cmdpal-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 8px;
+}
+
+.fc-mobile-cmdpal-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: var(--fc-text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  gap: 12px;
+  font-family: inherit;
+}
+
+.fc-mobile-cmdpal-item:active {
+  background: var(--fc-bgHover);
+}
+
+.fc-mobile-cmdpal-item-icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.fc-mobile-cmdpal-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-mobile-cmdpal-empty {
+  padding: 20px 16px;
+  text-align: center;
+  color: var(--fc-textDim);
+  font-size: 14px;
+}
+
+/* ── Topbar title as command trigger ── */
+
+.fc-mobile-topbar-title[data-tappable="true"] {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin: 0 -8px;
+}
+
+.fc-mobile-topbar-title[data-tappable="true"]:active {
+  background: var(--fc-bgHover);
+}
+
 /* ─── Spinner ─── */
 
 @keyframes fc-mobile-spin {
