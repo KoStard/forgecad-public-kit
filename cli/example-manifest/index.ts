@@ -29,6 +29,8 @@ function manifestPackageRoot(): string {
   return basename(candidate) === 'cli' ? resolve(candidate, '..') : candidate;
 }
 
+const EXCLUDED_EXAMPLE_DIRS = new Set(['bench', 'bench-v2']);
+
 export function listExampleArtifacts(): string[] {
   const packageRoot = manifestPackageRoot();
   const examplesRoot = join(packageRoot, 'examples');
@@ -39,6 +41,7 @@ export function listExampleArtifacts(): string[] {
       const fullPath = join(dir, entry);
       const stat = statSync(fullPath);
       if (stat.isDirectory()) {
+        if (dir === examplesRoot && EXCLUDED_EXAMPLE_DIRS.has(entry)) continue;
         walk(fullPath);
         continue;
       }

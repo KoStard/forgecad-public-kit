@@ -44,7 +44,7 @@ export function MobileCodeEditor() {
       <pre
         ref={preRef}
         className="fc-mobile-editor-highlight"
-        // eslint-disable-next-line react/no-danger
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: renders trusted syntax-highlighted code
         dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
       />
       <textarea

@@ -162,7 +162,12 @@ export function resolveSketchWorkplane(parentOrFace: ShapeAnchorTarget | FaceRef
 
   if (parentOrFace instanceof Shape && getShapeCompilePlan(parentOrFace)) {
     try {
-      return resolvePlanarFaceWorkplane(parentOrFace.face(face));
+      const faceRef = parentOrFace.face(face);
+      const workplane = resolvePlanarFaceWorkplane(faceRef);
+      if (isCanonicalFace(face) && workplane.source.kind === 'face-ref' && !faceRef.query && !faceRef.descendant) {
+        workplane.source = { kind: 'canonical-face', face, owner: resolveTargetQueryOwner(parentOrFace) };
+      }
+      return workplane;
     } catch (error) {
       if (!isCanonicalFace(face) || !isGenericMissingFaceError(error, face)) {
         throw error;

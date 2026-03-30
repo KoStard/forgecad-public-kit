@@ -4,7 +4,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git log:*)",
-      "Bash(gh repo:*)"
+      "Bash(gh repo:*)",
+      "Bash(grep -r \"isEvaluating\\\\|evaluationPhase\" /Users/kostard/Projects/CAD/ForgeCAD/src/components/*.tsx)"
     ]
   }
 }

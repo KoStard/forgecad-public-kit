@@ -15,6 +15,11 @@ type NonPartEntry = {
 
 const ASSEMBLY_ENTRIES: readonly NonPartEntry[] = [
   {
+    path: 'examples/api/assembly-disassembly.forge.js',
+    note: 'Disassembly animation demo with toDisassemblyView() auto-separation.',
+    expect: { minAnimations: 1 },
+  },
+  {
     path: 'examples/api/assembly-gear-coupling.forge.js',
     note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
   },
@@ -22,18 +27,6 @@ const ASSEMBLY_ENTRIES: readonly NonPartEntry[] = [
     path: 'examples/api/assembly-mechanism.forge.js',
     note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
     expect: { minUniqueGroups: 1 },
-  },
-  {
-    path: 'examples/api/import-assembly.forge.js',
-    note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
-  },
-  {
-    path: 'examples/api/import-assembly-merge.forge.js',
-    note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
-  },
-  {
-    path: 'examples/api/import-assembly-placed.forge.js',
-    note: 'Assemblies are in the architecture-phase gate through runtime solve and scene emission, not exact part-routing parity.',
   },
   {
     path: 'examples/api/runtime-joints-view.forge.js',
@@ -53,6 +46,22 @@ const ASSEMBLY_ENTRIES: readonly NonPartEntry[] = [
 ] as const;
 
 const RUNTIME_SCENE_ENTRIES: readonly NonPartEntry[] = [
+  {
+    path: 'examples/origami-fish.forge.js',
+    note: 'Origami fish — stylized folded-paper form using sketch and extrude.',
+  },
+  {
+    path: 'examples/gcode/bambu-vase.forge.js',
+    note: 'G-code spiral vase example for Bambu Lab A1.',
+  },
+  {
+    path: 'examples/api/smooth-surfaces-showcase.forge.js',
+    note: 'Surface and curve capabilities showcase — variableSweep, loft, surfacePatch, transition curves.',
+  },
+  {
+    path: 'examples/api/transition-curves.forge.js',
+    note: 'Transition curves — smooth connections between edges with G1/G2 continuity.',
+  },
   {
     path: 'examples/api/scene-basics.forge.js',
     note: 'Scene API demo — judged by runtime scene behavior (camera, lights, post-processing).',

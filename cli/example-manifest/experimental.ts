@@ -22,6 +22,26 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
   ),
   experimentalExample(
+    'examples/api/import-assembly.forge.js',
+    'Runtime error: subArm.part is not a function — needs API update.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/api/import-assembly-merge.forge.js',
+    'Runtime error: require(...).mergeInto is not a function — needs API update.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/api/import-assembly-placed.forge.js',
+    'Runtime error: sub.referenceNames is not a function — needs API update.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/cutting-layout-demo.forge.js',
+    'Cutting layout script does not return a Shape — needs a dedicated validator.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
     'examples/api/import-assembly-source.forge.js',
     'Source file for assembly import demos — not runnable standalone, only used as an import target.',
     'tasks/280-example-gap-recovery-and-legacy-fence.md',
@@ -109,4 +129,60 @@ export const EXPERIMENTAL_EXAMPLE_MANIFEST: ExampleManifestEntry[] = [
       'tasks/280-example-gap-recovery-and-legacy-fence.md',
     );
   }),
+  experimentalExample(
+    'examples/api/gyroid-voronoi-blend.forge.js',
+    'SDF toShape() produces faceted mesh geometry outside the exact BREP route.',
+    'sdf-exact-route',
+  ),
+  experimentalExample(
+    'examples/api/organic-noise-sculpture.forge.js',
+    'SDF noise field intersection — outside exact route.',
+    'sdf-exact-route',
+  ),
+  experimentalExample(
+    'examples/api/patterned-vase.forge.js',
+    'SDF voronoi pattern on revolved form — outside exact route.',
+    'sdf-exact-route',
+  ),
+  experimentalExample(
+    'examples/api/sdf-shapes.forge.js',
+    'SDF API showcase — smooth booleans, TPMS lattices, domain warps.',
+    'sdf-exact-route',
+  ),
+  experimentalExample('examples/api/voronoi-sphere.forge.js', 'SDF voronoi sphere — outside exact route.', 'sdf-exact-route'),
+  experimentalExample(
+    'examples/api/loft-along-spine-test.forge.js',
+    'loftAlongSpine() test — advanced loft API not yet fully validated.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/api/surface-patch-test.forge.js',
+    'surfacePatch() test — smooth surface fill, experimental API.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/api/variable-sweep-test.forge.js',
+    'variableSweep() test — tapered tube along curved spine, experimental API.',
+    'tasks/280-example-gap-recovery-and-legacy-fence.md',
+  ),
+  experimentalExample(
+    'examples/showcase/coral-vase.forge.js',
+    'SDF noise-textured vase — showcase, outside exact route.',
+    'sdf-exact-route',
+  ),
+  experimentalExample(
+    'examples/showcase/nested-spheres.forge.js',
+    'SDF concentric patterned shells — showcase, outside exact route.',
+    'sdf-exact-route',
+  ),
+  experimentalExample(
+    'examples/showcase/twisted-lattice-tower.forge.js',
+    'SDF gyroid lattice tower — showcase, outside exact route.',
+    'sdf-exact-route',
+  ),
+  experimentalExample(
+    'examples/showcase/voronoi-lampshade.forge.js',
+    'SDF voronoi lampshade — showcase, outside exact route.',
+    'sdf-exact-route',
+  ),
 ];

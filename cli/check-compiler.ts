@@ -95,10 +95,10 @@ let _compilerCases: CompilerCaseDefinition[] | undefined;
 function getCompilerCases(): CompilerCaseDefinition[] {
   if (_compilerCases) return _compilerCases;
   _compilerCases = [
-  inlineCase(
-    'exact-boolean-plate',
-    'Exact boolean plate with profile booleans and tapered extrude stays on the exact route.',
-    `
+    inlineCase(
+      'exact-boolean-plate',
+      'Exact boolean plate with profile booleans and tapered extrude stays on the exact route.',
+      `
 const ring = difference2d(
   roundedRect(90, 60, 8, true),
   roundedRect(84, 54, 5, true),
@@ -112,11 +112,11 @@ const body = roundedRect(96, 66, 8, true).extrude(20).subtract(
 );
 return [{ name: 'Plate', shape: union(body, leadIn) }];
 `,
-  ),
-  inlineCase(
-    'transform-heavy-solid',
-    'Exact primitives keep transform intent and runtime lowering aligned.',
-    `
+    ),
+    inlineCase(
+      'transform-heavy-solid',
+      'Exact primitives keep transform intent and runtime lowering aligned.',
+      `
 const pipe = cylinder(60, 5).pointAlong([0, 1, 0]);
 const ellipsoid = sphere(6).scale([1.2, 0.8, 0.5]).translate(4, -2, 1);
 const body = box(30, 30, 30, true)
@@ -126,11 +126,11 @@ const body = box(30, 30, 30, true)
   .rotateAround([0, 0, 1], 20, [0, 0, 0]);
 return [{ name: 'Body', shape: body }];
 `,
-  ),
-  inlineCase(
-    'split-solid-exact',
-    'Shape.split() keeps both branches inside compiler ownership when the cutter is compile-covered.',
-    `
+    ),
+    inlineCase(
+      'split-solid-exact',
+      'Shape.split() keeps both branches inside compiler ownership when the cutter is compile-covered.',
+      `
 const stock = box(48, 24, 20, true).toShape();
 const cutter = cylinder(28, 8, undefined, undefined, true)
   .translate(10, 0, 0)
@@ -141,11 +141,11 @@ return [
   { name: 'Outside', shape: outside },
 ];
 `,
-  ),
-  inlineCase(
-    'plane-trim-exact',
-    'Plane trims and split branches stay compiler-owned across both lowerers.',
-    `
+    ),
+    inlineCase(
+      'plane-trim-exact',
+      'Plane trims and split branches stay compiler-owned across both lowerers.',
+      `
 const body = box(40, 30, 20, true).toShape();
 const trimmed = body.trimByPlane([0, 0, 1], 0);
 const [upper, lower] = body.splitByPlane([0, 0, 1], 0);
@@ -155,11 +155,11 @@ return [
   { name: 'Lower', shape: lower },
 ];
 `,
-  ),
-  inlineCase(
-    'loft-exact',
-    'Loft stays compiler-owned and lowerable to both Manifold and CadQuery/OCCT for compatible section stacks.',
-    `
+    ),
+    inlineCase(
+      'loft-exact',
+      'Loft stays compiler-owned and lowerable to both Manifold and CadQuery/OCCT for compatible section stacks.',
+      `
 const body = loft(
   [
     roundedRect(26, 16, 3, true).translate(-1, 0),
@@ -170,11 +170,11 @@ const body = loft(
 );
 return [{ name: 'Loft', shape: body }];
 `,
-  ),
-  inlineCase(
-    'sweep-exact',
-    'Sweep keeps its sampled path intent in the compile graph and exports through the exact lowerer.',
-    `
+    ),
+    inlineCase(
+      'sweep-exact',
+      'Sweep keeps its sampled path intent in the compile graph and exports through the exact lowerer.',
+      `
 const profile = roundedRect(8, 4, 1.2, true).rotate(18).translate(1.5, 0);
 const route = [
   [0, 0, 0],
@@ -185,42 +185,42 @@ const route = [
 const body = sweep(profile, route, { up: [0, 0, 1], edgeLength: 0.5 });
 return [{ name: 'Sweep', shape: body }];
 `,
-  ),
-  inlineCase(
-    'shell-exact',
-    'Shell keeps semantic intent in the compile graph while exact lowering rewrites it into the supported boolean/extrude subset.',
-    `
+    ),
+    inlineCase(
+      'shell-exact',
+      'Shell keeps semantic intent in the compile graph while exact lowering rewrites it into the supported boolean/extrude subset.',
+      `
 const body = roundedRect(80, 50, 6, true)
   .extrude(30)
   .translate(4, -3, 2)
   .shell(2.5, { openFaces: ['top'] });
 return [{ name: 'Shell', shape: body }];
 `,
-  ),
-  inlineCase(
-    'hole-cut-workflows',
-    'Through holes, blind holes, and face-anchored cutouts stay compiler-owned and exact-exportable from one semantic workflow family.',
-    HOLE_CUT_WORKFLOW_CODE,
-  ),
-  inlineCase(
-    'created-face-downstream',
-    'Shell inner walls, blind-hole floors, and cut-created walls stay queryable enough to drive downstream exact-exportable features.',
-    CREATED_FACE_DOWNSTREAM_CODE,
-  ),
-  inlineCase(
-    'fillet-edge-workflow',
-    'Tracked vertical edge finishing stays compiler-owned through an ordinary union, preserves the selected propagated edge lineage, and still accepts downstream face-driven edits on the base-owner lineage.',
-    FILLET_EDGE_WORKFLOW_CODE,
-  ),
-  inlineCase(
-    'chamfer-edge-workflow',
-    'Tracked vertical chamfers lower through both backends after a supported union, preserve the selected propagated edge lineage, and still compose with additive and hole-driven edits.',
-    CHAMFER_EDGE_WORKFLOW_CODE,
-  ),
-  inlineCase(
-    'repeated-feature-ownership',
-    'Mirrored descendants and patterned cuts keep repeated-result ownership visible through booleans and downstream workplanes.',
-    `
+    ),
+    inlineCase(
+      'hole-cut-workflows',
+      'Through holes, blind holes, and face-anchored cutouts stay compiler-owned and exact-exportable from one semantic workflow family.',
+      HOLE_CUT_WORKFLOW_CODE,
+    ),
+    inlineCase(
+      'created-face-downstream',
+      'Shell inner walls, blind-hole floors, and cut-created walls stay queryable enough to drive downstream exact-exportable features.',
+      CREATED_FACE_DOWNSTREAM_CODE,
+    ),
+    inlineCase(
+      'fillet-edge-workflow',
+      'Tracked vertical edge finishing stays compiler-owned through an ordinary union, preserves the selected propagated edge lineage, and still accepts downstream face-driven edits on the base-owner lineage.',
+      FILLET_EDGE_WORKFLOW_CODE,
+    ),
+    inlineCase(
+      'chamfer-edge-workflow',
+      'Tracked vertical chamfers lower through both backends after a supported union, preserve the selected propagated edge lineage, and still compose with additive and hole-driven edits.',
+      CHAMFER_EDGE_WORKFLOW_CODE,
+    ),
+    inlineCase(
+      'repeated-feature-ownership',
+      'Mirrored descendants and patterned cuts keep repeated-result ownership visible through booleans and downstream workplanes.',
+      `
 const plate = roundedRect(90, 56, 6, true).extrude(14);
 const boss = roundedRect(18, 12, 3, true)
   .onFace(plate, 'top', { u: -22, v: 12, protrude: 0.5, selfAnchor: 'center' })
@@ -240,11 +240,11 @@ const body = union(
 ).subtract(mirroredDrill).subtract(slotCuts);
 return [{ name: 'Repeated Feature Plate', shape: body }];
 `,
-  ),
-  inlineCase(
-    'boolean-pattern-query-propagation',
-    'Boolean propagation keeps repeated-result descendants reviewable through supported unions and reports duplicate-owner merges explicitly.',
-    `
+    ),
+    inlineCase(
+      'boolean-pattern-query-propagation',
+      'Boolean propagation keeps repeated-result descendants reviewable through supported unions and reports duplicate-owner merges explicitly.',
+      `
 const duplicateSeed = roundedRect(16, 12, 2, true).extrude(10).toShape();
 const duplicateUnion = union(
   duplicateSeed,
@@ -267,11 +267,11 @@ return [
   { name: 'Trimmed Boss Plate', shape: trimmedBossPlate },
 ];
 `,
-  ),
-  inlineCase(
-    'sketch-on-face-placement',
-    'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
-    `
+    ),
+    inlineCase(
+      'sketch-on-face-placement',
+      'Downstream features keep semantic workplane placement intent in the compile graph and propagate it through later shape transforms.',
+      `
 const body = roundedRect(20, 12, 2, true).extrude(6, { center: true });
 const feature = rect(6, 4)
   .onFace(body, 'top', { u: 2, v: 1, protrude: 0.5, selfAnchor: 'center' })
@@ -280,12 +280,12 @@ const feature = rect(6, 4)
   .rotate(0, 0, 90);
 return [{ name: 'Feature', shape: feature }];
 `,
-  ),
-  ...COMPILER_REGRESSION_CORPUS.map((part) => fileCase(part.id, part.description, part.scriptPath)),
-  inlineCase(
-    'projection-downstream-gasket',
-    'Projection-driven downstream sketching keeps explicit projection intent on the sketch and still lowers follow-on face features through both compiler paths.',
-    `
+    ),
+    ...COMPILER_REGRESSION_CORPUS.map((part) => fileCase(part.id, part.description, part.scriptPath)),
+    inlineCase(
+      'projection-downstream-gasket',
+      'Projection-driven downstream sketching keeps explicit projection intent on the sketch and still lowers follow-on face features through both compiler paths.',
+      `
 const base = roundedRect(40, 24, 4, true).extrude(8, { center: true });
 const badge = roundedRect(18, 8, 2, true)
   .onFace(base, 'top', { u: 5, v: -2, protrude: 0.25, selfAnchor: 'center' })
@@ -300,11 +300,11 @@ return [
   { name: 'Gasket', shape: gasket },
 ];
 `,
-  ),
-  inlineCase(
-    'segmented-runtime-hints',
-    'Segmented runtime intent stays runnable but outside the exact BREP subset.',
-    `
+    ),
+    inlineCase(
+      'segmented-runtime-hints',
+      'Segmented runtime intent stays runnable but outside the exact BREP subset.',
+      `
 const segmentedDisk = circle2d(12, 18).extrude(4);
 const segmentedPost = cylinder(20, 5, undefined, 12);
 const segmentedLathe = polygon([
@@ -319,11 +319,11 @@ return [
   { name: 'Segmented Lathe', shape: segmentedLathe },
 ];
 `,
-  ),
-  inlineCase(
-    'sketch-profile-chain',
-    'Sketch-only profile chains keep profile lowering aligned with runtime cross-sections.',
-    `
+    ),
+    inlineCase(
+      'sketch-profile-chain',
+      'Sketch-only profile chains keep profile lowering aligned with runtime cross-sections.',
+      `
 const profile = difference2d(
   roundedRect(80, 50, 10, true),
   circle2d(12).translate(18, 0),
@@ -334,12 +334,12 @@ const profile = difference2d(
   .translate(5, -3);
 return [{ name: 'Profile', sketch: profile }];
 `,
-  ),
-  fileCase(
-    'example-brep-exportable',
-    'The public BREP-exportable example stays on the exact compiler route.',
-    resolvePackagePath(import.meta.url, 'examples', 'api', 'brep-exportable.forge.js'),
-  ),
+    ),
+    fileCase(
+      'example-brep-exportable',
+      'The public BREP-exportable example stays on the exact compiler route.',
+      resolvePackagePath(import.meta.url, 'examples', 'api', 'brep-exportable.forge.js'),
+    ),
   ];
   return _compilerCases;
 }

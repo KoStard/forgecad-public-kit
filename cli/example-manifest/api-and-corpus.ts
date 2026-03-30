@@ -26,15 +26,33 @@ const API_EXACT_PART_PATHS = [
   'examples/api/rotate-around-to.forge.js',
   'examples/api/sketch-basics.forge.js',
   'examples/api/sketch-on-face.forge.js',
-  'examples/api/spec-demo.forge.js',
   'examples/api/text2d-basics.forge.js',
   'examples/api/text2d-font.forge.js',
   'examples/api/extrude-options.forge.js',
   'examples/api/smooth-curve-connections.forge.js',
   'examples/api/verification-demo.forge.js',
+  'examples/api/arc-chain-demo.forge.js',
+  'examples/api/path-arc-demo.forge.js',
+  'examples/api/path-builder-showcase.forge.js',
+  'examples/api/path-smooth-cap-demo.forge.js',
 ] as const;
 
 const API_FACETED_PARTS = [
+  {
+    path: 'examples/api/spec-demo.forge.js',
+    blocker: 'Bracket shape uses unsupported geometry that cannot route through exact exporter.',
+    note: 'The spec demo demonstrates the overall API shape, not exact routing.',
+    primaryShapes: ['Bracket'],
+  },
+  {
+    path: 'examples/api/perforated-box.forge.js',
+    blocker: 'Perforated box uses boolean pattern that routes through faceted fallback.',
+  },
+  {
+    path: 'examples/iphone.forge.js',
+    blocker: 'iPhone model body uses geometry that routes through faceted fallback.',
+    primaryShapes: ['Body'],
+  },
   {
     path: 'examples/api/face-gears.forge.js',
     blocker: 'Face-gear and perpendicular gear helpers still rely on sampled tooth/profile geometry outside the exact export subset.',

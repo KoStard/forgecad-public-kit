@@ -664,11 +664,21 @@ export function FileExplorer() {
       >
         <span style={{ fontWeight: 600, color: 'var(--fc-textMuted)', fontSize: 12 }}>Project Files</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <span onClick={() => { setFocusedFolder(''); setCreating('file'); }} style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }} title="New file">
+          <span
+            onClick={() => {
+              setFocusedFolder('');
+              setCreating('file');
+            }}
+            style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
+            title="New file"
+          >
             + File
           </span>
           <span
-            onClick={() => { setFocusedFolder(''); setCreating('folder'); }}
+            onClick={() => {
+              setFocusedFolder('');
+              setCreating('folder');
+            }}
             style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
             title="New folder"
           >

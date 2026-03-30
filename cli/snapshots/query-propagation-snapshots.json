@@ -723,9 +723,9 @@
                 "note": "This face stays queryable through the cut rewrite."
               },
               {
-                "status": "supported",
-                "query": "propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
-                "note": "This face stays queryable through the cut rewrite."
+                "status": "ambiguous",
+                "query": "propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4",
+                "note": "The selected host face is rewritten by the cut result and is not a defended named target."
               },
               {
                 "status": "supported",
@@ -775,14 +775,14 @@
             ],
             "preservedEdges": [
               {
-                "status": "supported",
-                "query": "propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
-                "note": "cut leaves this vertical edge unaffected; none of its adjacent faces are in the rewrite set."
+                "status": "ambiguous",
+                "query": "propagated-edge(split <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
+                "note": "cut rewrites at least one adjacent face of this vertical edge; its post-rewrite identity is not defended as one single edge target."
               },
               {
-                "status": "supported",
-                "query": "propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
-                "note": "cut leaves this vertical edge unaffected; none of its adjacent faces are in the rewrite set."
+                "status": "ambiguous",
+                "query": "propagated-edge(split <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4",
+                "note": "cut rewrites at least one adjacent face of this vertical edge; its post-rewrite identity is not defended as one single edge target."
               },
               {
                 "status": "supported",
@@ -832,15 +832,15 @@
                 "code": "cut-source-face-split-ambiguous",
                 "category": "ambiguous",
                 "queryKind": "face",
-                "source": "face-ref()",
-                "query": "propagated-face(split <- face-ref()) @cut:shape-query-cut-4"
+                "source": "canonical-face(front) @hole:shape-query-hole-3",
+                "query": "propagated-face(split <- canonical-face(front) @hole:shape-query-hole-3) @cut:shape-query-cut-4"
               }
             ],
             "descendants": [
               "single(propagated-face(preserved <- propagated-face(split <- propagated-face(preserved <- tracked-face(bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- created-face(hole:cap) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(split <- created-face(cut:floor) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
-              "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
+              "face-region(propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-bottom) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-left) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
               "single(propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-top) @extrude:shape-query-extrude-1) @cut:shape-query-cut-2) @hole:shape-query-hole-3) @cut:shape-query-cut-4)",
@@ -857,8 +857,6 @@
               "single(created-face(cut:floor) @cut:shape-query-cut-4)",
               "edge-chain(created-edge(cut:entry-rim#edge) @cut:shape-query-cut-4)",
               "edge-chain(created-edge(cut:forward-end-rim#edge) @cut:shape-query-cut-4)",
-              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)",
-              "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)",
               "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tr#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)",
               "single(propagated-edge(preserved <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-tl#edge) @extrude:shape-query-extrude-1#edge) @cut:shape-query-cut-2#edge) @hole:shape-query-hole-3#edge) @cut:shape-query-cut-4)"
             ]

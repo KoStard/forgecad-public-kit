@@ -184,303 +184,303 @@ let _queryPropagationCases: QueryPropagationCaseDefinition[] | undefined;
 function getQueryPropagationCases(): QueryPropagationCaseDefinition[] {
   if (_queryPropagationCases) return _queryPropagationCases;
   _queryPropagationCases = [
-  inlineCase(
-    'trim-and-split-created-faces',
-    'Trim and split-by-plane workflows keep the defended plane-cap created-face query visible for each surviving branch.',
-    TRIM_AND_SPLIT_WORKFLOW_CODE,
-    [
-      {
-        name: 'Trimmed',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['trimByPlane'],
-        requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
-        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
-      },
-      {
-        name: 'Upper',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['trimByPlane'],
-        requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
-        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
-      },
-      {
-        name: 'Lower',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['trimByPlane'],
-        requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
-        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
-      },
-    ],
-  ),
-  inlineCase(
-    'hole-cut-workflows',
-    'Hole and cut workflows record ambiguous preserved-face descendants plus defended created face and edge-chain slots.',
-    HOLE_CUT_WORKFLOW_CODE,
-    [
-      {
-        name: 'Workflow',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['cut', 'cut', 'hole', 'hole'],
-        requiredDiagnosticCodes: ['cut-source-face-split-ambiguous', 'hole-source-face-split-ambiguous'],
-        requiredPreservedFaceQueries: [
-          'propagated-face(split <- tracked-face(side-bottom)',
-          'propagated-face(split <- tracked-face(side-top)',
-          'propagated-face(split <- propagated-face(preserved <- tracked-face(top)',
-          'propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right)',
-        ],
-        requiredCreatedFaceQueries: [
-          'created-face(hole:wall)',
-          'created-face(hole:floor)',
-          'created-face(cut:floor)',
-          'created-face(cut:wall-right)',
-        ],
-        requiredCreatedEdgeQueries: [
-          'created-edge(hole:entry-rim#edge)',
-          'created-edge(hole:forward-end-rim#edge)',
-          'created-edge(cut:entry-rim#edge)',
-          'created-edge(cut:forward-end-rim#edge)',
-        ],
-      },
-    ],
-  ),
-  inlineCase(
-    'advanced-hole-cut-variants',
-    'Two-sided threaded holes and tapered cuts keep defended cap/wall ownership and created edge chains reviewable in one feature stack.',
-    ADVANCED_HOLE_CUT_VARIANTS_CODE,
-    [
-      {
-        name: 'Advanced Variants',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['cut', 'hole', 'cut'],
-        requiredDiagnosticCodes: [
-          'cut-source-face-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-          'hole-up-to-face-target-split-ambiguous',
-        ],
-        requiredCreatedFaceQueries: ['created-face(hole:cap)', 'created-face(cut:wall-right)'],
-        requiredCreatedEdgeQueries: [
-          'created-edge(hole:reverse-end-rim#edge)',
-          'created-edge(hole:forward-end-rim#edge)',
-          'created-edge(cut:forward-end-rim#edge)',
-        ],
-      },
-    ],
-  ),
-  inlineCase(
-    'fillet-edge-workflow',
-    'Fillet workflows keep a preserved propagated edge finishable after an ordinary union while downstream hole/cut created faces stay visible in one chain.',
-    FILLET_EDGE_WORKFLOW_CODE,
-    [
-      {
-        name: 'Filleted Body',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['boolean:difference', 'cut', 'hole', 'fillet', 'boolean:union', 'fillet'],
-        requiredDiagnosticCodes: [
-          'boolean-difference-face-split-ambiguous',
+    inlineCase(
+      'trim-and-split-created-faces',
+      'Trim and split-by-plane workflows keep the defended plane-cap created-face query visible for each surviving branch.',
+      TRIM_AND_SPLIT_WORKFLOW_CODE,
+      [
+        {
+          name: 'Trimmed',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['trimByPlane'],
+          requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
+          requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+        },
+        {
+          name: 'Upper',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['trimByPlane'],
+          requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
+          requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+        },
+        {
+          name: 'Lower',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['trimByPlane'],
+          requiredDiagnosticCodes: ['trim-by-plane-preserved-face-propagation-ambiguous', 'trim-by-plane-edge-propagation-ambiguous'],
+          requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+        },
+      ],
+    ),
+    inlineCase(
+      'hole-cut-workflows',
+      'Hole and cut workflows record ambiguous preserved-face descendants plus defended created face and edge-chain slots.',
+      HOLE_CUT_WORKFLOW_CODE,
+      [
+        {
+          name: 'Workflow',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['cut', 'cut', 'hole', 'hole'],
+          requiredDiagnosticCodes: ['cut-source-face-split-ambiguous', 'hole-source-face-split-ambiguous'],
+          requiredPreservedFaceQueries: [
+            'propagated-face(split <- tracked-face(side-bottom)',
+            'propagated-face(split <- tracked-face(side-top)',
+            'propagated-face(split <- propagated-face(preserved <- tracked-face(top)',
+            'propagated-face(split <- propagated-face(preserved <- propagated-face(preserved <- propagated-face(preserved <- tracked-face(side-right)',
+          ],
+          requiredCreatedFaceQueries: [
+            'created-face(hole:wall)',
+            'created-face(hole:floor)',
+            'created-face(cut:floor)',
+            'created-face(cut:wall-right)',
+          ],
+          requiredCreatedEdgeQueries: [
+            'created-edge(hole:entry-rim#edge)',
+            'created-edge(hole:forward-end-rim#edge)',
+            'created-edge(cut:entry-rim#edge)',
+            'created-edge(cut:forward-end-rim#edge)',
+          ],
+        },
+      ],
+    ),
+    inlineCase(
+      'advanced-hole-cut-variants',
+      'Two-sided threaded holes and tapered cuts keep defended cap/wall ownership and created edge chains reviewable in one feature stack.',
+      ADVANCED_HOLE_CUT_VARIANTS_CODE,
+      [
+        {
+          name: 'Advanced Variants',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['cut', 'hole', 'cut'],
+          requiredDiagnosticCodes: [
+            'cut-source-face-split-ambiguous',
+            'hole-source-face-split-ambiguous',
+            'hole-up-to-face-target-split-ambiguous',
+          ],
+          requiredCreatedFaceQueries: ['created-face(hole:cap)', 'created-face(cut:wall-right)'],
+          requiredCreatedEdgeQueries: [
+            'created-edge(hole:reverse-end-rim#edge)',
+            'created-edge(hole:forward-end-rim#edge)',
+            'created-edge(cut:forward-end-rim#edge)',
+          ],
+        },
+      ],
+    ),
+    inlineCase(
+      'fillet-edge-workflow',
+      'Fillet workflows keep a preserved propagated edge finishable after an ordinary union while downstream hole/cut created faces stay visible in one chain.',
+      FILLET_EDGE_WORKFLOW_CODE,
+      [
+        {
+          name: 'Filleted Body',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['boolean:difference', 'cut', 'hole', 'fillet', 'boolean:union', 'fillet'],
+          requiredDiagnosticCodes: [
+            'boolean-difference-face-split-ambiguous',
 
-          'cut-source-face-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-          'boolean-union-edge-inherited-ambiguity',
-          'fillet-selected-edge-merged-ambiguous',
-          'fillet-created-face-propagation-unsupported',
-        ],
-        requiredPreservedFaceQueries: [
-          'propagated-face(split <- propagated-face(preserved <- created-face(hole:floor)',
-          'propagated-face(split <- created-face(cut:wall-right)',
-        ],
-        requiredPreservedEdgeQueries: [
-          'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge)',
-        ],
-      },
-    ],
-  ),
-  inlineCase(
-    'chamfer-edge-workflow',
-    'Chamfer workflows keep a preserved propagated edge finishable after an ordinary union alongside upstream hole rewrite diagnostics.',
-    CHAMFER_EDGE_WORKFLOW_CODE,
-    [
-      {
-        name: 'Chamfered Body',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['hole', 'chamfer', 'boolean:union', 'chamfer'],
-        requiredDiagnosticCodes: [
-          'hole-source-face-split-ambiguous',
-          'boolean-union-edge-inherited-ambiguity',
-          'chamfer-selected-edge-merged-ambiguous',
-          'chamfer-created-face-propagation-unsupported',
-        ],
-        requiredPreservedEdgeQueries: [
-          'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge)',
-        ],
-      },
-    ],
-  ),
-  compilerCorpusCase(
-    'corpus-enclosure-shell-cuts',
-    'The enclosure corpus keeps defended shell ownership plus later boolean rewrite boundaries reviewable inside a normal product-style part.',
-    [
-      {
-        name: 'Enclosure Shell Cuts',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['boolean:difference', 'boolean:difference', 'boolean:union', 'shell', 'boolean:union', 'boolean:union'],
-        requiredDiagnosticCodes: [
-          'boolean-difference-face-split-ambiguous',
+            'cut-source-face-split-ambiguous',
+            'hole-source-face-split-ambiguous',
+            'boolean-union-edge-inherited-ambiguity',
+            'fillet-selected-edge-merged-ambiguous',
+            'fillet-created-face-propagation-unsupported',
+          ],
+          requiredPreservedFaceQueries: [
+            'propagated-face(split <- propagated-face(preserved <- created-face(hole:floor)',
+            'propagated-face(split <- created-face(cut:wall-right)',
+          ],
+          requiredPreservedEdgeQueries: [
+            'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge)',
+          ],
+        },
+      ],
+    ),
+    inlineCase(
+      'chamfer-edge-workflow',
+      'Chamfer workflows keep a preserved propagated edge finishable after an ordinary union alongside upstream hole rewrite diagnostics.',
+      CHAMFER_EDGE_WORKFLOW_CODE,
+      [
+        {
+          name: 'Chamfered Body',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['hole', 'chamfer', 'boolean:union', 'chamfer'],
+          requiredDiagnosticCodes: [
+            'hole-source-face-split-ambiguous',
+            'boolean-union-edge-inherited-ambiguity',
+            'chamfer-selected-edge-merged-ambiguous',
+            'chamfer-created-face-propagation-unsupported',
+          ],
+          requiredPreservedEdgeQueries: [
+            'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-br#edge)',
+          ],
+        },
+      ],
+    ),
+    compilerCorpusCase(
+      'corpus-enclosure-shell-cuts',
+      'The enclosure corpus keeps defended shell ownership plus later boolean rewrite boundaries reviewable inside a normal product-style part.',
+      [
+        {
+          name: 'Enclosure Shell Cuts',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['boolean:difference', 'boolean:difference', 'boolean:union', 'shell', 'boolean:union', 'boolean:union'],
+          requiredDiagnosticCodes: [
+            'boolean-difference-face-split-ambiguous',
 
-          'boolean-union-face-inherited-ambiguity',
-          'boolean-union-face-merged-ambiguous',
-          'boolean-union-edge-propagation-unsupported',
-        ],
-      },
-    ],
-  ),
-  compilerCorpusCase(
-    'corpus-edge-finished-mount',
-    'The edge-finished mount corpus keeps fillet, hole, cut, and later boolean rewrite diagnostics aligned through one ordinary workflow.',
-    [
-      {
-        name: 'Edge Finished Mount',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['boolean:difference', 'cut', 'hole', 'chamfer', 'boolean:union', 'fillet', 'boolean:union'],
-        requiredDiagnosticCodes: [
-          'boolean-difference-face-split-ambiguous',
+            'boolean-union-face-inherited-ambiguity',
+            'boolean-union-face-merged-ambiguous',
+            'boolean-union-edge-propagation-unsupported',
+          ],
+        },
+      ],
+    ),
+    compilerCorpusCase(
+      'corpus-edge-finished-mount',
+      'The edge-finished mount corpus keeps fillet, hole, cut, and later boolean rewrite diagnostics aligned through one ordinary workflow.',
+      [
+        {
+          name: 'Edge Finished Mount',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['boolean:difference', 'cut', 'hole', 'chamfer', 'boolean:union', 'fillet', 'boolean:union'],
+          requiredDiagnosticCodes: [
+            'boolean-difference-face-split-ambiguous',
 
-          'cut-source-face-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-          'boolean-union-edge-propagation-unsupported',
-          'boolean-union-edge-inherited-ambiguity',
-          'fillet-selected-edge-merged-ambiguous',
-          'fillet-created-face-propagation-unsupported',
-          'chamfer-selected-edge-merged-ambiguous',
-          'chamfer-created-face-propagation-unsupported',
-        ],
-        requiredPreservedEdgeQueries: [
-          'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge)',
-        ],
-      },
-    ],
-  ),
-  compilerCorpusCase(
-    'corpus-fastener-plate-variants',
-    'The fastener-plate corpus keeps counterbore/countersink created faces and up-to-face split diagnostics reviewable through one ordinary richer hole workflow.',
-    [
-      {
-        name: 'Fastener Plate Variants',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['cut', 'hole', 'hole', 'hole', 'hole'],
-        requiredDiagnosticCodes: [
-          'cut-source-face-split-ambiguous',
-          'cut-up-to-face-target-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-          'hole-up-to-face-target-split-ambiguous',
-        ],
-        requiredCreatedFaceQueries: [
-          'created-face(hole:counterbore-floor)',
-          'created-face(hole:counterbore-wall)',
-          'created-face(hole:countersink-wall)',
-        ],
-        requiredCreatedEdgeQueries: ['created-edge(hole:head-transition-rim#edge)', 'created-edge(cut:forward-end-rim#edge)'],
-        requiredPreservedFaceQueries: ['propagated-face(preserved <- created-face(hole:counterbore-floor)'],
-      },
-    ],
-  ),
-  compilerCorpusCase(
-    'corpus-service-panel-cover',
-    'The service-panel cover corpus keeps repeated-boss unions, richer hole/cut rewrites, and the later projection-driven union reviewable in one ordinary cover workflow.',
-    [
-      {
-        name: 'Service Panel Cover',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['boolean:union', 'cut', 'hole', 'hole', 'hole', 'hole', 'boolean:union', 'boolean:union'],
-        requiredDiagnosticCodes: [
-          'boolean-union-edge-propagation-unsupported',
-          'cut-source-face-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-          'hole-up-to-face-target-split-ambiguous',
-        ],
-        requiredCreatedFaceQueries: [
-          'created-face(hole:counterbore-floor)',
-          'created-face(hole:counterbore-wall)',
-          'created-face(hole:countersink-wall)',
-          'created-face(cut:wall-right)',
-          'created-face(cut:floor)',
-        ],
-        requiredCreatedEdgeQueries: ['created-edge(hole:head-transition-rim#edge)', 'created-edge(cut:forward-end-rim#edge)'],
-        requiredPreservedFaceQueries: [
-          'propagated-face(preserved <- created-face(hole:counterbore-floor)',
-          'propagated-face(preserved <- created-face(hole:countersink-wall)',
-          'propagated-face(preserved <- created-face(cut:floor)',
-        ],
-      },
-    ],
-  ),
-  compilerCorpusCase(
-    'corpus-folded-service-panel-cover',
-    'The sheet-metal cover corpus keeps panel/flange cut descendants and bend-region semantics reviewable across both the folded body and flat pattern outputs.',
-    [
-      {
-        name: 'Folded Service Panel Cover',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
-        requiredDiagnosticCodes: ['cut-source-face-split-ambiguous'],
-        requiredCreatedFaceQueries: ['created-face(cut:wall-right)', 'created-face(cut:wall)'],
-        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
-        requiredPreservedFaceQueries: [
-          'propagated-face(split <- tracked-face(panel)',
-          'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
-        ],
-      },
-      {
-        name: 'Flat Service Panel Cover',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
-        requiredDiagnosticCodes: ['cut-source-face-split-ambiguous'],
-        requiredCreatedFaceQueries: ['created-face(cut:wall-right)', 'created-face(cut:wall)'],
-        requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
-        requiredPreservedFaceQueries: [
-          'propagated-face(split <- tracked-face(panel)',
-          'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
-        ],
-      },
-    ],
-  ),
-  compilerCorpusCase(
-    'corpus-trimmed-access-cover',
-    'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.',
-    [
-      {
-        name: 'Trimmed Access Cover',
-        exactRouteKind: 'exact',
-        facetedRouteKind: 'exact',
-        operations: ['boolean:union', 'trimByPlane', 'cut', 'hole', 'boolean:union'],
-        requiredDiagnosticCodes: [
-          'boolean-union-edge-propagation-unsupported',
-          'trim-by-plane-preserved-face-propagation-ambiguous',
-          'trim-by-plane-edge-propagation-ambiguous',
-          'cut-source-face-split-ambiguous',
-          'hole-source-face-split-ambiguous',
-        ],
-        requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
-        requiredPreservedFaceQueries: [
-          'propagated-face(preserved <- created-face(trimByPlane:plane-cap)',
-          'propagated-face(preserved <- canonical-face(top)',
-          'propagated-face(preserved <- created-face(hole:floor)',
-        ],
-      },
-    ],
-  ),
+            'cut-source-face-split-ambiguous',
+            'hole-source-face-split-ambiguous',
+            'boolean-union-edge-propagation-unsupported',
+            'boolean-union-edge-inherited-ambiguity',
+            'fillet-selected-edge-merged-ambiguous',
+            'fillet-created-face-propagation-unsupported',
+            'chamfer-selected-edge-merged-ambiguous',
+            'chamfer-created-face-propagation-unsupported',
+          ],
+          requiredPreservedEdgeQueries: [
+            'propagated-edge(merged <- propagated-edge(preserved <- propagated-edge(preserved <- tracked-edge(vert-bl#edge)',
+          ],
+        },
+      ],
+    ),
+    compilerCorpusCase(
+      'corpus-fastener-plate-variants',
+      'The fastener-plate corpus keeps counterbore/countersink created faces and up-to-face split diagnostics reviewable through one ordinary richer hole workflow.',
+      [
+        {
+          name: 'Fastener Plate Variants',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['cut', 'hole', 'hole', 'hole', 'hole'],
+          requiredDiagnosticCodes: [
+            'cut-source-face-split-ambiguous',
+            'cut-up-to-face-target-split-ambiguous',
+            'hole-source-face-split-ambiguous',
+            'hole-up-to-face-target-split-ambiguous',
+          ],
+          requiredCreatedFaceQueries: [
+            'created-face(hole:counterbore-floor)',
+            'created-face(hole:counterbore-wall)',
+            'created-face(hole:countersink-wall)',
+          ],
+          requiredCreatedEdgeQueries: ['created-edge(hole:head-transition-rim#edge)', 'created-edge(cut:forward-end-rim#edge)'],
+          requiredPreservedFaceQueries: ['propagated-face(preserved <- created-face(hole:counterbore-floor)'],
+        },
+      ],
+    ),
+    compilerCorpusCase(
+      'corpus-service-panel-cover',
+      'The service-panel cover corpus keeps repeated-boss unions, richer hole/cut rewrites, and the later projection-driven union reviewable in one ordinary cover workflow.',
+      [
+        {
+          name: 'Service Panel Cover',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['boolean:union', 'cut', 'hole', 'hole', 'hole', 'hole', 'boolean:union', 'boolean:union'],
+          requiredDiagnosticCodes: [
+            'boolean-union-edge-propagation-unsupported',
+            'cut-source-face-split-ambiguous',
+            'hole-source-face-split-ambiguous',
+            'hole-up-to-face-target-split-ambiguous',
+          ],
+          requiredCreatedFaceQueries: [
+            'created-face(hole:counterbore-floor)',
+            'created-face(hole:counterbore-wall)',
+            'created-face(hole:countersink-wall)',
+            'created-face(cut:wall-right)',
+            'created-face(cut:floor)',
+          ],
+          requiredCreatedEdgeQueries: ['created-edge(hole:head-transition-rim#edge)', 'created-edge(cut:forward-end-rim#edge)'],
+          requiredPreservedFaceQueries: [
+            'propagated-face(preserved <- created-face(hole:counterbore-floor)',
+            'propagated-face(preserved <- created-face(hole:countersink-wall)',
+            'propagated-face(preserved <- created-face(cut:floor)',
+          ],
+        },
+      ],
+    ),
+    compilerCorpusCase(
+      'corpus-folded-service-panel-cover',
+      'The sheet-metal cover corpus keeps panel/flange cut descendants and bend-region semantics reviewable across both the folded body and flat pattern outputs.',
+      [
+        {
+          name: 'Folded Service Panel Cover',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
+          requiredDiagnosticCodes: ['cut-source-face-split-ambiguous'],
+          requiredCreatedFaceQueries: ['created-face(cut:wall-right)', 'created-face(cut:wall)'],
+          requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
+          requiredPreservedFaceQueries: [
+            'propagated-face(split <- tracked-face(panel)',
+            'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
+          ],
+        },
+        {
+          name: 'Flat Service Panel Cover',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['cut', 'cut', 'cut', 'cut', 'cut', 'cut'],
+          requiredDiagnosticCodes: ['cut-source-face-split-ambiguous'],
+          requiredCreatedFaceQueries: ['created-face(cut:wall-right)', 'created-face(cut:wall)'],
+          requiredCreatedEdgeQueries: ['created-edge(cut:entry-rim#edge)'],
+          requiredPreservedFaceQueries: [
+            'propagated-face(split <- tracked-face(panel)',
+            'propagated-face(split <- propagated-face(preserved <- tracked-face(flange-right)',
+          ],
+        },
+      ],
+    ),
+    compilerCorpusCase(
+      'corpus-trimmed-access-cover',
+      'The trimmed access-cover corpus keeps trim-created plane-cap targeting reviewable while earlier hole/cut created faces and preserved canonical faces flow through later unions.',
+      [
+        {
+          name: 'Trimmed Access Cover',
+          exactRouteKind: 'exact',
+          facetedRouteKind: 'exact',
+          operations: ['boolean:union', 'trimByPlane', 'cut', 'hole', 'boolean:union'],
+          requiredDiagnosticCodes: [
+            'boolean-union-edge-propagation-unsupported',
+            'trim-by-plane-preserved-face-propagation-ambiguous',
+            'trim-by-plane-edge-propagation-ambiguous',
+            'cut-source-face-split-ambiguous',
+            'hole-source-face-split-ambiguous',
+          ],
+          requiredCreatedFaceQueries: ['created-face(trimByPlane:plane-cap)'],
+          requiredPreservedFaceQueries: [
+            'propagated-face(preserved <- created-face(trimByPlane:plane-cap)',
+            'propagated-face(preserved <- canonical-face(top)',
+            'propagated-face(preserved <- created-face(hole:floor)',
+          ],
+        },
+      ],
+    ),
   ];
   return _queryPropagationCases;
 }

@@ -32,6 +32,7 @@ export function SvgPreview() {
           width: '100%',
           height: '100%',
         }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: renders trusted compiler-generated SVG
         dangerouslySetInnerHTML={{ __html: sized }}
       />
       <div

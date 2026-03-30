@@ -18,7 +18,9 @@ function detectMobile(): boolean {
   // Don't enter mobile mode when the user deliberately chose it.
   try {
     if (localStorage.getItem('ff-verticalLayout') === '1') return false;
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
 
   const hasTouch = navigator.maxTouchPoints > 0;
   const isNarrow = window.innerWidth < 768;
