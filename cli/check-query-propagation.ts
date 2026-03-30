@@ -180,7 +180,10 @@ function compilerCorpusCase(
   return fileCase(part.id, description, part.scriptPath, expectedObjects);
 }
 
-const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
+let _queryPropagationCases: QueryPropagationCaseDefinition[] | undefined;
+function getQueryPropagationCases(): QueryPropagationCaseDefinition[] {
+  if (_queryPropagationCases) return _queryPropagationCases;
+  _queryPropagationCases = [
   inlineCase(
     'trim-and-split-created-faces',
     'Trim and split-by-plane workflows keep the defended plane-cap created-face query visible for each surviving branch.',
@@ -478,7 +481,9 @@ const QUERY_PROPAGATION_CASES: QueryPropagationCaseDefinition[] = [
       },
     ],
   ),
-];
+  ];
+  return _queryPropagationCases;
+}
 
 function parseArgs(argv: string[]) {
   let update = false;
@@ -583,7 +588,7 @@ function summarizeShapeObject(object: CompilerShapeInspection): QueryPropagation
 }
 
 function generateSnapshots(caseId?: string): QueryPropagationCaseSnapshot[] {
-  const selected = caseId ? QUERY_PROPAGATION_CASES.filter((entry) => entry.id === caseId) : QUERY_PROPAGATION_CASES;
+  const selected = caseId ? getQueryPropagationCases().filter((entry) => entry.id === caseId) : getQueryPropagationCases();
   if (selected.length === 0) {
     throw new Error(`Unknown query-propagation snapshot case: ${caseId}`);
   }
@@ -626,7 +631,7 @@ function assertIncludesAll(
 }
 
 function assertExpectedCoverage(snapshots: QueryPropagationCaseSnapshot[]): void {
-  const definitions = new Map(QUERY_PROPAGATION_CASES.map((entry) => [entry.id, entry]));
+  const definitions = new Map(getQueryPropagationCases().map((entry) => [entry.id, entry]));
 
   for (const snapshot of snapshots) {
     const definition = definitions.get(snapshot.id);

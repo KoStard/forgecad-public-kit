@@ -91,7 +91,10 @@ function fileCase(id: string, description: string, scriptPath: string): Compiler
   };
 }
 
-const COMPILER_CASES: CompilerCaseDefinition[] = [
+let _compilerCases: CompilerCaseDefinition[] | undefined;
+function getCompilerCases(): CompilerCaseDefinition[] {
+  if (_compilerCases) return _compilerCases;
+  _compilerCases = [
   inlineCase(
     'exact-boolean-plate',
     'Exact boolean plate with profile booleans and tapered extrude stays on the exact route.',
@@ -335,9 +338,11 @@ return [{ name: 'Profile', sketch: profile }];
   fileCase(
     'example-brep-exportable',
     'The public BREP-exportable example stays on the exact compiler route.',
-    'examples/api/brep-exportable.forge.js',
+    resolvePackagePath(import.meta.url, 'examples', 'api', 'brep-exportable.forge.js'),
   ),
-];
+  ];
+  return _compilerCases;
+}
 
 function parseArgs(argv: string[]) {
   let update = false;
@@ -380,7 +385,8 @@ function stripUndefinedDeep<T>(value: T): T {
 }
 
 function generateSnapshots(caseId?: string): CompilerCaseSnapshot[] {
-  const selected = caseId ? COMPILER_CASES.filter((entry) => entry.id === caseId) : COMPILER_CASES;
+  const cases = getCompilerCases();
+  const selected = caseId ? cases.filter((entry) => entry.id === caseId) : cases;
   if (selected.length === 0) {
     throw new Error(`Unknown compiler snapshot case: ${caseId}`);
   }
