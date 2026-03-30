@@ -3,7 +3,7 @@
  *
  * - Tab-based: Code and Model are never visible simultaneously
  * - Loads only Manifold backend (no OCCT)
- * - Passive 3D viewport (orbit/zoom/pan only)
+ * - 3D viewport with orbit/zoom/pan and joint animation controls
  * - Mesh-only exports (3MF/STL/OBJ)
  */
 
@@ -16,8 +16,10 @@ import { MobileCodeEditor } from './MobileCodeEditor';
 import { MobileCommandPalette } from './MobileCommandPalette';
 import { MobileExport } from './MobileExport';
 import { MobileFilePicker } from './MobileFilePicker';
+import { MobileJointControls } from './MobileJointControls';
 import { MobileParams } from './MobileParams';
 import { MobileViewport } from './MobileViewport';
+import { useMobileJointAnimation } from './useMobileJointAnimation';
 import './mobile.css';
 
 type Tab = 'code' | 'model';
@@ -36,6 +38,7 @@ export function MobileApp() {
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const anim = useMobileJointAnimation();
 
   // ── Init kernel (Manifold only) ──
   useEffect(() => {
@@ -148,7 +151,24 @@ export function MobileApp() {
 
         {/* Model tab */}
         <div className="fc-mobile-tab-panel" data-active={tab === 'model' ? 'true' : undefined}>
-          <MobileViewport />
+          <MobileViewport jointMatrices={anim.jointMatrices} />
+          <MobileJointControls
+            joints={anim.joints}
+            animationClips={anim.animationClips}
+            jointAnimationClip={anim.jointAnimationClip}
+            jointAnimationPlaying={anim.jointAnimationPlaying}
+            jointAnimationSpeed={anim.jointAnimationSpeed}
+            activeAnimationClip={anim.activeAnimationClip}
+            displayedAnimationProgress={anim.displayedAnimationProgress}
+            displayedJointValues={anim.displayedJointValues}
+            displayedRawJointValues={anim.displayedRawJointValues}
+            coupledJointNames={anim.coupledJointNames}
+            setJointAnimationClip={anim.setJointAnimationClip}
+            setJointAnimationProgress={anim.setJointAnimationProgress}
+            setJointAnimationSpeed={anim.setJointAnimationSpeed}
+            toggleJointAnimationPlayback={anim.toggleJointAnimationPlayback}
+            setJointValue={anim.setJointValue}
+          />
           <MobileParams />
         </div>
       </div>

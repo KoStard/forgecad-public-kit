@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { animationSpeedToSlider, formatAnimationSpeed, sliderToAnimationSpeed } from '../../animationSpeed';
+import { resolveJointRange } from './jointUtils';
 
 const inputStyle: CSSProperties = {
   flex: 1,
@@ -24,11 +25,6 @@ const labelStyle: CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: 0.6,
 };
-
-const resolveJointRange = (type: 'revolute' | 'prismatic', min?: number, max?: number): { min: number; max: number } => ({
-  min: min ?? (type === 'prismatic' ? -100 : 0),
-  max: max ?? (type === 'prismatic' ? 100 : 360),
-});
 
 interface JointControlsProps {
   joints: any[];

@@ -1,12 +1,11 @@
 import type { CutPlaneDef } from '@forge/cutPlane';
 import type { SceneObject } from '@forge/index';
-import { findJointAnimationClip, resolveJointAnimation } from '@forge/assembly/jointAnimation';
-import { resolveJointViewValues } from '@forge/assembly/jointsView';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCameraForwardVector } from '../../capture/cameraState';
 import { formatRenderSceneCliSpec, type ViewportRenderSceneState } from '../../capture/renderSceneState';
 import type { ViewportCameraState } from '../../capture/cameraState';
 import { useForgeStore } from '../../store/forgeStore';
+import { useJointAnimationValues, useJointsConfig } from './useJointAnimation';
 
 const DEFAULT_OBJECT_SETTINGS = { visible: true, opacity: 1, color: '#5b9bd5' } as const;
 
@@ -119,36 +118,22 @@ export function useViewPanelState() {
   const setSectionExplorerFlip = useForgeStore((s) => s.setSectionExplorerFlip);
 
   const cutPlanes = useMemo((): CutPlaneDef[] => result?.cutPlanes ?? [], [result]);
-  const joints = useMemo(() => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? [])), [result]);
-  const jointCouplings = useMemo(() => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.couplings ?? [])), [result]);
-  const animationClips = useMemo(() => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.animations ?? [])), [result]);
+  const { joints, jointCouplings, animationClips } = useJointsConfig();
 
-  const activeAnimationClip = useMemo(
-    () => findJointAnimationClip(animationClips, jointAnimationClip),
-    [animationClips, jointAnimationClip],
-  );
-  const animatedJointValues = useMemo(
-    () => resolveJointAnimation(activeAnimationClip, jointAnimationProgress, jointValues),
-    [activeAnimationClip, jointAnimationProgress, jointValues],
-  );
-  const displayedJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues, { clamp: true }),
-    [animatedJointValues, jointCouplings, joints],
-  );
-  const displayedRawJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues),
-    [animatedJointValues, jointCouplings, joints],
-  );
-  const coupledJointNames = useMemo(() => new Set(jointCouplings.map((coupling) => coupling.joint)), [jointCouplings]);
+  const {
+    activeAnimationClip,
+    animatedJointValues,
+    displayedJointValues,
+    displayedRawJointValues,
+    coupledJointNames,
+    displayedAnimationProgress,
+  } = useJointAnimationValues(joints, jointCouplings, animationClips);
+
   const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const [sceneCopyStatus, setSceneCopyStatus] = useState<string | null>(null);
   const [constraintsSectionOpen, setConstraintsSectionOpen] = useState(true);
   const sceneCopyTimeoutRef = useRef<number | null>(null);
   const cameraForward = useMemo(() => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null), [viewportCameraState]);
-  const displayedAnimationProgress =
-    activeAnimationClip?.loop && activeAnimationClip.continuous
-      ? jointAnimationProgress - Math.floor(jointAnimationProgress)
-      : Math.max(0, Math.min(1, jointAnimationProgress));
 
   useEffect(() => {
     if (!hoveredJointName) return;
