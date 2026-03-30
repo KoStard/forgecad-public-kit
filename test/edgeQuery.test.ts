@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeAll } from 'vitest';
-import { initKernel, Shape, getWasm } from '../src/forge/kernel';
-import { extractEdgeSegments } from '../src/forge/meshEdgeExtraction';
-import { selectEdge, selectEdges, coalesceEdges } from '../src/forge/edgeQuery';
-import { filletEdgeSegment, chamferEdgeSegment } from '../src/forge/edgeSegmentFeatures';
+import { initKernel, Shape, getWasm, box as kernelBox, cylinder as kernelCylinder } from '../src/forge/kernel';
+import { extractEdgeSegments } from '../src/forge/mesh/meshEdgeExtraction';
+import { selectEdge, selectEdges, coalesceEdges } from '../src/forge/query/edgeQuery';
+import { filletEdgeSegment, chamferEdgeSegment } from '../src/forge/edge-features/edgeSegmentFeatures';
 
 beforeAll(async () => {
   await initKernel();
@@ -127,13 +127,13 @@ describe('coalesceEdges', () => {
 
 describe('filletEdgeSegment', () => {
   test('fillets a box edge without error', () => {
-    const box = makeBox(20, 20, 20);
-    const edge = selectEdge(box, {
+    const b = kernelBox(20, 20, 20);
+    const edge = selectEdge(b, {
       parallel: [0, 0, 1],
       near: [0, 0, 10],
     });
-    const boxVol = box.volume();
-    const result = filletEdgeSegment(box, edge, 2);
+    const boxVol = b.volume();
+    const result = filletEdgeSegment(b, edge, 2);
     expect(result).toBeInstanceOf(Shape);
     // Crescent approach removes sharp corner, keeps arc surface.
     // Net loss per cross-section = r² - πr²/4 = (1 - π/4)×r² ≈ 0.215×r²
@@ -143,22 +143,20 @@ describe('filletEdgeSegment', () => {
   });
 
   test('chamfers a box edge without error', () => {
-    const box = makeBox(20, 20, 20);
-    const edge = selectEdge(box, {
+    const b = kernelBox(20, 20, 20);
+    const edge = selectEdge(b, {
       parallel: [0, 0, 1],
       near: [0, 0, 10],
     });
-    const result = chamferEdgeSegment(box, edge, 2);
+    const result = chamferEdgeSegment(b, edge, 2);
     expect(result).toBeInstanceOf(Shape);
-    expect(result.volume()).toBeLessThan(box.volume());
+    expect(result.volume()).toBeLessThan(b.volume());
   });
 
   test('fillets on a boolean result', () => {
-    const wasm = getWasm();
-    const a = wasm.Manifold.cube([20, 20, 20], false);
-    const b = wasm.Manifold.cube([10, 10, 30], false).translate(5, 5, -5);
-    const m = wasm.Manifold.union([a, b]);
-    const shape = new Shape(m);
+    const a = kernelBox(20, 20, 20);
+    const b = kernelBox(10, 10, 30).translate(5, 5, -5);
+    const shape = a.add(b);
 
     const edges = selectEdges(shape, { parallel: [0, 0, 1] });
     expect(edges.length).toBeGreaterThan(4); // More than a plain box due to boolean
@@ -174,17 +172,10 @@ describe('filletEdgeSegment', () => {
 
   test('fillets a non-90° edge (triangular prism)', () => {
     // Build an equilateral triangular prism: 60° dihedral angles
-    const wasm = getWasm();
     const side = 20;
     const h = side * Math.sqrt(3) / 2; // height of equilateral triangle
     const prismLength = 30;
-    // Equilateral triangle in XY plane, extruded along Z
-    const cs = new wasm.CrossSection([[
-      [0, 0],
-      [side, 0],
-      [side / 2, h],
-    ]]);
-    const prism = new Shape(cs.extrude(prismLength, 0, 0, undefined, false));
+    const prism = kernelCylinder(prismLength, side / Math.sqrt(3), undefined, 3);
 
     // Select a vertical edge (along Z) — should have ~60° dihedral angle
     const edges = selectEdges(prism, { parallel: [0, 0, 1] });
@@ -196,7 +187,7 @@ describe('filletEdgeSegment', () => {
     }
 
     // Fillet one edge
-    const edge = selectEdge(prism, { parallel: [0, 0, 1], near: [0, 0, 15] });
+    const edge = selectEdge(prism, { parallel: [0, 0, 1], near: [side / Math.sqrt(3), 0, 15] });
     const prismVol = prism.volume();
     const r = 2;
     const result = filletEdgeSegment(prism, edge, r);
@@ -213,18 +204,9 @@ describe('filletEdgeSegment', () => {
 
   test('fillets obtuse angle edge (hexagonal prism)', () => {
     // Regular hexagon prism: 120° dihedral angles at each edge
-    const wasm = getWasm();
-    const nSides = 6;
     const outerR = 15;
     const prismLength = 25;
-    // Build regular hexagon as polygon
-    const hexPoints: [number, number][] = [];
-    for (let i = 0; i < nSides; i++) {
-      const angle = (2 * Math.PI * i) / nSides;
-      hexPoints.push([outerR * Math.cos(angle), outerR * Math.sin(angle)]);
-    }
-    const cs = new wasm.CrossSection([hexPoints]);
-    const hex = new Shape(cs.extrude(prismLength, 0, 0, undefined, false));
+    const hex = kernelCylinder(prismLength, outerR, undefined, 6);
 
     // Vertical edges should have 120° dihedral
     const edges = selectEdges(hex, { parallel: [0, 0, 1] });
@@ -243,18 +225,11 @@ describe('filletEdgeSegment', () => {
   });
 
   test('chamfers a non-90° edge', () => {
-    // Equilateral triangular prism
-    const wasm = getWasm();
+    // Equilateral triangular prism via kernel cylinder with 3 segments
     const side = 20;
-    const h = side * Math.sqrt(3) / 2;
-    const cs = new wasm.CrossSection([[
-      [0, 0],
-      [side, 0],
-      [side / 2, h],
-    ]]);
-    const prism = new Shape(cs.extrude(30, 0, 0, undefined, false));
+    const prism = kernelCylinder(30, side / Math.sqrt(3), undefined, 3);
 
-    const edge = selectEdge(prism, { parallel: [0, 0, 1], near: [0, 0, 15] });
+    const edge = selectEdge(prism, { parallel: [0, 0, 1], near: [side / Math.sqrt(3), 0, 15] });
     const result = chamferEdgeSegment(prism, edge, 2);
     expect(result).toBeInstanceOf(Shape);
     expect(result.volume()).toBeLessThan(prism.volume());

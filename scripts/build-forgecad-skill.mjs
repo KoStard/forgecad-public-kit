@@ -491,6 +491,230 @@ ${docSections}
 }
 
 // ---------------------------------------------------------------------------
+// Installer page — mobile-friendly HTML for copying/downloading the skill
+// ---------------------------------------------------------------------------
+
+function buildInstallerPage() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Install ForgeCAD AI Skill</title>
+  <meta name="description" content="Give Claude, ChatGPT, or any AI assistant full ForgeCAD CAD modeling knowledge in one tap.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+      --success: #3fb950; --radius: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 24px 16px env(safe-area-inset-bottom, 16px);
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 480px; width: 100%; }
+    .logo { font-size: 28px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: var(--dim); font-size: 14px; margin-bottom: 28px; line-height: 1.5; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+    .card p { font-size: 13px; color: var(--dim); line-height: 1.55; margin-bottom: 14px; }
+    .steps { list-style: none; counter-reset: step; margin-bottom: 16px; }
+    .steps li {
+      counter-increment: step; font-size: 13px; color: var(--dim);
+      line-height: 1.55; padding: 4px 0 4px 28px; position: relative;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute; left: 0; top: 4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--border); color: var(--text);
+      font-size: 11px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn {
+      display: block; width: 100%; padding: 14px;
+      border: none; border-radius: 8px; cursor: pointer;
+      font-size: 15px; font-weight: 600; font-family: inherit;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary.success { background: var(--success); }
+    .btn-secondary {
+      background: transparent; color: var(--accent);
+      border: 1px solid var(--border); margin-top: 8px;
+    }
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--dim); font-size: 12px; margin: 4px 0;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; background: rgba(88,166,255,0.15);
+      color: var(--accent); margin-left: 6px; vertical-align: middle;
+    }
+    .cli-block {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 12px; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+      font-size: 12px; color: var(--text); word-break: break-all;
+      user-select: all; -webkit-user-select: all;
+    }
+    .footer { text-align: center; margin-top: 12px; font-size: 12px; color: var(--dim); }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .embed-note {
+      background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.2);
+      border-radius: 8px; padding: 14px; margin-top: 14px;
+    }
+    .embed-note p { color: var(--dim); font-size: 12px; line-height: 1.5; margin: 0; }
+    .embed-note strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">ForgeCAD</div>
+    <p class="subtitle">
+      Give any AI assistant full CAD modeling knowledge.<br>
+      Build 3D models through conversation.
+    </p>
+
+    <!-- Card 1: Claude Projects (recommended for mobile) -->
+    <div class="card">
+      <h2>Claude Mobile / Web <span class="badge">Recommended</span></h2>
+      <p>Add ForgeCAD as project knowledge so every conversation in that project can build 3D models.</p>
+      <ol class="steps">
+        <li>Tap <strong>Download Skill File</strong> below</li>
+        <li>Open Claude app &rarr; <strong>Projects</strong> &rarr; create or pick a project</li>
+        <li>Tap <strong>Add knowledge</strong> &rarr; upload the downloaded file</li>
+        <li>Start chatting &mdash; ask Claude to build a model!</li>
+      </ol>
+      <button class="btn btn-primary" id="downloadBtn" onclick="downloadSkill()">
+        Download Skill File
+      </button>
+      <div class="divider">or</div>
+      <button class="btn btn-secondary" id="copyBtn" onclick="copySkill()">
+        Copy to Clipboard (for pasting)
+      </button>
+    </div>
+
+    <!-- Card 2: Other AI assistants -->
+    <div class="card">
+      <h2>ChatGPT, Gemini, or other chat UIs</h2>
+      <p>Copy the skill and paste it as the first message in a new conversation, or add it to your custom instructions.</p>
+      <button class="btn btn-secondary" onclick="copySkill()">
+        Copy ForgeCAD Context
+      </button>
+    </div>
+
+    <!-- Card 3: CLI agents -->
+    <div class="card">
+      <h2>Claude Code, Codex, OpenCode</h2>
+      <p>Install the multi-file skill so the agent loads docs on demand:</p>
+      <div class="cli-block">npx forgecad skill install</div>
+    </div>
+
+    <!-- Embed note -->
+    <div class="embed-note">
+      <p>
+        <strong>Interactive 3D preview:</strong> After installing, ask the AI to build a model and
+        provide a ForgeCAD embed link. You'll get an interactive 3D viewer you can rotate and zoom
+        right in your browser.
+      </p>
+    </div>
+
+    <div class="footer">
+      <a href="https://kostard.github.io/ForgeCAD/">Open ForgeCAD Editor</a>
+      &nbsp;&middot;&nbsp;
+      <a href="https://github.com/KoStard/ForgeCAD">GitHub</a>
+      &nbsp;&middot;&nbsp;
+      <a href="https://www.npmjs.com/package/forgecad">npm</a>
+    </div>
+  </div>
+
+  <script>
+    const CONTEXT_URL = 'CONTEXT.md';
+    let cachedContext = null;
+
+    async function fetchContext() {
+      if (cachedContext) return cachedContext;
+      const res = await fetch(CONTEXT_URL);
+      if (!res.ok) throw new Error('Failed to load skill file');
+      cachedContext = await res.text();
+      return cachedContext;
+    }
+
+    async function copySkill() {
+      const btn = document.getElementById('copyBtn');
+      try {
+        const text = await fetchContext();
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied!';
+        btn.classList.add('success');
+        setTimeout(() => {
+          btn.textContent = 'Copy to Clipboard (for pasting)';
+          btn.classList.remove('success');
+        }, 2500);
+      } catch (e) {
+        // Fallback for browsers that block clipboard API
+        try {
+          const text = await fetchContext();
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;left:-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          btn.textContent = 'Copied!';
+          btn.classList.add('success');
+          setTimeout(() => {
+            btn.textContent = 'Copy to Clipboard (for pasting)';
+            btn.classList.remove('success');
+          }, 2500);
+        } catch (e2) {
+          alert('Could not copy. Try the Download button instead.');
+        }
+      }
+    }
+
+    async function downloadSkill() {
+      const btn = document.getElementById('downloadBtn');
+      try {
+        const text = await fetchContext();
+        const blob = new Blob([text], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ForgeCAD-Skill.md';
+        a.click();
+        URL.revokeObjectURL(url);
+        btn.textContent = 'Downloaded!';
+        btn.classList.add('success');
+        setTimeout(() => {
+          btn.textContent = 'Download Skill File';
+          btn.classList.remove('success');
+        }, 2500);
+      } catch (e) {
+        alert('Download failed: ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 
@@ -511,5 +735,15 @@ console.log(`Copied docs -> ${installDocsOutputDir}`);
 
 writeFileSync(oneFileOutputPath, buildOneFileContent());
 console.log(`Wrote ${oneFileOutputPath}`);
+
+// ---------------------------------------------------------------------------
+// Skill installer page — mobile-friendly landing page for copying/downloading
+// the skill into Claude Projects, ChatGPT, etc.
+// Deployed to /ForgeCAD/skill/ on GitHub Pages.
+// ---------------------------------------------------------------------------
+
+const installerHtmlPath = path.join(repoRoot, "dist-skill/index.html");
+writeFileSync(installerHtmlPath, buildInstallerPage());
+console.log(`Wrote ${installerHtmlPath}`);
 
 console.log(`Indexed ${allDocs.length} standard + ${allDevDocs.length} dev source files (${allOneFileDocs.length} for one-file output).`);
