@@ -1,0 +1,36 @@
+{
+  "name": "pipe-tee",
+  "description": "Reproduce the pipe-tee model from reference images",
+  "difficulty": "medium",
+  "referenceModel": "reference.forge.js",
+  "preparedAt": "2026-03-30T10:13:30.458Z",
+  "metrics": {
+    "volume": 28338.9,
+    "surfaceArea": 19643.93,
+    "boundingBox": {
+      "min": [
+        25,
+        -15,
+        -15
+      ],
+      "max": [
+        120,
+        15,
+        40
+      ],
+      "size": [
+        95,
+        30,
+        55
+      ]
+    },
+    "isEmpty": false
+  },
+  "imageSize": 512,
+  "validators": [
+    "iou",
+    "volume",
+    "bbox",
+    "surfaceArea"
+  ]
+}
