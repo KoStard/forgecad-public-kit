@@ -1,0 +1,22 @@
+{
+  "volume": 10834.77,
+  "surfaceArea": 5452,
+  "boundingBox": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      40,
+      30,
+      30
+    ],
+    "size": [
+      40,
+      30,
+      30
+    ]
+  },
+  "isEmpty": false
+}
