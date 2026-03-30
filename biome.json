@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["src/**", "cli/**"]
+    "includes": ["src/**", "cli/**", "!src/forge/forge-api.d.ts"]
   },
   "formatter": {
     "enabled": true,
