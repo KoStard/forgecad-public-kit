@@ -290,7 +290,7 @@ function SceneGround({ config }: { config: SceneConfig }) {
   if (!ground || ground.visible === false) return null;
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, ground.height ?? 0]} receiveShadow={ground.receiveShadow ?? false}>
+    <mesh position={[0, 0, ground.height ?? 0]} receiveShadow={ground.receiveShadow ?? false}>
       <planeGeometry args={[10000, 10000]} />
       <meshStandardMaterial color={ground.color ?? '#1a1a1a'} roughness={1} metalness={0} />
     </mesh>

@@ -95,7 +95,7 @@ export interface SceneGroundConfig {
   visible?: boolean;
   /** Ground color */
   color?: string;
-  /** Ground Y offset from origin */
+  /** Ground Z offset from origin */
   height?: number;
   /** Receive shadows on the ground */
   receiveShadow?: boolean;
