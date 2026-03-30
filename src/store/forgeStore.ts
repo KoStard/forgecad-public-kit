@@ -349,6 +349,11 @@ const initialObjectSettingsByFile: ObjectSettingsByFile = (() => {
   return {};
 })();
 
+/** Debounce timer for setParam → execute(). Slider visual updates are instant
+ *  via paramOverrides; the worker dispatch waits until dragging settles. */
+let paramExecuteTimer: ReturnType<typeof setTimeout> | null = null;
+const PARAM_DEBOUNCE_MS = 80;
+
 export const useForgeStore = create<ForgeStore>((set, get) => ({
   files: { ...INITIAL_FILES },
   savedFiles: { ...INITIAL_SAVED },
@@ -752,7 +757,13 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     const previewKey = curFile ? resolvePreviewFile(curFile, get().files) : null;
     const nextByFile = previewKey ? { ...paramOverridesByFile, [previewKey]: overrides } : paramOverridesByFile;
     set({ paramOverrides: overrides, paramOverridesByFile: nextByFile });
-    get().execute();
+    // Debounce execute — slider visual is already instant via paramOverrides,
+    // the worker only needs the final value after dragging settles.
+    if (paramExecuteTimer) clearTimeout(paramExecuteTimer);
+    paramExecuteTimer = setTimeout(() => {
+      paramExecuteTimer = null;
+      get().execute();
+    }, PARAM_DEBOUNCE_MS);
   },
 
   resetParamOverrides: () => {
