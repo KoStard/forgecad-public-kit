@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fileSystem } from '../fs';
 import { useForgeStore } from '../store/forgeStore';
 import { MobileCodeEditor } from './MobileCodeEditor';
+import { MobileCommandPalette } from './MobileCommandPalette';
 import { MobileExport } from './MobileExport';
 import { MobileFilePicker } from './MobileFilePicker';
 import { MobileParams } from './MobileParams';
@@ -34,6 +35,7 @@ export function MobileApp() {
   const [tab, setTab] = useState<Tab>('code');
   const [filePickerOpen, setFilePickerOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // ── Init kernel (Manifold only) ──
   useEffect(() => {
@@ -97,7 +99,28 @@ export function MobileApp() {
             <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         </button>
-        <span className="fc-mobile-topbar-title">{displayName}</span>
+        <span
+          className="fc-mobile-topbar-title"
+          data-tappable="true"
+          onClick={() => setCommandPaletteOpen(true)}
+          role="button"
+          tabIndex={0}
+        >
+          {displayName}
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ marginLeft: 4, opacity: 0.4, verticalAlign: 'middle' }}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </span>
         <button className="fc-mobile-topbar-btn" onClick={() => setExportOpen(true)} title="Export">
           <svg
             width="18"
@@ -185,6 +208,7 @@ export function MobileApp() {
       {/* ── Overlays ── */}
       {filePickerOpen && <MobileFilePicker onClose={() => setFilePickerOpen(false)} />}
       {exportOpen && <MobileExport onClose={() => setExportOpen(false)} />}
+      {commandPaletteOpen && <MobileCommandPalette onClose={() => setCommandPaletteOpen(false)} />}
     </div>
   );
 }
