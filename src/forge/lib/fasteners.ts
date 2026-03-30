@@ -4,33 +4,12 @@
 
 import { buildShapeFromCompilePlan, box, cylinder, Shape, union } from '../kernel';
 import { type MetricSize, type FastenerFit, METRIC_HOLE_TABLE } from './basic-fasteners';
-import {
-  boltHole,
-  fastenerHole,
-  counterbore,
-  tube,
-  pipe,
-  hexNut,
-  roundedBox,
-  bracket,
-  holePattern,
-} from './basic-fasteners';
+import { boltHole, fastenerHole, counterbore, tube, pipe, hexNut, roundedBox, bracket, holePattern } from './basic-fasteners';
 import { tSlotProfile, tSlotExtrusion } from './tslot';
 import { profile2020BSlot6Profile, profile2020BSlot6 } from './profiles-2020';
 import { explode } from './explode';
 import { pipeRoute, elbow } from './pipe-routing';
-import {
-  spurGear,
-  bevelGear,
-  faceGear,
-  sideGear,
-  ringGear,
-  rackGear,
-  gearPair,
-  bevelGearPair,
-  faceGearPair,
-  sideGearPair,
-} from './gears';
+import { spurGear, bevelGear, faceGear, sideGear, ringGear, rackGear, gearPair, bevelGearPair, faceGearPair, sideGearPair } from './gears';
 
 // ---------------------------------------------------------------------------
 // Thread

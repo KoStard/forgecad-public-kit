@@ -133,7 +133,12 @@ export function expandBox(box: LabelBox, pad: number): LabelBox {
   };
 }
 
-export function clampLabelCenter(center: Vec2, textHalfW: number, textHalfH: number, cell: { x: number; y: number; w: number; h: number }): Vec2 {
+export function clampLabelCenter(
+  center: Vec2,
+  textHalfW: number,
+  textHalfH: number,
+  cell: { x: number; y: number; w: number; h: number },
+): Vec2 {
   const inset = 4;
   const minX = cell.x + inset + textHalfW;
   const maxX = cell.x + cell.w - inset - textHalfW;

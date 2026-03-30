@@ -15,7 +15,10 @@ export type ObjectSettingsByFile = Record<string, ObjectSettingsMap>;
 
 export const DEFAULT_OBJECT_COLOR = '#5b9bd5';
 
-export const getObjectSettingsForPreviewFile = (objectSettingsByFile: ObjectSettingsByFile, previewFile: string | null): ObjectSettingsMap => {
+export const getObjectSettingsForPreviewFile = (
+  objectSettingsByFile: ObjectSettingsByFile,
+  previewFile: string | null,
+): ObjectSettingsMap => {
   if (!previewFile) return {};
   return objectSettingsByFile[previewFile] ?? {};
 };

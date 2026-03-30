@@ -154,11 +154,7 @@ interface BuildRunStateInput {
   hoveredJointName: string | null;
 }
 
-export function buildRunState(
-  previewFile: string | null,
-  runResult: RunResult,
-  state: BuildRunStateInput,
-) {
+export function buildRunState(previewFile: string | null, runResult: RunResult, state: BuildRunStateInput) {
   const synced = syncObjectSettings(
     runResult.objects,
     getObjectSettingsForPreviewFile(state.objectSettingsByFile, previewFile),

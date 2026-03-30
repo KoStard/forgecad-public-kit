@@ -244,9 +244,7 @@ const normalizeAnimation = (animation: JointViewAnimationInput): JointViewAnimat
     const lastKf = animation.keyframes[animation.keyframes.length - 1];
     if (lastKf && typeof lastKf === 'object' && lastKf.ticks !== undefined) {
       if (!isFiniteNumber(lastKf.ticks) || lastKf.ticks <= 0) {
-        throw new Error(
-          `jointsView animation "${name}" keyframes[${animation.keyframes.length - 1}].ticks must be a positive number`,
-        );
+        throw new Error(`jointsView animation "${name}" keyframes[${animation.keyframes.length - 1}].ticks must be a positive number`);
       }
     }
 

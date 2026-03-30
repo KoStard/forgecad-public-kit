@@ -10,13 +10,7 @@
 
 import { readFile, writeFile } from 'fs/promises';
 import { basename, resolve } from 'path';
-import {
-  formatCutSequence,
-  generateCuttingLayoutPdf,
-  getCollectedSheetStock,
-  init,
-  runScript,
-} from '../src/forge/headless';
+import { formatCutSequence, generateCuttingLayoutPdf, getCollectedSheetStock, init, runScript } from '../src/forge/headless';
 import { collectProjectFiles } from './collect-files';
 
 function argValue(argv: string[], name: string): string | undefined {

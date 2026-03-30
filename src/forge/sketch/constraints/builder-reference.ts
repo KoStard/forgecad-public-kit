@@ -45,7 +45,12 @@ proto.importRectangle = function (
   },
   fixed = false,
 ): { bottom: LineId; right: LineId; top: LineId; left: LineId; points: [PointId, PointId, PointId, PointId] } {
-  const [bl, br, tr, tl] = r.vertices.map((v: { x: number; y: number }) => this.importPoint(v, fixed)) as [PointId, PointId, PointId, PointId];
+  const [bl, br, tr, tl] = r.vertices.map((v: { x: number; y: number }) => this.importPoint(v, fixed)) as [
+    PointId,
+    PointId,
+    PointId,
+    PointId,
+  ];
   return {
     bottom: this.line(bl, br),
     right: this.line(br, tr),

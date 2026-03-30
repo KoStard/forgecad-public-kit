@@ -54,13 +54,15 @@ export interface ViewportHandlers {
     x: number;
     y: number;
   } | null;
-  setFaceInfoPanel: React.Dispatch<React.SetStateAction<{
-    objectId: string;
-    faceName: string | null;
-    hitNormal: [number, number, number] | null;
-    x: number;
-    y: number;
-  } | null>>;
+  setFaceInfoPanel: React.Dispatch<
+    React.SetStateAction<{
+      objectId: string;
+      faceName: string | null;
+      hitNormal: [number, number, number] | null;
+      x: number;
+      y: number;
+    } | null>
+  >;
   faceInfoData: EvalWorkerFaceInfoResult | null;
   faceInfoLoading: boolean;
   sketchEntityInfo: SketchEntityInfoPanel | null;
@@ -120,31 +122,40 @@ export function useViewportHandlers({
     setObjectContextMenu(null);
   }, []);
 
-  const hideHoverTooltip = useCallback((id?: string | null) => {
-    if (id !== undefined && hoverTooltipIdRef.current !== id) return;
-    hoverTooltipIdRef.current = null;
-    const tooltip = hoverTooltipRef.current;
-    if (!tooltip) return;
-    tooltip.style.visibility = 'hidden';
-    tooltip.style.opacity = '0';
-  }, [hoverTooltipIdRef, hoverTooltipRef]);
+  const hideHoverTooltip = useCallback(
+    (id?: string | null) => {
+      if (id !== undefined && hoverTooltipIdRef.current !== id) return;
+      hoverTooltipIdRef.current = null;
+      const tooltip = hoverTooltipRef.current;
+      if (!tooltip) return;
+      tooltip.style.visibility = 'hidden';
+      tooltip.style.opacity = '0';
+    },
+    [hoverTooltipIdRef, hoverTooltipRef],
+  );
 
-  const showHoverTooltip = useCallback((label: { id: string; name: string; x: number; y: number }) => {
-    hoverTooltipIdRef.current = label.id;
-    const tooltip = hoverTooltipRef.current;
-    if (!tooltip) return;
-    if (tooltip.textContent !== label.name) tooltip.textContent = label.name;
-    tooltip.style.left = `${label.x}px`;
-    tooltip.style.top = `${label.y}px`;
-    tooltip.style.visibility = 'visible';
-    tooltip.style.opacity = '1';
-  }, [hoverTooltipIdRef, hoverTooltipRef]);
+  const showHoverTooltip = useCallback(
+    (label: { id: string; name: string; x: number; y: number }) => {
+      hoverTooltipIdRef.current = label.id;
+      const tooltip = hoverTooltipRef.current;
+      if (!tooltip) return;
+      if (tooltip.textContent !== label.name) tooltip.textContent = label.name;
+      tooltip.style.left = `${label.x}px`;
+      tooltip.style.top = `${label.y}px`;
+      tooltip.style.visibility = 'visible';
+      tooltip.style.opacity = '1';
+    },
+    [hoverTooltipIdRef, hoverTooltipRef],
+  );
 
-  const handleViewPersistenceResolved = useCallback((restored: boolean) => {
-    if (restored) {
-      initialFitRequestedRef.current = true;
-    }
-  }, [initialFitRequestedRef]);
+  const handleViewPersistenceResolved = useCallback(
+    (restored: boolean) => {
+      if (restored) {
+        initialFitRequestedRef.current = true;
+      }
+    },
+    [initialFitRequestedRef],
+  );
 
   useEffect(() => {
     if (!viewPersistenceResolved) return;
@@ -268,7 +279,16 @@ export function useViewportHandlers({
         y: event.clientY - rect.top + 12,
       });
     },
-    [containerRef, hideHoverTooltip, isViewportInteracting, knownFileNames, measureMode, objectPickSyncEnabled, setHoveredObjectId, showHoverTooltip],
+    [
+      containerRef,
+      hideHoverTooltip,
+      isViewportInteracting,
+      knownFileNames,
+      measureMode,
+      objectPickSyncEnabled,
+      setHoveredObjectId,
+      showHoverTooltip,
+    ],
   );
 
   const clearHoverLabel = useCallback(
@@ -394,21 +414,24 @@ export function useViewportHandlers({
     closeObjectContextMenu();
   }, [closeObjectContextMenu, objectContextMenu, objects]);
 
-  const handleSketchEntityClick = useCallback((entity: SketchHoveredEntity, clientX: number, clientY: number) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const panelWidth = 248;
-    const panelHeight = 160;
-    const x = Math.min(
-      Math.max(clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
-      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - panelWidth - OBJECT_CONTEXT_MENU_MARGIN),
-    );
-    const y = Math.min(
-      Math.max(clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
-      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - panelHeight - OBJECT_CONTEXT_MENU_MARGIN),
-    );
-    setSketchEntityInfo({ entity, x, y });
-  }, [containerRef]);
+  const handleSketchEntityClick = useCallback(
+    (entity: SketchHoveredEntity, clientX: number, clientY: number) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const panelWidth = 248;
+      const panelHeight = 160;
+      const x = Math.min(
+        Math.max(clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
+        Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - panelWidth - OBJECT_CONTEXT_MENU_MARGIN),
+      );
+      const y = Math.min(
+        Math.max(clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
+        Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - panelHeight - OBJECT_CONTEXT_MENU_MARGIN),
+      );
+      setSketchEntityInfo({ entity, x, y });
+    },
+    [containerRef],
+  );
 
   const handleViewportPointerMissed = useCallback(
     (event: MouseEvent) => {
@@ -423,9 +446,12 @@ export function useViewportHandlers({
     [clearFocusedObject, measureMode],
   );
 
-  const handlePerformanceInfoChange = useCallback((stats: ViewportPerformanceInfo | null) => {
-    setPerformanceInfo(stats);
-  }, [setPerformanceInfo]);
+  const handlePerformanceInfoChange = useCallback(
+    (stats: ViewportPerformanceInfo | null) => {
+      setPerformanceInfo(stats);
+    },
+    [setPerformanceInfo],
+  );
 
   return {
     objectContextMenu,

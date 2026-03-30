@@ -106,7 +106,10 @@ proto.concentric = function (this: any, a: any, b: any): any {
 
 /** Constrain a point to lie on an infinite line (collinear). */
 proto.collinear = function (this: any, point: any, line: any): any {
-  return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<
+    SketchConstraint,
+    'id'
+  >);
 };
 
 /** Constrain two points to be symmetric about an axis line. */
@@ -137,7 +140,10 @@ proto.fix = function (this: any, point: any, x?: number, y?: number): any {
 
 /** Constrain a point to lie at the midpoint of a line. */
 proto.midpoint = function (this: any, point: any, line: any): any {
-  return this.constrain({ type: 'midpoint', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  return this.constrain({ type: 'midpoint', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<
+    SketchConstraint,
+    'id'
+  >);
 };
 
 /** Constrain a point to lie on the perimeter of a circle. */
@@ -150,5 +156,8 @@ proto.pointOnCircle = function (this: any, point: any, circle: any): any {
 
 /** Constrain a point to lie on a bounded line segment (not its infinite extension). */
 proto.pointOnLine = function (this: any, point: any, line: any): any {
-  return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  return this.constrain({ type: 'pointOnLine', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<
+    SketchConstraint,
+    'id'
+  >);
 };

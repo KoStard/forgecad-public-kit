@@ -12,10 +12,7 @@ export function SvgPreview() {
   // Ensure the SVG element fills its container by injecting width/height="100%"
   // if the SVG tag doesn't already have them. SVGs with only viewBox and no
   // explicit dimensions collapse to 0×0 inside a flex container.
-  const sized = svgContent.replace(
-    /(<svg\b)(?![^>]*\bwidth\s*=)/i,
-    '$1 width="100%" height="100%"',
-  );
+  const sized = svgContent.replace(/(<svg\b)(?![^>]*\bwidth\s*=)/i, '$1 width="100%" height="100%"');
 
   return (
     <div

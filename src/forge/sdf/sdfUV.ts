@@ -75,9 +75,12 @@ function analyzeNodeUV(node: SdfNode, toLocal: (p: Vec3) => Vec3): UVAnalysis {
 
     case 'sdf:rotate': {
       const [rx, ry, rz] = node.degrees.map((d) => d * DEG);
-      const cx = cos(rx), sx = sin(rx);
-      const cy = cos(ry), sy = sin(ry);
-      const cz = cos(rz), sz = sin(rz);
+      const cx = cos(rx),
+        sx = sin(rx);
+      const cy = cos(ry),
+        sy = sin(ry);
+      const cz = cos(rz),
+        sz = sin(rz);
       const prev = toLocal;
       // Inverse rotation (transpose of Rz * Ry * Rx)
       const next: (p: Vec3) => Vec3 = (p) => {

@@ -44,7 +44,7 @@ const edgeTable = new Int32Array(256);
     for (let j = 0; j < 24; j += 2) {
       const a = !!(i & (1 << cubeEdges[j]));
       const b = !!(i & (1 << cubeEdges[j + 1]));
-      em |= a !== b ? (1 << (j >> 1)) : 0;
+      em |= a !== b ? 1 << (j >> 1) : 0;
     }
     edgeTable[i] = em;
   }
@@ -101,13 +101,9 @@ export function surfaceNets(
         for (let k = 0; k < 2; ++k) {
           for (let j = 0; j < 2; ++j) {
             for (let i = 0; i < 2; ++i, ++g) {
-              const val = sdfFn([
-                scale[0] * (x[0] + i) + shift[0],
-                scale[1] * (x[1] + j) + shift[1],
-                scale[2] * (x[2] + k) + shift[2],
-              ]);
+              const val = sdfFn([scale[0] * (x[0] + i) + shift[0], scale[1] * (x[1] + j) + shift[1], scale[2] * (x[2] + k) + shift[2]]);
               grid[g] = val;
-              mask |= val < 0 ? (1 << g) : 0;
+              mask |= val < 0 ? 1 << g : 0;
             }
           }
         }
@@ -117,7 +113,9 @@ export function surfaceNets(
 
         // Find centroid of edge crossings
         const edgeMask = edgeTable[mask];
-        let vx = 0, vy = 0, vz = 0;
+        let vx = 0,
+          vy = 0,
+          vz = 0;
         let eCount = 0;
 
         for (let i = 0; i < 12; ++i) {
@@ -133,9 +131,9 @@ export function surfaceNets(
 
           // Accumulate interpolated vertex position per axis
           // Each axis: if the two cube corners differ on this bit, interpolate; otherwise take the corner value
-          vx += (e0 & 1) !== (e1 & 1) ? (e0 & 1 ? 1.0 - interp : interp) : (e0 & 1 ? 1.0 : 0);
-          vy += (e0 & 2) !== (e1 & 2) ? (e0 & 2 ? 1.0 - interp : interp) : (e0 & 2 ? 1.0 : 0);
-          vz += (e0 & 4) !== (e1 & 4) ? (e0 & 4 ? 1.0 - interp : interp) : (e0 & 4 ? 1.0 : 0);
+          vx += (e0 & 1) !== (e1 & 1) ? (e0 & 1 ? 1.0 - interp : interp) : e0 & 1 ? 1.0 : 0;
+          vy += (e0 & 2) !== (e1 & 2) ? (e0 & 2 ? 1.0 - interp : interp) : e0 & 2 ? 1.0 : 0;
+          vz += (e0 & 4) !== (e1 & 4) ? (e0 & 4 ? 1.0 - interp : interp) : e0 & 4 ? 1.0 : 0;
         }
 
         // Average and transform to world coordinates

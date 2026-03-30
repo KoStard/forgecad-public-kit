@@ -14,12 +14,7 @@ import { buildExplodeTree, computeExplodeTreeOffsets } from './explodeTree';
 import { expandBoundsByTransformedAabb } from './geometryUtils';
 import { computeJointNodeMatrices } from './jointUtils';
 import { isObjectExcludedFromCutPlane, SECTION_EXPLORER_PLANE_NAME, toClippingPlane } from './sectionUtils';
-import {
-  type HoveredJointOverlayState,
-  IDENTITY_MATRIX,
-  ZERO_OFFSET,
-  type ViewportPerformanceInfo,
-} from './types';
+import { type HoveredJointOverlayState, IDENTITY_MATRIX, ZERO_OFFSET, type ViewportPerformanceInfo } from './types';
 
 export function useViewportState() {
   const measureMode = useForgeStore((s) => s.measureMode);
@@ -79,10 +74,7 @@ export function useViewportState() {
   const cutPlaneDefs = useMemo((): CutPlaneDef[] => result?.cutPlanes ?? [], [result]);
   const explodeConfig = useMemo((): ExplodeViewOptions | null => result?.explodeView ?? null, [result]);
   const jointsConfig = useMemo(() => result?.jointsView ?? null, [result]);
-  const jointOverlayConfig = useMemo(
-    () => result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay,
-    [result],
-  );
+  const jointOverlayConfig = useMemo(() => result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay, [result]);
   const sceneConfig = useMemo((): SceneConfig | null => result?.sceneConfig ?? null, [result]);
 
   const [defaultLightsOverridden, setDefaultLightsOverridden] = useState(false);

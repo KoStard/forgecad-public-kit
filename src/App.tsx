@@ -338,11 +338,7 @@ function FullApp() {
   useEffect(() => {
     const externalUrl = getExternalUrl();
     const gistId = getGistId();
-    const fetcher = externalUrl
-      ? fetchUrlModel(externalUrl)
-      : gistId
-        ? fetchGistModel(gistId)
-        : null;
+    const fetcher = externalUrl ? fetchUrlModel(externalUrl) : gistId ? fetchGistModel(gistId) : null;
     if (!fetcher) return;
     fetcher
       .then((model) => {

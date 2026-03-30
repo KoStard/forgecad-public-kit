@@ -309,10 +309,7 @@ function packMaterialGroup(pieces: ExpandedPiece[], sheetW: number, sheetH: numb
 function computeSheetCutSequence(sheet: PackedSheet): GuillotineCut[] {
   const result: Omit<GuillotineCut, 'step'>[] = [];
 
-  function decompose(
-    rx: number, ry: number, rw: number, rh: number,
-    pieces: PackedPiece[],
-  ): void {
+  function decompose(rx: number, ry: number, rw: number, rh: number, pieces: PackedPiece[]): void {
     if (pieces.length <= 1) return; // 0-1 pieces need no cuts
 
     // Collect candidate cut positions from piece boundaries within the region
@@ -360,8 +357,12 @@ function computeSheetCutSequence(sheet: PackedSheet): GuillotineCut[] {
  * Prefers shorter cuts (less material to cut through).
  */
 function findBestCut(
-  rx: number, ry: number, rw: number, rh: number,
-  pieces: PackedPiece[], eps: number,
+  rx: number,
+  ry: number,
+  rw: number,
+  rh: number,
+  pieces: PackedPiece[],
+  eps: number,
 ): { axis: 'V' | 'H'; pos: number; groupA: PackedPiece[]; groupB: PackedPiece[] } | null {
   let best: { axis: 'V' | 'H'; pos: number; groupA: PackedPiece[]; groupB: PackedPiece[]; length: number } | null = null;
 
@@ -427,7 +428,12 @@ function findBestCut(
   return best;
 }
 
-export function computeCuttingLayout(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number, kerf: number = 0): CuttingLayoutResult {
+export function computeCuttingLayout(
+  entries: SheetStockDef[],
+  sheetWidth: number,
+  sheetHeight: number,
+  kerf: number = 0,
+): CuttingLayoutResult {
   const expanded = expandPieces(entries);
   const groups = groupByMaterial(expanded);
 
@@ -468,7 +474,9 @@ export function formatCutSequence(layout: CuttingLayoutResult): string {
   const lines: string[] = [];
 
   for (const sheet of layout.sheets) {
-    lines.push(`\n  Sheet ${sheet.sheetIndex + 1} — ${sheet.material} (${sheet.sheetWidth} x ${sheet.sheetHeight} mm, ${sheet.pieces.length} pieces)`);
+    lines.push(
+      `\n  Sheet ${sheet.sheetIndex + 1} — ${sheet.material} (${sheet.sheetWidth} x ${sheet.sheetHeight} mm, ${sheet.pieces.length} pieces)`,
+    );
 
     if (sheet.cuts.length === 0) {
       lines.push('    (no cuts needed — single piece fills sheet)');
@@ -514,13 +522,15 @@ function cutStepColor(t: number): ColorRgb {
 function pdfCircle(cx: number, cy: number, r: number): string {
   // Approximate circle with 4 cubic Bezier curves (kappa = 0.5522847498)
   const k = 0.5522847498 * r;
-  return [
-    `${cx - r} ${cy} m`,
-    `${cx - r} ${cy + k} ${cx - k} ${cy + r} ${cx} ${cy + r} c`,
-    `${cx + k} ${cy + r} ${cx + r} ${cy + k} ${cx + r} ${cy} c`,
-    `${cx + r} ${cy - k} ${cx + k} ${cy - r} ${cx} ${cy - r} c`,
-    `${cx - k} ${cy - r} ${cx - r} ${cy - k} ${cx - r} ${cy} c`,
-  ].join('\n') + '\n';
+  return (
+    [
+      `${cx - r} ${cy} m`,
+      `${cx - r} ${cy + k} ${cx - k} ${cy + r} ${cx} ${cy + r} c`,
+      `${cx + k} ${cy + r} ${cx + r} ${cy + k} ${cx + r} ${cy} c`,
+      `${cx + r} ${cy - k} ${cx + k} ${cy - r} ${cx} ${cy - r} c`,
+      `${cx - k} ${cy - r} ${cx - r} ${cy - k} ${cx - r} ${cy} c`,
+    ].join('\n') + '\n'
+  );
 }
 
 const HEADER_HEIGHT = 44;
@@ -561,7 +571,10 @@ function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: Cuttin
   const prelAvailH = DRAW_AREA_HEIGHT - RULER_BOTTOM;
   const prelScale = Math.min(prelAvailW / sheet.sheetWidth, prelAvailH / sheet.sheetHeight);
 
-  interface SmallEntry { num: number; piece: PackedPiece }
+  interface SmallEntry {
+    num: number;
+    piece: PackedPiece;
+  }
   const smallPieces: SmallEntry[] = [];
   const pieceNum: (number | null)[] = [];
   let numCounter = 0;
@@ -737,7 +750,10 @@ function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: Cuttin
       // Find the first row where this label fits without overlap
       let row = 0;
       for (let r = 0; r < MAX_ROWS; r++) {
-        if (leftEdge >= rowRightEdge[r]) { row = r; break; }
+        if (leftEdge >= rowRightEdge[r]) {
+          row = r;
+          break;
+        }
         row = r + 1;
       }
       if (row >= MAX_ROWS) row = MAX_ROWS - 1; // clamp
@@ -781,7 +797,10 @@ function renderSheetPage(sheet: PackedSheet, totalSheets: number, layout: Cuttin
       // Find first column where this label doesn't overlap vertically
       let col = 0;
       for (let c = 0; c < MAX_COLS; c++) {
-        if (topEdge <= rowBottomEdge[c]) { col = c; break; }
+        if (topEdge <= rowBottomEdge[c]) {
+          col = c;
+          break;
+        }
         col = c + 1;
       }
       if (col >= MAX_COLS) col = MAX_COLS - 1;
@@ -972,18 +991,18 @@ function renderSummaryPage(layout: CuttingLayoutResult, sheetWidth: number, shee
     ),
   );
   cmd.push(
-    commandText(
-      `Cuts: ${totalCuts} total (${formatNumber(layout.totalCutLength)} mm total cut length)`,
-      tableX + 4,
-      tableY - 20,
-      10,
-    ),
+    commandText(`Cuts: ${totalCuts} total (${formatNumber(layout.totalCutLength)} mm total cut length)`, tableX + 4, tableY - 20, 10),
   );
 
   return cmd.join('');
 }
 
-export function generateCuttingLayoutPdf(entries: SheetStockDef[], sheetWidth: number, sheetHeight: number, kerf: number = 0): CuttingLayoutPdfResult {
+export function generateCuttingLayoutPdf(
+  entries: SheetStockDef[],
+  sheetWidth: number,
+  sheetHeight: number,
+  kerf: number = 0,
+): CuttingLayoutPdfResult {
   if (entries.length === 0) {
     throw new Error('No sheet stock entries to lay out.');
   }

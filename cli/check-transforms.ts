@@ -451,21 +451,13 @@ function testTickBasedKeyframes() {
   // Tick-based: omit `at`, positions auto-computed as evenly spaced
   resetJointsView();
   jointsView({
-    joints: [
-      { name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0], min: -180, max: 180 },
-    ],
+    joints: [{ name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0], min: -180, max: 180 }],
     animations: [
       {
         name: 'Tick Test',
         duration: 2,
         loop: true,
-        keyframes: [
-          { values: { J1: 0 } },
-          { values: { J1: 45 } },
-          { values: { J1: 90 } },
-          { values: { J1: 45 } },
-          { values: { J1: 0 } },
-        ],
+        keyframes: [{ values: { J1: 0 } }, { values: { J1: 45 } }, { values: { J1: 90 } }, { values: { J1: 45 } }, { values: { J1: 0 } }],
       },
     ],
   });
@@ -501,10 +493,7 @@ function testTickBasedKeyframes() {
   for (const t of [0, 0.1, 0.25, 0.4, 0.5, 0.75, 0.9, 1.0]) {
     const tickResult = resolveJointAnimation(tickClip, t);
     const explicitResult = resolveJointAnimation(explicitClip, t);
-    assert(
-      approx(tickResult.J1, explicitResult.J1),
-      `At t=${t}: tick=${tickResult.J1} vs explicit=${explicitResult.J1}`,
-    );
+    assert(approx(tickResult.J1, explicitResult.J1), `At t=${t}: tick=${tickResult.J1} vs explicit=${explicitResult.J1}`);
   }
 
   // Verify single-keyframe tick → at=0
@@ -545,7 +534,15 @@ function testTickBasedKeyframes() {
   try {
     jointsView({
       joints: [{ name: 'J1', child: 'A', type: 'revolute', axis: [0, 0, 1], pivot: [0, 0, 0] }],
-      animations: [{ name: 'Bad', keyframes: [{ at: 0, ticks: 2, values: { J1: 0 } }, { at: 1, values: { J1: 1 } }] }],
+      animations: [
+        {
+          name: 'Bad',
+          keyframes: [
+            { at: 0, ticks: 2, values: { J1: 0 } },
+            { at: 1, values: { J1: 1 } },
+          ],
+        },
+      ],
     });
   } catch {
     threwTicksAt = true;

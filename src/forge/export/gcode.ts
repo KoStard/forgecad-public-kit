@@ -131,11 +131,15 @@ const BAMBU_P1_X1_OVERRIDES: Partial<PrinterProfile> = {
 
 function bambuOverridesFor(preset: PrinterPreset): Partial<PrinterProfile> {
   switch (preset) {
-    case 'bambu-a1': return BAMBU_A1_OVERRIDES;
-    case 'bambu-a1-mini': return BAMBU_A1_MINI_OVERRIDES;
+    case 'bambu-a1':
+      return BAMBU_A1_OVERRIDES;
+    case 'bambu-a1-mini':
+      return BAMBU_A1_MINI_OVERRIDES;
     case 'bambu-p1s':
-    case 'bambu-x1c': return BAMBU_P1_X1_OVERRIDES;
-    default: return {};
+    case 'bambu-x1c':
+      return BAMBU_P1_X1_OVERRIDES;
+    default:
+      return {};
   }
 }
 
@@ -553,11 +557,16 @@ function f(n: number): string {
 /** Map printer preset to the model name BambuStudio expects in metadata. */
 function bambuModelName(preset: PrinterPreset): string {
   switch (preset) {
-    case 'bambu-a1': return 'Bambu Lab A1';
-    case 'bambu-a1-mini': return 'Bambu Lab A1 mini';
-    case 'bambu-p1s': return 'Bambu Lab P1S';
-    case 'bambu-x1c': return 'Bambu Lab X1 Carbon';
-    default: return 'Generic';
+    case 'bambu-a1':
+      return 'Bambu Lab A1';
+    case 'bambu-a1-mini':
+      return 'Bambu Lab A1 mini';
+    case 'bambu-p1s':
+      return 'Bambu Lab P1S';
+    case 'bambu-x1c':
+      return 'Bambu Lab X1 Carbon';
+    default:
+      return 'Generic';
   }
 }
 

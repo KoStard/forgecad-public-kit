@@ -58,12 +58,7 @@ import {
   readViewPreferences,
   writeViewPreferences,
 } from './executionHelpers';
-import {
-  computeServerSnapshot,
-  postApplyServerSnapshot,
-  computeServerFileChange,
-  computeServerFileDelete,
-} from './serverSync';
+import { computeServerSnapshot, postApplyServerSnapshot, computeServerFileChange, computeServerFileDelete } from './serverSync';
 
 // ---------------------------------------------------------------------------
 // Re-export sharedBundle/sharedModel for consumers that need them
@@ -1315,7 +1310,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
       set({ paramOverrides: {}, lastValidResult: null } as any);
       setParamOverrides({});
       window.history.replaceState(null, '', `#${nextState.activeFile}`);
-      try { localStorage.setItem(LAST_ACTIVE_FILE_KEY, nextState.activeFile); } catch { /* */ }
+      try {
+        localStorage.setItem(LAST_ACTIVE_FILE_KEY, nextState.activeFile);
+      } catch {
+        /* */
+      }
       setTimeout(() => get().execute(), 0);
     }
   },

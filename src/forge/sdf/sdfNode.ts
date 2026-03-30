@@ -346,7 +346,12 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
     case 'sdf:shell':
       return { kind: 'sdf:shell', child: cloneSdfNode(node.child), thickness: node.thickness };
     case 'sdf:displace':
-      return { kind: 'sdf:displace', child: cloneSdfNode(node.child), functionBody: node.functionBody, ...(node.constants ? { constants: { ...node.constants } } : {}) };
+      return {
+        kind: 'sdf:displace',
+        child: cloneSdfNode(node.child),
+        functionBody: node.functionBody,
+        ...(node.constants ? { constants: { ...node.constants } } : {}),
+      };
     case 'sdf:surfaceDisplace':
       return {
         kind: 'sdf:surfaceDisplace',
@@ -394,6 +399,11 @@ export function cloneSdfNode(node: SdfNode): SdfNode {
 
     // Custom
     case 'sdf:custom':
-      return { kind: 'sdf:custom', functionBody: node.functionBody, bounds: { min: [...node.bounds.min], max: [...node.bounds.max] }, ...(node.constants ? { constants: { ...node.constants } } : {}) };
+      return {
+        kind: 'sdf:custom',
+        functionBody: node.functionBody,
+        bounds: { min: [...node.bounds.min], max: [...node.bounds.max] },
+        ...(node.constants ? { constants: { ...node.constants } } : {}),
+      };
   }
 }

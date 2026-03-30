@@ -22,7 +22,14 @@ import type { ToolpathData } from './export/gcode';
 import { GCodeBuilder, gcode } from './export/gcode';
 import { group, ShapeGroup } from './group';
 import { joint } from './assembly/joint';
-import { type CollectedJointsView, getCollectedJointsView, jointsView, resetJointsView, restoreJointsView, saveJointsView } from './assembly/jointsView';
+import {
+  type CollectedJointsView,
+  getCollectedJointsView,
+  jointsView,
+  resetJointsView,
+  restoreJointsView,
+  saveJointsView,
+} from './assembly/jointsView';
 import {
   box,
   buildShapeFromCompilePlan,
@@ -41,7 +48,17 @@ import {
 } from './kernel';
 import { partLibrary } from './library';
 import { detectMeshFormat } from './mesh/meshParsers';
-import { boolParam, createTrackedScope, getCollectedParams, type ParamDef, param, resetParams, runWithParamScope, setParamOverrides, validateConsumedOverrides } from './params';
+import {
+  boolParam,
+  createTrackedScope,
+  getCollectedParams,
+  type ParamDef,
+  param,
+  resetParams,
+  runWithParamScope,
+  setParamOverrides,
+  validateConsumedOverrides,
+} from './params';
 import { type ForgeQualityPreset, resolveForgeQualityPreset, runWithForgeQuality } from './quality';
 import { type CollectedRobotExport, getCollectedRobotExport, resetRobotExport, robotExport } from './export/robotExport';
 import { getCollectedScene, resetScene, type SceneConfig, scene } from './scene';
@@ -508,8 +525,7 @@ function executeFile(
       const { source: src, lookupKey, resolvedPath } = resolveImportSource(fileName, normalizedRequested, allFiles, options);
       if (isSvgImportPath(resolvedPath)) {
         throw new Error(
-          `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is an SVG asset. ` +
-            'Use importSvgSketch() instead.',
+          `JS import "${normalizedRequested}" resolved to "${resolvedPath}", which is an SVG asset. ` + 'Use importSvgSketch() instead.',
         );
       }
       if (resolvedPath.endsWith('.forge-notebook.json')) {
@@ -790,10 +806,7 @@ export function runScript(
         const resolvedTreePath = treePath && treePath.length > 0 ? treePath : [label];
         if (child instanceof ShapeGroup) {
           child.children.forEach((nested, i) => {
-            flattenGroupChild(nested, groupChildLabel(child, label, i), groupName, [
-              ...resolvedTreePath,
-              shapeGroupChildSegment(child, i),
-            ]);
+            flattenGroupChild(nested, groupChildLabel(child, label, i), groupName, [...resolvedTreePath, shapeGroupChildSegment(child, i)]);
           });
           return;
         }
@@ -886,9 +899,7 @@ export function runScript(
       // Assembly / SolvedAssembly: auto-solve and flatten into named scene objects.
       // Uses toSceneObjects() to preserve group names (groupName on SceneObject).
       const assemblySceneItems =
-        result instanceof Assembly ? result.solve().toSceneObjects()
-        : result instanceof SolvedAssembly ? result.toSceneObjects()
-        : null;
+        result instanceof Assembly ? result.solve().toSceneObjects() : result instanceof SolvedAssembly ? result.toSceneObjects() : null;
       if (assemblySceneItems) {
         assemblySceneItems.forEach((item, index) => {
           const label = `Object ${index + 1}`;
@@ -926,11 +937,18 @@ export function runScript(
           }
           throw new Error('Array results must contain Shape/Sketch items');
         });
-      } else if (result !== null && typeof result === 'object' && !Array.isArray(result) &&
-                 !(result instanceof Shape) && !(result instanceof Sketch) &&
-                 !(result instanceof TrackedShape) && !(result instanceof ShapeGroup) &&
-                 !(result instanceof GCodeBuilder) && !(result instanceof Assembly) &&
-                 !(result instanceof SolvedAssembly)) {
+      } else if (
+        result !== null &&
+        typeof result === 'object' &&
+        !Array.isArray(result) &&
+        !(result instanceof Shape) &&
+        !(result instanceof Sketch) &&
+        !(result instanceof TrackedShape) &&
+        !(result instanceof ShapeGroup) &&
+        !(result instanceof GCodeBuilder) &&
+        !(result instanceof Assembly) &&
+        !(result instanceof SolvedAssembly)
+      ) {
         // Plain object return — check for default, then render all renderables
         const obj = result as Record<string, unknown>;
         const defaultValue = obj.default;

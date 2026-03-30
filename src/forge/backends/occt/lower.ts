@@ -346,7 +346,7 @@ function lowerProfileToFace(oc: OCCTModule, plan: ProfileCompilePlan): any {
       op.SetArguments(args);
       op.SetTools(tools);
       op.Build(new oc.Message_ProgressRange_1());
-      let result = op.Shape();
+      const result = op.Shape();
 
       // Merge coplanar face fragments. The boolean produces a compound
       // of face fragments; UnifySameDomain merges adjacent coplanar faces
@@ -984,9 +984,7 @@ function _lowerShapeCompilePlanToOCCTInner(plan: ShapeCompilePlan, oc?: OCCTModu
           'Switch to the Manifold backend or use the default backend.',
       );
     case 'sdf':
-      throw new Error(
-        "SDF shapes require the Manifold backend. Add setActiveBackend('manifold') at the top of your script.",
-      );
+      throw new Error("SDF shapes require the Manifold backend. Add setActiveBackend('manifold') at the top of your script.");
   }
 }
 

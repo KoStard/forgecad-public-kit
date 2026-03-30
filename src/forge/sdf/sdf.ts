@@ -201,10 +201,7 @@ export class SdfShape {
    * shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3)
    * ```
    */
-  surfaceDisplace(
-    pattern: SurfacePattern | ((u: number, v: number) => number),
-    options?: SurfaceDisplaceOptions,
-  ): SdfShape {
+  surfaceDisplace(pattern: SurfacePattern | ((u: number, v: number) => number), options?: SurfaceDisplaceOptions): SdfShape {
     let body: string;
     let constants: Record<string, number> | undefined;
     if (pattern instanceof SurfacePattern) {
@@ -513,7 +510,7 @@ export interface KnurlOptions {
 export function knurl(options?: KnurlOptions): SdfShape {
   const pitch = options?.pitch ?? 3;
   const depth = options?.depth ?? 0.5;
-  const angle = (options?.angle ?? 30) * Math.PI / 180;
+  const angle = ((options?.angle ?? 30) * Math.PI) / 180;
   const freq = (2 * Math.PI) / pitch;
   // Diamond knurl = intersection of two helical sine waves at opposing angles
   const cosA = Math.cos(angle);
@@ -722,7 +719,11 @@ export function basketWeave(options?: BasketWeaveOptions): SurfacePattern {
  *
  * You must provide bounds since the function is opaque.
  */
-export function fromFunction(fn: (x: number, y: number, z: number) => number, bounds: { min: Vec3; max: Vec3 }, constants?: Record<string, number>): SdfShape {
+export function fromFunction(
+  fn: (x: number, y: number, z: number) => number,
+  bounds: { min: Vec3; max: Vec3 },
+  constants?: Record<string, number>,
+): SdfShape {
   return new SdfShape({ kind: 'sdf:custom', functionBody: extractFunctionBody(fn), bounds, constants });
 }
 

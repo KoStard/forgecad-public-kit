@@ -10,9 +10,7 @@ export {
   pushTopologyRewriteDescendantContract,
 } from './queryPropagationCore';
 
-export {
-  buildBooleanTopologyRewritePropagation,
-} from './booleanQueryPropagation';
+export { buildBooleanTopologyRewritePropagation } from './booleanQueryPropagation';
 
 export {
   buildShellTopologyRewritePropagation,

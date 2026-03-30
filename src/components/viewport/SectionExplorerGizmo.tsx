@@ -7,7 +7,11 @@ const PLANE_COLOR = '#00bbff';
 const PLANE_OPACITY = 0.12;
 
 /** Keyed by resetKey so it remounts when the user picks an axis preset. */
-function SectionGizmoInner({ size, initialNormal, initialOffset }: {
+function SectionGizmoInner({
+  size,
+  initialNormal,
+  initialOffset,
+}: {
   size: number;
   initialNormal: [number, number, number];
   initialOffset: number;
@@ -62,13 +66,7 @@ function SectionGizmoInner({ size, initialNormal, initialOffset }: {
     >
       <mesh userData={{ measureHelper: true }} renderOrder={19}>
         <planeGeometry args={[planeSize, planeSize]} />
-        <meshBasicMaterial
-          color={PLANE_COLOR}
-          transparent
-          opacity={PLANE_OPACITY}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
+        <meshBasicMaterial color={PLANE_COLOR} transparent opacity={PLANE_OPACITY} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       <lineLoop renderOrder={20}>
@@ -98,12 +96,5 @@ export function SectionExplorerGizmo({ size }: { size: number }) {
   const offset = useForgeStore((s) => s.sectionExplorerOffset);
   const resetKey = useForgeStore((s) => s.sectionExplorerResetKey);
 
-  return (
-    <SectionGizmoInner
-      key={resetKey}
-      size={size}
-      initialNormal={normal}
-      initialOffset={offset}
-    />
-  );
+  return <SectionGizmoInner key={resetKey} size={size} initialNormal={normal} initialOffset={offset} />;
 }

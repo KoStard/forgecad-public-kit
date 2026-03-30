@@ -170,8 +170,7 @@ export function createSpurToothSketch(meta: GearMeta, segmentsPerTooth: number):
 
   if (hasFillets) {
     // Right fillet: flank base → root circle (center offset to negative angles)
-    const rightRootAngle = addRootFilletPoints(
-      pts, meta.rootRadius, filletRadius, -thetaStart, -1, true, 2);
+    const rightRootAngle = addRootFilletPoints(pts, meta.rootRadius, filletRadius, -thetaStart, -1, true, 2);
     // Root arc between fillet tangent points
     const leftRootAngle = thetaStart + Math.asin(filletRadius / (meta.rootRadius + filletRadius));
     addArcPoints(pts, meta.rootRadius, rightRootAngle, leftRootAngle, arcSteps);

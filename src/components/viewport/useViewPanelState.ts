@@ -119,18 +119,9 @@ export function useViewPanelState() {
   const setSectionExplorerFlip = useForgeStore((s) => s.setSectionExplorerFlip);
 
   const cutPlanes = useMemo((): CutPlaneDef[] => result?.cutPlanes ?? [], [result]);
-  const joints = useMemo(
-    () => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? [])),
-    [result],
-  );
-  const jointCouplings = useMemo(
-    () => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.couplings ?? [])),
-    [result],
-  );
-  const animationClips = useMemo(
-    () => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.animations ?? [])),
-    [result],
-  );
+  const joints = useMemo(() => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.joints ?? [])), [result]);
+  const jointCouplings = useMemo(() => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.couplings ?? [])), [result]);
+  const animationClips = useMemo(() => (result?.jointsView?.enabled === false ? [] : (result?.jointsView?.animations ?? [])), [result]);
 
   const activeAnimationClip = useMemo(
     () => findJointAnimationClip(animationClips, jointAnimationClip),
@@ -153,10 +144,7 @@ export function useViewPanelState() {
   const [sceneCopyStatus, setSceneCopyStatus] = useState<string | null>(null);
   const [constraintsSectionOpen, setConstraintsSectionOpen] = useState(true);
   const sceneCopyTimeoutRef = useRef<number | null>(null);
-  const cameraForward = useMemo(
-    () => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null),
-    [viewportCameraState],
-  );
+  const cameraForward = useMemo(() => (viewportCameraState ? getCameraForwardVector(viewportCameraState) : null), [viewportCameraState]);
   const displayedAnimationProgress =
     activeAnimationClip?.loop && activeAnimationClip.continuous
       ? jointAnimationProgress - Math.floor(jointAnimationProgress)
@@ -176,10 +164,7 @@ export function useViewPanelState() {
   );
   const sceneObjectOverrideCount = useMemo(() => Object.keys(cliSceneState?.objects ?? {}).length, [cliSceneState]);
 
-  const selectedObject = useMemo(
-    () => objects.find((obj) => obj.id === selectedObjectId) ?? null,
-    [objects, selectedObjectId],
-  );
+  const selectedObject = useMemo(() => objects.find((obj) => obj.id === selectedObjectId) ?? null, [objects, selectedObjectId]);
   const objectItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const constraintMeta = selectedObject?.sketchMeta ?? null;
   const constraintStatusColor =

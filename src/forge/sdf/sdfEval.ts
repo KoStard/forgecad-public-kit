@@ -403,7 +403,9 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
           const gy = gradFn([p[0], p[1] + eps, p[2]]) - gradFn([p[0], p[1] - eps, p[2]]);
           const gz = gradFn([p[0], p[1], p[2] + eps]) - gradFn([p[0], p[1], p[2] - eps]);
           const glen = sqrt(gx * gx + gy * gy + gz * gz);
-          let nx = 0, ny = 0, nz = 0;
+          let nx = 0,
+            ny = 0,
+            nz = 0;
           if (glen > 1e-10) {
             const invG = 1 / glen;
             nx = gx * invG;
@@ -411,10 +413,7 @@ export function compileSdfNode(node: SdfNode): SdfEvalFn {
             nz = gz * invG;
           }
 
-          const wallDist = wFn(
-            p[0] * invCell, p[1] * invCell, p[2] * invCell,
-            nx, ny, nz, threshold,
-          );
+          const wallDist = wFn(p[0] * invCell, p[1] * invCell, p[2] * invCell, nx, ny, nz, threshold);
           return wallDist * cellSize - halfWall;
         };
       }

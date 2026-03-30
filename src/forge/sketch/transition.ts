@@ -143,11 +143,7 @@ export interface TransitionEdge {
  * );
  * ```
  */
-export function transitionCurve(
-  edgeA: TransitionEdge,
-  edgeB: TransitionEdge,
-  options: TransitionCurveOptions = {},
-): HermiteCurve3D {
+export function transitionCurve(edgeA: TransitionEdge, edgeB: TransitionEdge, options: TransitionCurveOptions = {}): HermiteCurve3D {
   const a: EdgeEndpoint = {
     point: edgeA.point,
     tangent: edgeA.tangent,
@@ -187,11 +183,7 @@ export function transitionCurve(
  * );
  * ```
  */
-export function transitionSurface(
-  edgeA: TransitionEdge,
-  edgeB: TransitionEdge,
-  options: TransitionSurfaceOptions = {},
-): Shape {
+export function transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge, options: TransitionSurfaceOptions = {}): Shape {
   const curve = transitionCurve(edgeA, edgeB, options);
   const samples = options.samples ?? 64;
   const pathPoints = curve.toPolyline(samples);
@@ -238,11 +230,7 @@ export function transitionCurveFromPoints(
   endTangent: Vec3,
   options: TransitionCurveOptions = {},
 ): HermiteCurve3D {
-  return transitionCurve(
-    { point: startPoint, tangent: startTangent },
-    { point: endPoint, tangent: endTangent },
-    options,
-  );
+  return transitionCurve({ point: startPoint, tangent: startTangent }, { point: endPoint, tangent: endTangent }, options);
 }
 
 // ── Edge Selection Helpers ──────────────────────────────────────────
@@ -317,15 +305,15 @@ export function pickEdge(edge: EdgeRef, options: EdgePickOptions = {}): Transiti
   switch (which) {
     case 'start':
       point = [...edge.start];
-      tangent = flip ? v3Scale(dir, -1) as Vec3 : dir;
+      tangent = flip ? (v3Scale(dir, -1) as Vec3) : dir;
       break;
     case 'end':
       point = [...edge.end];
-      tangent = flip ? dir : v3Scale(dir, -1) as Vec3;
+      tangent = flip ? dir : (v3Scale(dir, -1) as Vec3);
       break;
     case 'mid':
       point = v3Avg(edge.start, edge.end);
-      tangent = flip ? v3Scale(dir, -1) as Vec3 : dir;
+      tangent = flip ? (v3Scale(dir, -1) as Vec3) : dir;
       break;
   }
 
@@ -354,10 +342,7 @@ export function pickEdge(edge: EdgeRef, options: EdgePickOptions = {}): Transiti
  * const edgeB = pickEdgeSegment(topEdge, { end: 'mid', tangentMode: 'outward' });
  * ```
  */
-export function pickEdgeSegment(
-  edge: EdgeSegment,
-  options: EdgePickOptions = {},
-): TransitionEdge {
+export function pickEdgeSegment(edge: EdgeSegment, options: EdgePickOptions = {}): TransitionEdge {
   const which = options.end ?? 'start';
   const mode = options.tangentMode ?? 'along';
   const flip = options.flip ?? false;
@@ -381,14 +366,14 @@ export function pickEdgeSegment(
   } else if (mode === 'outward') {
     // Average the two face normals to get the "outward" direction
     const avgNormal = v3Norm(v3Add(edge.normalA, edge.normalB));
-    tangent = flip ? v3Scale(avgNormal, -1) as Vec3 : avgNormal;
+    tangent = flip ? (v3Scale(avgNormal, -1) as Vec3) : avgNormal;
   } else {
     // 'along' mode: use edge direction
     const dir = edge.direction;
     if (which === 'end') {
-      tangent = flip ? [dir[0], dir[1], dir[2]] : v3Scale(dir, -1) as Vec3;
+      tangent = flip ? [dir[0], dir[1], dir[2]] : (v3Scale(dir, -1) as Vec3);
     } else {
-      tangent = flip ? v3Scale(dir, -1) as Vec3 : [dir[0], dir[1], dir[2]];
+      tangent = flip ? (v3Scale(dir, -1) as Vec3) : [dir[0], dir[1], dir[2]];
     }
   }
 
@@ -439,11 +424,7 @@ export interface ConnectEdgesOptions extends TransitionSurfaceOptions {
   flipB?: boolean;
 }
 
-export function connectEdges(
-  edgeA: EdgeSegment,
-  edgeB: EdgeSegment,
-  options: ConnectEdgesOptions = {},
-): Shape {
+export function connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options: ConnectEdgesOptions = {}): Shape {
   const a = pickEdgeSegment(edgeA, {
     end: options.endA,
     tangentMode: options.tangentModeA,

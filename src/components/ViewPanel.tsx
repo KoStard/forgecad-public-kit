@@ -432,11 +432,7 @@ export function ViewPanel() {
         <div style={labelStyle}>Section Explorer</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-            <input
-              type="checkbox"
-              checked={sectionExplorerEnabled}
-              onChange={(e) => setSectionExplorerEnabled(e.target.checked)}
-            />
+            <input type="checkbox" checked={sectionExplorerEnabled} onChange={(e) => setSectionExplorerEnabled(e.target.checked)} />
             Enable clipping plane
           </label>
         </div>
@@ -445,9 +441,10 @@ export function ViewPanel() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--fc-textDim)', minWidth: 36 }}>Axis</span>
               {AXIS_PRESETS.map(({ label, normal }) => {
-                const isActive = sectionExplorerNormal[0] === normal[0]
-                  && sectionExplorerNormal[1] === normal[1]
-                  && sectionExplorerNormal[2] === normal[2];
+                const isActive =
+                  sectionExplorerNormal[0] === normal[0] &&
+                  sectionExplorerNormal[1] === normal[1] &&
+                  sectionExplorerNormal[2] === normal[2];
                 return (
                   <button
                     key={label}
@@ -462,11 +459,7 @@ export function ViewPanel() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fc-text)' }}>
-                <input
-                  type="checkbox"
-                  checked={sectionExplorerFlip}
-                  onChange={(e) => setSectionExplorerFlip(e.target.checked)}
-                />
+                <input type="checkbox" checked={sectionExplorerFlip} onChange={(e) => setSectionExplorerFlip(e.target.checked)} />
                 Flip direction
               </label>
             </div>

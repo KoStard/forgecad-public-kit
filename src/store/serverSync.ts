@@ -7,13 +7,7 @@
  */
 
 import { setParamOverrides } from '@forge/params';
-import {
-  findPreferredEntryFile,
-  STARTUP_HASH_FILE,
-  LAST_ACTIVE_FILE_KEY,
-  collectParentPaths,
-  resolvePreviewFile,
-} from './fileHelpers';
+import { findPreferredEntryFile, STARTUP_HASH_FILE, LAST_ACTIVE_FILE_KEY, collectParentPaths, resolvePreviewFile } from './fileHelpers';
 import { type ObjectSettingsByFile, removeObjectSettingsForFile } from './objectSettings';
 import { writeViewPreferences } from './executionHelpers';
 
@@ -29,8 +23,14 @@ export interface ServerSyncStoreSlice {
   lastValidResult: unknown;
 }
 
-interface SharedModel { filename: string; code: string }
-interface SharedBundle { entry: string; files: Record<string, string> }
+interface SharedModel {
+  filename: string;
+  code: string;
+}
+interface SharedBundle {
+  entry: string;
+  files: Record<string, string>;
+}
 
 const MESH_EXTS = ['.stl', '.obj', '.3mf'];
 
@@ -146,7 +146,11 @@ export function postApplyServerSnapshot(
     setSlice({ paramOverrides: {}, lastValidResult: null });
     setParamOverrides({});
     window.history.replaceState(null, '', `#${newActiveFile}`);
-    try { localStorage.setItem(LAST_ACTIVE_FILE_KEY, newActiveFile); } catch { /* */ }
+    try {
+      localStorage.setItem(LAST_ACTIVE_FILE_KEY, newActiveFile);
+    } catch {
+      /* */
+    }
     setTimeout(execute, 0);
   } else {
     const previewFile = newActiveFile ? resolvePreviewFile(newActiveFile, files) : null;

@@ -512,12 +512,7 @@ function lowerSdfToManifold(
  * progressively less aggressive ratios and validate each result. If no
  * simplification level produces a valid manifold, we return the original mesh.
  */
-function simplifySdfMesh(
-  triVerts: Uint32Array,
-  vertProperties: Float32Array,
-  edgeLength: number,
-  wasm: ManifoldToplevel,
-): Uint32Array {
+function simplifySdfMesh(triVerts: Uint32Array, vertProperties: Float32Array, edgeLength: number, wasm: ManifoldToplevel): Uint32Array {
   const maxError = edgeLength * 0.25;
   // Try 50%, then 75% retention
   for (const ratio of [0.5, 0.75]) {
@@ -541,7 +536,9 @@ function simplifySdfMesh(
 function filterDegenerateTriangles(triVerts: Uint32Array): Uint32Array {
   let writeIdx = 0;
   for (let i = 0; i < triVerts.length; i += 3) {
-    const a = triVerts[i], b = triVerts[i + 1], c = triVerts[i + 2];
+    const a = triVerts[i],
+      b = triVerts[i + 1],
+      c = triVerts[i + 2];
     if (a !== b && b !== c && a !== c) {
       triVerts[writeIdx++] = a;
       triVerts[writeIdx++] = b;

@@ -1,4 +1,9 @@
-import { buildLoftShapeCompilePlan, buildSweepShapeCompilePlan, buildVariableSweepShapeCompilePlan, createOwnedShapeCompilePlan } from '../compilePlan';
+import {
+  buildLoftShapeCompilePlan,
+  buildSweepShapeCompilePlan,
+  buildVariableSweepShapeCompilePlan,
+  createOwnedShapeCompilePlan,
+} from '../compilePlan';
 import { buildShapeFromCompilePlan, getActiveBackend, type Shape } from '../kernel';
 import { scaleLevelSetBoundsPadding, scaleLevelSetEdgeLength, scaleSplineSamples, scaleSweepPathSamples } from '../quality';
 import { getSketchCompileProfilePlan, Sketch } from './core';
@@ -387,12 +392,7 @@ export interface LoftAlongSpineOptions {
  *
  * Performance note: uses level-set meshing, heavier than simple loft().
  */
-export function loftAlongSpine(
-  profiles: Sketch[],
-  spine: Curve3D | Vec3[],
-  tValues: number[],
-  options: LoftAlongSpineOptions = {},
-): Shape {
+export function loftAlongSpine(profiles: Sketch[], spine: Curve3D | Vec3[], tValues: number[], options: LoftAlongSpineOptions = {}): Shape {
   if (profiles.length < 2) throw new Error('loftAlongSpine requires at least two profiles');
   if (profiles.length !== tValues.length) {
     throw new Error('loftAlongSpine requires tValues.length === profiles.length');
@@ -494,11 +494,7 @@ export function sweep(profile: Sketch, path: Curve3D | Vec3[], options: SweepOpt
  *
  * Performance note: like sweep(), this uses level-set meshing internally.
  */
-export function variableSweep(
-  spine: Curve3D | Vec3[],
-  sections: VariableSweepSection[],
-  options: VariableSweepOptions = {},
-): Shape {
+export function variableSweep(spine: Curve3D | Vec3[], sections: VariableSweepSection[], options: VariableSweepOptions = {}): Shape {
   if (sections.length < 2) throw new Error('variableSweep requires at least two sections');
 
   const sortedSections = [...sections].sort((a, b) => a.t - b.t);

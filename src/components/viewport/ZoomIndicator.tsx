@@ -24,9 +24,7 @@ export function ZoomSampler({ onZoomChange }: { onZoomChange: (mmPerPx: number) 
       const orbitTarget = (controls as OrbitControlsImpl | null)?.target;
       const dist = orbitTarget ? camera.position.distanceTo(orbitTarget) : camera.position.length();
       const persp = camera as THREE.PerspectiveCamera;
-      mmPerPx =
-        (2 * Math.tan(THREE.MathUtils.degToRad(persp.fov * 0.5)) * dist) /
-        (size.height * Math.max(1e-6, persp.zoom));
+      mmPerPx = (2 * Math.tan(THREE.MathUtils.degToRad(persp.fov * 0.5)) * dist) / (size.height * Math.max(1e-6, persp.zoom));
     }
 
     // Only emit when the value changes meaningfully (>1% relative change)
@@ -86,7 +84,7 @@ function roundToNice(v: number): number {
     return Math.round(v / 10) * 10;
   }
   // Very large ratios — round to significant figures
-  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const mag = 10 ** Math.floor(Math.log10(v));
   return Math.round(v / mag) * mag;
 }
 

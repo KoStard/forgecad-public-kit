@@ -137,49 +137,51 @@ export function JointControls({
       {joints.some((j) => !j.hidden) && (
         <div style={sectionStyle}>
           <div style={labelStyle}>Joints</div>
-          {joints.filter((j) => !j.hidden).map((joint) => {
-            const { min, max } = resolveJointRange(joint.type, joint.min, joint.max);
-            const rawValue = displayedRawJointValues[joint.name] ?? joint.defaultValue;
-            const clampedValue = displayedJointValues[joint.name] ?? joint.defaultValue;
-            const value = Math.max(min, Math.min(max, clampedValue));
-            const step = joint.type === 'prismatic' ? 0.1 : 1;
-            const isCoupled = coupledJointNames.has(joint.name);
+          {joints
+            .filter((j) => !j.hidden)
+            .map((joint) => {
+              const { min, max } = resolveJointRange(joint.type, joint.min, joint.max);
+              const rawValue = displayedRawJointValues[joint.name] ?? joint.defaultValue;
+              const clampedValue = displayedJointValues[joint.name] ?? joint.defaultValue;
+              const value = Math.max(min, Math.min(max, clampedValue));
+              const step = joint.type === 'prismatic' ? 0.1 : 1;
+              const isCoupled = coupledJointNames.has(joint.name);
 
-            return (
-              <div
-                key={joint.name}
-                style={{ marginBottom: 8 }}
-                onMouseEnter={() => setHoveredJointName(joint.name)}
-                onMouseLeave={() => {
-                  if (hoveredJointName === joint.name) setHoveredJointName(null);
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
-                  <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
-                  <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
-                    {Number(rawValue.toFixed(2))}
-                    {joint.unit ? ` ${joint.unit}` : ''}
-                    {isCoupled ? ' (linked)' : ''}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  step={step}
-                  value={value}
-                  disabled={!!activeAnimationClip || isCoupled}
-                  onFocus={() => setHoveredJointName(joint.name)}
-                  onBlur={() => {
+              return (
+                <div
+                  key={joint.name}
+                  style={{ marginBottom: 8 }}
+                  onMouseEnter={() => setHoveredJointName(joint.name)}
+                  onMouseLeave={() => {
                     if (hoveredJointName === joint.name) setHoveredJointName(null);
                   }}
-                  onChange={(event) => setJointValue(joint.name, Number(event.target.value))}
-                  title={isCoupled ? 'Linked joint (driven by other joints)' : undefined}
-                  style={{ width: '100%' }}
-                />
-              </div>
-            );
-          })}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
+                    <span style={{ color: 'var(--fc-text)' }}>{joint.name}</span>
+                    <span style={{ color: 'var(--fc-accent)', fontFamily: 'monospace' }}>
+                      {Number(rawValue.toFixed(2))}
+                      {joint.unit ? ` ${joint.unit}` : ''}
+                      {isCoupled ? ' (linked)' : ''}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={value}
+                    disabled={!!activeAnimationClip || isCoupled}
+                    onFocus={() => setHoveredJointName(joint.name)}
+                    onBlur={() => {
+                      if (hoveredJointName === joint.name) setHoveredJointName(null);
+                    }}
+                    onChange={(event) => setJointValue(joint.name, Number(event.target.value))}
+                    title={isCoupled ? 'Linked joint (driven by other joints)' : undefined}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              );
+            })}
           <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fc-textDim)' }}>
             {activeAnimationClip ? 'Animation clip currently drives joint values.' : 'Viewport-only motion. Geometry does not recompute.'}
           </div>

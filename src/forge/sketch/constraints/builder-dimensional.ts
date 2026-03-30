@@ -102,7 +102,10 @@ proto.pointLineDistance = function (this: any, point: any, line: any, value: num
  */
 proto.lineDistance = function (this: any, a: any, b: any, value: number): any {
   this.requireFinite(value, 'lineDistance');
-  return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+  return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<
+    SketchConstraint,
+    'id'
+  >);
 };
 
 /** Constrain the absolute angle of a line from the positive X-axis (degrees). */
@@ -329,13 +332,19 @@ proto.shapeArea = function (this: any, shape: any, value: number): any {
 
 /** Constrain two shapes to share the same centroid. */
 proto.shapeEqualCentroid = function (this: any, a: any, b: any): any {
-  return this.constrain({ type: 'shapeEqualCentroid', a: this.resolveShapeId(a), b: this.resolveShapeId(b) } as Omit<SketchConstraint, 'id'>);
+  return this.constrain({ type: 'shapeEqualCentroid', a: this.resolveShapeId(a), b: this.resolveShapeId(b) } as Omit<
+    SketchConstraint,
+    'id'
+  >);
 };
 
 /** Constrain the unsigned angle between two lines (accepts both orientations). */
 proto.angleBetween = function (this: any, a: any, b: any, value: number): any {
   this.requireFinite(value, 'angleBetween');
-  return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+  return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<
+    SketchConstraint,
+    'id'
+  >);
 };
 
 /** Enforce counter-clockwise winding on a polygon defined by its vertices. */

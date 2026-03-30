@@ -124,7 +124,18 @@ export function computeGeometryArrays(mesh: {
 
   // Auto-smooth normals for Manifold meshes (no B-rep normals)
   if (!vertNormals && triCount > 0) {
-    computeAutoSmoothNormals(triVerts, vertProperties, numProp, triCount, faceNx, faceNy, faceNz, normals, mesh.mergeFromVert, mesh.mergeToVert);
+    computeAutoSmoothNormals(
+      triVerts,
+      vertProperties,
+      numProp,
+      triCount,
+      faceNx,
+      faceNy,
+      faceNz,
+      normals,
+      mesh.mergeFromVert,
+      mesh.mergeToVert,
+    );
   }
 
   const edgePositions = computeSharpEdges(
@@ -191,7 +202,9 @@ function computeAutoSmoothNormals(
       if (!adjacentTris || adjacentTris.length <= 1) continue;
 
       // Average face normals of adjacent triangles that are "smooth" relative to this triangle
-      let sx = 0, sy = 0, sz = 0;
+      let sx = 0,
+        sy = 0,
+        sz = 0;
       for (const adj of adjacentTris) {
         const dot = faceNx[t] * faceNx[adj] + faceNy[t] * faceNy[adj] + faceNz[t] * faceNz[adj];
         if (dot >= SMOOTH_THRESHOLD_DOT) {

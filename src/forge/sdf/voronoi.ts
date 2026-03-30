@@ -36,21 +36,12 @@ function mix(h: number): number {
  * floats in [0, 1) that serve as the feature-point offset within
  * the cell. `seed` differentiates independent noise fields.
  */
-function hashCell(
-  ix: number,
-  iy: number,
-  iz: number,
-  seed: number,
-): [number, number, number] {
-  let h = (((ix * 73856093) ^ (iy * 19349669) ^ (iz * 83492791)) + seed) | 0;
+function hashCell(ix: number, iy: number, iz: number, seed: number): [number, number, number] {
+  const h = (((ix * 73856093) ^ (iy * 19349669) ^ (iz * 83492791)) + seed) | 0;
   const hx = mix(h);
   const hy = mix(hx + 0x6a09e667);
   const hz = mix(hy + 0xbb67ae85);
-  return [
-    (hx >>> 0) / 0x100000000,
-    (hy >>> 0) / 0x100000000,
-    (hz >>> 0) / 0x100000000,
-  ];
+  return [(hx >>> 0) / 0x100000000, (hy >>> 0) / 0x100000000, (hz >>> 0) / 0x100000000];
 }
 
 // ---------------------------------------------------------------------------
@@ -60,12 +51,7 @@ function hashCell(
 /**
  * Returns [F1, F2] — distances to the nearest and second-nearest feature points.
  */
-function worleyCore(
-  x: number,
-  y: number,
-  z: number,
-  seed: number,
-): [number, number] {
+function worleyCore(x: number, y: number, z: number, seed: number): [number, number] {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const iz = Math.floor(z);
@@ -123,16 +109,7 @@ function worleyCore(
  * on the tangent plane). Default 0.85 removes membranes while keeping some
  * 3D depth variation.
  */
-function worleySurface(
-  x: number,
-  y: number,
-  z: number,
-  seed: number,
-  nx: number,
-  ny: number,
-  nz: number,
-  threshold: number,
-): number {
+function worleySurface(x: number, y: number, z: number, seed: number, nx: number, ny: number, nz: number, threshold: number): number {
   const ix = Math.floor(x);
   const iy = Math.floor(y);
   const iz = Math.floor(z);
@@ -199,9 +176,7 @@ export function worley3(x: number, y: number, z: number): [number, number] {
 /**
  * Returns a seeded Worley-noise evaluator returning [F1, F2].
  */
-export function seededWorley3(
-  seed: number,
-): (x: number, y: number, z: number) => [number, number] {
+export function seededWorley3(seed: number): (x: number, y: number, z: number) => [number, number] {
   const s = seed | 0;
   return (x: number, y: number, z: number) => worleyCore(x, y, z, s);
 }
@@ -210,11 +185,7 @@ export function seededWorley3(
  * Surface-aware Voronoi returning wall distance with membrane suppression.
  * Uses smooth (F2-F1)/2 + bisector normal modulation.
  */
-export function worley3Surface(
-  x: number, y: number, z: number,
-  nx: number, ny: number, nz: number,
-  threshold: number,
-): number {
+export function worley3Surface(x: number, y: number, z: number, nx: number, ny: number, nz: number, threshold: number): number {
   return worleySurface(x, y, z, 0, nx, ny, nz, threshold);
 }
 

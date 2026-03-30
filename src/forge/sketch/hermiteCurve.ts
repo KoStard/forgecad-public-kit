@@ -29,11 +29,7 @@ function v3Dot(a: Vec3, b: Vec3): number {
 }
 
 function v3Cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function v3Len(v: Vec3): number {
@@ -47,11 +43,7 @@ function v3Norm(v: Vec3): Vec3 {
 }
 
 function v3Lerp(a: Vec3, b: Vec3, t: number): Vec3 {
-  return [
-    a[0] + (b[0] - a[0]) * t,
-    a[1] + (b[1] - a[1]) * t,
-    a[2] + (b[2] - a[2]) * t,
-  ];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
 // ── Hermite basis functions ─────────────────────────────────────────
@@ -61,10 +53,10 @@ function cubicHermiteBasis(t: number): [number, number, number, number] {
   const t2 = t * t;
   const t3 = t2 * t;
   return [
-    2 * t3 - 3 * t2 + 1,   // h00: position at P0
-    t3 - 2 * t2 + t,       // h10: tangent at P0
-    -2 * t3 + 3 * t2,      // h01: position at P1
-    t3 - t2,               // h11: tangent at P1
+    2 * t3 - 3 * t2 + 1, // h00: position at P0
+    t3 - 2 * t2 + t, // h10: tangent at P0
+    -2 * t3 + 3 * t2, // h01: position at P1
+    t3 - t2, // h11: tangent at P1
   ];
 }
 
@@ -72,20 +64,20 @@ function cubicHermiteBasis(t: number): [number, number, number, number] {
 function cubicHermiteBasisDeriv(t: number): [number, number, number, number] {
   const t2 = t * t;
   return [
-    6 * t2 - 6 * t,        // h00'
-    3 * t2 - 4 * t + 1,    // h10'
-    -6 * t2 + 6 * t,       // h01'
-    3 * t2 - 2 * t,        // h11'
+    6 * t2 - 6 * t, // h00'
+    3 * t2 - 4 * t + 1, // h10'
+    -6 * t2 + 6 * t, // h01'
+    3 * t2 - 2 * t, // h11'
   ];
 }
 
 /** Second derivative of cubic Hermite basis */
 function cubicHermiteBasisDeriv2(t: number): [number, number, number, number] {
   return [
-    12 * t - 6,            // h00''
-    6 * t - 4,             // h10''
-    -12 * t + 6,           // h01''
-    6 * t - 2,             // h11''
+    12 * t - 6, // h00''
+    6 * t - 4, // h10''
+    -12 * t + 6, // h01''
+    6 * t - 2, // h11''
   ];
 }
 
@@ -236,8 +228,7 @@ export class HermiteCurve3D {
         probeIdx++;
       }
       // Linearly interpolate parameter
-      const frac = (target - cumulative[probeIdx]) /
-        (cumulative[probeIdx + 1] - cumulative[probeIdx]);
+      const frac = (target - cumulative[probeIdx]) / (cumulative[probeIdx + 1] - cumulative[probeIdx]);
       const t = (probeIdx + frac) / probeCount;
       pts.push(this.pointAt(t));
     }
@@ -300,12 +291,12 @@ function quinticHermiteBasis(t: number): [number, number, number, number, number
   const t4 = t3 * t;
   const t5 = t4 * t;
   return [
-    1 - 10 * t3 + 15 * t4 - 6 * t5,             // h00: position at P0
-    t - 6 * t3 + 8 * t4 - 3 * t5,               // h10: tangent at P0
-    0.5 * t2 - 1.5 * t3 + 1.5 * t4 - 0.5 * t5,  // h20: curvature at P0
-    10 * t3 - 15 * t4 + 6 * t5,                  // h01: position at P1
-    -4 * t3 + 7 * t4 - 3 * t5,                   // h11: tangent at P1
-    0.5 * t3 - t4 + 0.5 * t5,                    // h21: curvature at P1
+    1 - 10 * t3 + 15 * t4 - 6 * t5, // h00: position at P0
+    t - 6 * t3 + 8 * t4 - 3 * t5, // h10: tangent at P0
+    0.5 * t2 - 1.5 * t3 + 1.5 * t4 - 0.5 * t5, // h20: curvature at P0
+    10 * t3 - 15 * t4 + 6 * t5, // h01: position at P1
+    -4 * t3 + 7 * t4 - 3 * t5, // h11: tangent at P1
+    0.5 * t3 - t4 + 0.5 * t5, // h21: curvature at P1
   ];
 }
 
@@ -315,12 +306,12 @@ function quinticHermiteBasisDeriv(t: number): [number, number, number, number, n
   const t3 = t2 * t;
   const t4 = t3 * t;
   return [
-    -30 * t2 + 60 * t3 - 30 * t4,                // h00'
-    1 - 18 * t2 + 32 * t3 - 15 * t4,             // h10'
-    t - 4.5 * t2 + 6 * t3 - 2.5 * t4,            // h20'
-    30 * t2 - 60 * t3 + 30 * t4,                  // h01'
-    -12 * t2 + 28 * t3 - 15 * t4,                // h11'
-    1.5 * t2 - 4 * t3 + 2.5 * t4,                // h21'
+    -30 * t2 + 60 * t3 - 30 * t4, // h00'
+    1 - 18 * t2 + 32 * t3 - 15 * t4, // h10'
+    t - 4.5 * t2 + 6 * t3 - 2.5 * t4, // h20'
+    30 * t2 - 60 * t3 + 30 * t4, // h01'
+    -12 * t2 + 28 * t3 - 15 * t4, // h11'
+    1.5 * t2 - 4 * t3 + 2.5 * t4, // h21'
   ];
 }
 
@@ -329,12 +320,12 @@ function quinticHermiteBasisDeriv2(t: number): [number, number, number, number, 
   const t2 = t * t;
   const t3 = t2 * t;
   return [
-    -60 * t + 180 * t2 - 120 * t3,               // h00''
-    -36 * t + 96 * t2 - 60 * t3,                 // h10''
-    1 - 9 * t + 18 * t2 - 10 * t3,               // h20''
-    60 * t - 180 * t2 + 120 * t3,                 // h01''
-    -24 * t + 84 * t2 - 60 * t3,                 // h11''
-    3 * t - 12 * t2 + 10 * t3,                   // h21''
+    -60 * t + 180 * t2 - 120 * t3, // h00''
+    -36 * t + 96 * t2 - 60 * t3, // h10''
+    1 - 9 * t + 18 * t2 - 10 * t3, // h20''
+    60 * t - 180 * t2 + 120 * t3, // h01''
+    -24 * t + 84 * t2 - 60 * t3, // h11''
+    3 * t - 12 * t2 + 10 * t3, // h21''
   ];
 }
 
@@ -413,12 +404,9 @@ export class QuinticHermiteCurve3D {
     const tt = Math.max(0, Math.min(1, t));
     const [h00, h10, h20, h01, h11, h21] = quinticHermiteBasis(tt);
     return [
-      h00 * this.p0[0] + h10 * this.t0[0] + h20 * this.c0[0] +
-        h01 * this.p1[0] + h11 * this.t1[0] + h21 * this.c1[0],
-      h00 * this.p0[1] + h10 * this.t0[1] + h20 * this.c0[1] +
-        h01 * this.p1[1] + h11 * this.t1[1] + h21 * this.c1[1],
-      h00 * this.p0[2] + h10 * this.t0[2] + h20 * this.c0[2] +
-        h01 * this.p1[2] + h11 * this.t1[2] + h21 * this.c1[2],
+      h00 * this.p0[0] + h10 * this.t0[0] + h20 * this.c0[0] + h01 * this.p1[0] + h11 * this.t1[0] + h21 * this.c1[0],
+      h00 * this.p0[1] + h10 * this.t0[1] + h20 * this.c0[1] + h01 * this.p1[1] + h11 * this.t1[1] + h21 * this.c1[1],
+      h00 * this.p0[2] + h10 * this.t0[2] + h20 * this.c0[2] + h01 * this.p1[2] + h11 * this.t1[2] + h21 * this.c1[2],
     ];
   }
 
@@ -427,12 +415,9 @@ export class QuinticHermiteCurve3D {
     const tt = Math.max(0, Math.min(1, t));
     const [h00, h10, h20, h01, h11, h21] = quinticHermiteBasisDeriv(tt);
     return v3Norm([
-      h00 * this.p0[0] + h10 * this.t0[0] + h20 * this.c0[0] +
-        h01 * this.p1[0] + h11 * this.t1[0] + h21 * this.c1[0],
-      h00 * this.p0[1] + h10 * this.t0[1] + h20 * this.c0[1] +
-        h01 * this.p1[1] + h11 * this.t1[1] + h21 * this.c1[1],
-      h00 * this.p0[2] + h10 * this.t0[2] + h20 * this.c0[2] +
-        h01 * this.p1[2] + h11 * this.t1[2] + h21 * this.c1[2],
+      h00 * this.p0[0] + h10 * this.t0[0] + h20 * this.c0[0] + h01 * this.p1[0] + h11 * this.t1[0] + h21 * this.c1[0],
+      h00 * this.p0[1] + h10 * this.t0[1] + h20 * this.c0[1] + h01 * this.p1[1] + h11 * this.t1[1] + h21 * this.c1[1],
+      h00 * this.p0[2] + h10 * this.t0[2] + h20 * this.c0[2] + h01 * this.p1[2] + h11 * this.t1[2] + h21 * this.c1[2],
     ]);
   }
 
@@ -441,12 +426,9 @@ export class QuinticHermiteCurve3D {
     const tt = Math.max(0, Math.min(1, t));
     const [h00, h10, h20, h01, h11, h21] = quinticHermiteBasisDeriv2(tt);
     return [
-      h00 * this.p0[0] + h10 * this.t0[0] + h20 * this.c0[0] +
-        h01 * this.p1[0] + h11 * this.t1[0] + h21 * this.c1[0],
-      h00 * this.p0[1] + h10 * this.t0[1] + h20 * this.c0[1] +
-        h01 * this.p1[1] + h11 * this.t1[1] + h21 * this.c1[1],
-      h00 * this.p0[2] + h10 * this.t0[2] + h20 * this.c0[2] +
-        h01 * this.p1[2] + h11 * this.t1[2] + h21 * this.c1[2],
+      h00 * this.p0[0] + h10 * this.t0[0] + h20 * this.c0[0] + h01 * this.p1[0] + h11 * this.t1[0] + h21 * this.c1[0],
+      h00 * this.p0[1] + h10 * this.t0[1] + h20 * this.c0[1] + h01 * this.p1[1] + h11 * this.t1[1] + h21 * this.c1[1],
+      h00 * this.p0[2] + h10 * this.t0[2] + h20 * this.c0[2] + h01 * this.p1[2] + h11 * this.t1[2] + h21 * this.c1[2],
     ];
   }
 
@@ -503,8 +485,7 @@ export class QuinticHermiteCurve3D {
         probeIdx++;
       }
       // Linearly interpolate parameter
-      const frac = (target - cumulative[probeIdx]) /
-        (cumulative[probeIdx + 1] - cumulative[probeIdx]);
+      const frac = (target - cumulative[probeIdx]) / (cumulative[probeIdx + 1] - cumulative[probeIdx]);
       const t = (probeIdx + frac) / probeCount;
       pts.push(this.pointAt(t));
     }
@@ -532,10 +513,7 @@ export class QuinticHermiteCurve3D {
  * @param b - End endpoint with position, tangent, optional curvature and weight
  * @returns QuinticHermiteCurve3D instance
  */
-export function hermiteTransitionG2(
-  a: QuinticHermiteCurveEndpoint,
-  b: QuinticHermiteCurveEndpoint,
-): QuinticHermiteCurve3D {
+export function hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoint): QuinticHermiteCurve3D {
   return new QuinticHermiteCurve3D(
     { point: a.point, tangent: a.tangent, curvature: a.curvature, weight: a.weight },
     { point: b.point, tangent: b.tangent, curvature: b.curvature, weight: b.weight },

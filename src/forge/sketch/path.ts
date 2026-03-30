@@ -37,14 +37,7 @@ export function adaptiveArcSegments(radius: number, sweepRadians: number, tol = 
  * Arc center from start/end/radius/winding — matches ConstrainedSketchBuilder convention.
  * Radius is clamped to the minimum viable value (half the chord length).
  */
-export function arcCenter(
-  sx: number,
-  sy: number,
-  ex: number,
-  ey: number,
-  radius: number,
-  clockwise: boolean,
-): [number, number] {
+export function arcCenter(sx: number, sy: number, ex: number, ey: number, radius: number, clockwise: boolean): [number, number] {
   const mx = (sx + ex) / 2;
   const my = (sy + ey) / 2;
   const dx = ex - sx;
@@ -74,7 +67,7 @@ export function sampleArc(
   segments?: number,
 ): [number, number][] {
   const r = Math.hypot(sx - cx, sy - cy);
-  let startAngle = Math.atan2(sy - cy, sx - cx);
+  const startAngle = Math.atan2(sy - cy, sx - cx);
   let endAngle = Math.atan2(ey - cy, ex - cx);
 
   if (clockwise) {
@@ -112,9 +105,7 @@ export function tangentArcGeom(
   const dy = ey - sy;
   const cross = dx * ty - dy * tx;
   if (Math.abs(cross) < 1e-9) {
-    throw new Error(
-      'tangentArcTo: endpoint lies along the current direction — use lineTo instead.',
-    );
+    throw new Error('tangentArcTo: endpoint lies along the current direction — use lineTo instead.');
   }
   const d2 = dx * dx + dy * dy;
   const clockwise = cross > 0;
@@ -126,13 +117,7 @@ export function tangentArcGeom(
 }
 
 /** Departure tangent of an arc at its end point, given its center and winding. */
-function arcEndTangent(
-  ex: number,
-  ey: number,
-  cx: number,
-  cy: number,
-  clockwise: boolean,
-): [number, number] {
+function arcEndTangent(ex: number, ey: number, cx: number, cy: number, clockwise: boolean): [number, number] {
   const rx = ex - cx;
   const ry = ey - cy;
   const r = Math.hypot(rx, ry);
@@ -145,10 +130,14 @@ function arcEndTangent(
  * Start point is excluded.
  */
 export function sampleBezier(
-  sx: number, sy: number,
-  cp1x: number, cp1y: number,
-  cp2x: number, cp2y: number,
-  ex: number, ey: number,
+  sx: number,
+  sy: number,
+  cp1x: number,
+  cp1y: number,
+  cp2x: number,
+  cp2y: number,
+  ex: number,
+  ey: number,
   segments?: number,
 ): [number, number][] {
   const n = segments ?? adaptiveBezierSegments(sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey);
@@ -160,26 +149,24 @@ export function sampleBezier(
     const uuu = uu * u;
     const tt = t * t;
     const ttt = tt * t;
-    pts.push([
-      uuu * sx + 3 * uu * t * cp1x + 3 * u * tt * cp2x + ttt * ex,
-      uuu * sy + 3 * uu * t * cp1y + 3 * u * tt * cp2y + ttt * ey,
-    ]);
+    pts.push([uuu * sx + 3 * uu * t * cp1x + 3 * u * tt * cp2x + ttt * ex, uuu * sy + 3 * uu * t * cp1y + 3 * u * tt * cp2y + ttt * ey]);
   }
   return pts;
 }
 
 /** Adaptive segment count for a cubic bezier based on control polygon length. */
 function adaptiveBezierSegments(
-  sx: number, sy: number,
-  cp1x: number, cp1y: number,
-  cp2x: number, cp2y: number,
-  ex: number, ey: number,
+  sx: number,
+  sy: number,
+  cp1x: number,
+  cp1y: number,
+  cp2x: number,
+  cp2y: number,
+  ex: number,
+  ey: number,
   tol = DEFAULT_TOLERANCE,
 ): number {
-  const polyLen =
-    Math.hypot(cp1x - sx, cp1y - sy) +
-    Math.hypot(cp2x - cp1x, cp2y - cp1y) +
-    Math.hypot(ex - cp2x, ey - cp2y);
+  const polyLen = Math.hypot(cp1x - sx, cp1y - sy) + Math.hypot(cp2x - cp1x, cp2y - cp1y) + Math.hypot(ex - cp2x, ey - cp2y);
   const chordLen = Math.hypot(ex - sx, ey - sy);
   const deviation = polyLen - chordLen;
   if (deviation < tol) return 4;
@@ -191,11 +178,7 @@ function adaptiveBezierSegments(
  * Returns all intermediate samples (excluding the first control point, which
  * is assumed to be the current cursor).
  */
-export function sampleCatmullRomSegment(
-  points: [number, number][],
-  tension: number,
-  samplesPerSeg = 16,
-): [number, number][] {
+export function sampleCatmullRomSegment(points: [number, number][], tension: number, samplesPerSeg = 16): [number, number][] {
   const n = points.length;
   if (n < 2) return points.slice();
   const pts: [number, number][] = [];
@@ -214,9 +197,12 @@ export function sampleCatmullRomSegment(
 }
 
 function catmullRom2D(
-  p0: [number, number], p1: [number, number],
-  p2: [number, number], p3: [number, number],
-  t: number, tension: number,
+  p0: [number, number],
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number],
+  t: number,
+  tension: number,
 ): [number, number] {
   const tt = t * t;
   const ttt = tt * t;
@@ -229,10 +215,7 @@ function catmullRom2D(
   const h10 = ttt - 2 * tt + t;
   const h01 = -2 * ttt + 3 * tt;
   const h11 = ttt - tt;
-  return [
-    h00 * p1[0] + h10 * m1x + h01 * p2[0] + h11 * m2x,
-    h00 * p1[1] + h10 * m1y + h01 * p2[1] + h11 * m2y,
-  ];
+  return [h00 * p1[0] + h10 * m1x + h01 * p2[0] + h11 * m2x, h00 * p1[1] + h10 * m1y + h01 * p2[1] + h11 * m2y];
 }
 
 // ── Polygon winding helper ───────────────────────────────────────────────────
@@ -303,16 +286,8 @@ export class PathBuilder {
     return this.arcTo(this.x + dx, this.y + dy, radius, clockwise);
   }
 
-  bezierBy(
-    dcp1x: number, dcp1y: number,
-    dcp2x: number, dcp2y: number,
-    dx: number, dy: number,
-  ): this {
-    return this.bezierTo(
-      this.x + dcp1x, this.y + dcp1y,
-      this.x + dcp2x, this.y + dcp2y,
-      this.x + dx, this.y + dy,
-    );
+  bezierBy(dcp1x: number, dcp1y: number, dcp2x: number, dcp2y: number, dx: number, dy: number): this {
+    return this.bezierTo(this.x + dcp1x, this.y + dcp1y, this.x + dcp2x, this.y + dcp2y, this.x + dx, this.y + dy);
   }
 
   // ── Arcs ──────────────────────────────────────────────────────────────────
@@ -379,18 +354,16 @@ export class PathBuilder {
     const halfDist = dccLen / 2;
     const capDist = R + rc;
     if (capDist < halfDist) {
-      throw new Error(
-        `smoothCapTo: capRadius ${R} too small — minimum is ${(halfDist - rc).toFixed(2)}`,
-      );
+      throw new Error(`smoothCapTo: capRadius ${R} too small — minimum is ${(halfDist - rc).toFixed(2)}`);
     }
     const t = Math.sqrt(capDist * capDist - halfDist * halfDist);
     const ccx = mcx + t * perpX;
     const ccy = mcy + t * perpY;
 
-    const top1x = csx + rc * (ccx - csx) / capDist;
-    const top1y = csy + rc * (ccy - csy) / capDist;
-    const top2x = cex + rc * (ccx - cex) / capDist;
-    const top2y = cey + rc * (ccy - cey) / capDist;
+    const top1x = csx + (rc * (ccx - csx)) / capDist;
+    const top1y = csy + (rc * (ccy - csy)) / capDist;
+    const top2x = cex + (rc * (ccx - cex)) / capDist;
+    const top2y = cey + (rc * (ccy - cey)) / capDist;
 
     this.segs.push({ kind: 'arc', x: top1x, y: top1y, cx: csx, cy: csy, clockwise: false });
     const [d1x, d1y] = arcEndTangent(top1x, top1y, csx, csy, false);
@@ -421,11 +394,7 @@ export class PathBuilder {
   /**
    * Cubic bezier from current position to (x, y) via two control points.
    */
-  bezierTo(
-    cp1x: number, cp1y: number,
-    cp2x: number, cp2y: number,
-    x: number, y: number,
-  ): this {
+  bezierTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): this {
     this.segs.push({ kind: 'bezier', x, y, cp1x, cp1y, cp2x, cp2y });
     // Departure tangent at end = direction from cp2 to endpoint
     const tdx = x - cp2x;
@@ -448,11 +417,7 @@ export class PathBuilder {
    * The second control point `(cp2x, cp2y)` must be provided — it controls
    * the arrival curvature. For a fully automatic smooth curve, see `smoothThrough`.
    */
-  tangentBezierTo(
-    cp2x: number, cp2y: number,
-    x: number, y: number,
-    weight?: number,
-  ): this {
+  tangentBezierTo(cp2x: number, cp2y: number, x: number, y: number, weight?: number): this {
     const chord = Math.hypot(x - this.x, y - this.y);
     const w = weight ?? chord / 3;
     const cp1x = this.x + this.dirX * w;
@@ -515,7 +480,7 @@ export class PathBuilder {
     // We only fillet line-line corners for now (the common case).
     // The corner point is the start of `curr` = end of `prev`.
     // We need the direction of each segment to compute the trim.
-    const cornerX = curr.kind === 'line' || curr.kind === 'move' ? prev.kind === 'line' || prev.kind === 'move' ? 0 : 0 : 0;
+    const cornerX = curr.kind === 'line' || curr.kind === 'move' ? (prev.kind === 'line' || prev.kind === 'move' ? 0 : 0) : 0;
     // Get the two directions meeting at the corner
     const { trimA, trimB, arcSeg } = this.computeFilletGeom(radius);
     if (!arcSeg) throw new Error('fillet: cannot fillet these segments (parallel or degenerate)');
@@ -558,7 +523,9 @@ export class PathBuilder {
   }
 
   private computeFilletGeom(radius: number): {
-    trimA: [number, number]; trimB: [number, number]; arcSeg: PathSeg | null;
+    trimA: [number, number];
+    trimB: [number, number];
+    arcSeg: PathSeg | null;
   } {
     const n = this.segs.length;
     const prev = this.segs[n - 2];
@@ -595,8 +562,10 @@ export class PathBuilder {
 
     const arcSeg: PathSeg = {
       kind: 'arc',
-      x: trimB[0], y: trimB[1],
-      cx: acx, cy: acy,
+      x: trimB[0],
+      y: trimB[1],
+      cx: acx,
+      cy: acy,
       clockwise,
     };
 
@@ -604,7 +573,8 @@ export class PathBuilder {
   }
 
   private computeChamferGeom(distance: number): {
-    trimA: [number, number]; trimB: [number, number];
+    trimA: [number, number];
+    trimB: [number, number];
   } {
     const n = this.segs.length;
     const prev = this.segs[n - 2];
@@ -639,7 +609,8 @@ export class PathBuilder {
           sx = prevSeg.x;
           sy = prevSeg.y;
         } else {
-          sx = 0; sy = 0;
+          sx = 0;
+          sy = 0;
         }
         const dx = seg.x - sx;
         const dy = seg.y - sy;
@@ -659,7 +630,8 @@ export class PathBuilder {
           sx = this.segs[idx - 1].x;
           sy = this.segs[idx - 1].y;
         } else {
-          sx = 0; sy = 0;
+          sx = 0;
+          sy = 0;
         }
         // Tangent at start = perpendicular to radius at start
         const rx = sx - seg.cx;
@@ -677,7 +649,8 @@ export class PathBuilder {
           sx = this.segs[idx - 1].x;
           sy = this.segs[idx - 1].y;
         } else {
-          sx = 0; sy = 0;
+          sx = 0;
+          sy = 0;
         }
         const dx = seg.cp1x - sx;
         const dy = seg.cp1y - sy;
@@ -719,9 +692,17 @@ export class PathBuilder {
    */
   mirror(axis: 'x' | 'y' | [number, number]): this {
     let nx: number, ny: number;
-    if (axis === 'x') { nx = 0; ny = 1; }
-    else if (axis === 'y') { nx = 1; ny = 0; }
-    else { const len = Math.hypot(axis[0], axis[1]); nx = axis[0] / len; ny = axis[1] / len; }
+    if (axis === 'x') {
+      nx = 0;
+      ny = 1;
+    } else if (axis === 'y') {
+      nx = 1;
+      ny = 0;
+    } else {
+      const len = Math.hypot(axis[0], axis[1]);
+      nx = axis[0] / len;
+      ny = axis[1] / len;
+    }
 
     // Mirror point across axis through origin (0,0) — we'll translate to pivot after
     const pivotX = this.x;
@@ -743,8 +724,13 @@ export class PathBuilder {
         // Find this segment's start point (= its predecessor's end)
         const idx = this.segs.indexOf(seg);
         let sx: number, sy: number;
-        if (idx > 0) { sx = this.segs[idx - 1].x; sy = this.segs[idx - 1].y; }
-        else { sx = 0; sy = 0; }
+        if (idx > 0) {
+          sx = this.segs[idx - 1].x;
+          sy = this.segs[idx - 1].y;
+        } else {
+          sx = 0;
+          sy = 0;
+        }
         // Mirror the start point (which becomes the endpoint in the reversed path)
         const [mx, my] = reflect(sx, sy);
         this.segs.push({ kind: 'line', x: mx, y: my });
@@ -753,8 +739,13 @@ export class PathBuilder {
       } else if (seg.kind === 'arc') {
         const idx = this.segs.indexOf(seg);
         let sx: number, sy: number;
-        if (idx > 0) { sx = this.segs[idx - 1].x; sy = this.segs[idx - 1].y; }
-        else { sx = 0; sy = 0; }
+        if (idx > 0) {
+          sx = this.segs[idx - 1].x;
+          sy = this.segs[idx - 1].y;
+        } else {
+          sx = 0;
+          sy = 0;
+        }
         const [mx, my] = reflect(sx, sy);
         const [mcx, mcy] = reflect(seg.cx, seg.cy);
         // Mirroring flips the winding
@@ -764,8 +755,13 @@ export class PathBuilder {
       } else if (seg.kind === 'bezier') {
         const idx = this.segs.indexOf(seg);
         let sx: number, sy: number;
-        if (idx > 0) { sx = this.segs[idx - 1].x; sy = this.segs[idx - 1].y; }
-        else { sx = 0; sy = 0; }
+        if (idx > 0) {
+          sx = this.segs[idx - 1].x;
+          sy = this.segs[idx - 1].y;
+        } else {
+          sx = 0;
+          sy = 0;
+        }
         const [mx, my] = reflect(sx, sy);
         const [mcp1x, mcp1y] = reflect(seg.cp2x, seg.cp2y); // swap cp1/cp2 for reversal
         const [mcp2x, mcp2y] = reflect(seg.cp1x, seg.cp1y);
@@ -827,7 +823,7 @@ export class PathBuilder {
         // First point of spline is the current cursor (already in pts)
         const sampled = sampleCatmullRomSegment(seg.points, seg.tension);
         // Skip the first sampled point if it matches current cursor
-        const startIdx = (sampled.length > 0 && Math.hypot(sampled[0][0] - px, sampled[0][1] - py) < 1e-6) ? 1 : 0;
+        const startIdx = sampled.length > 0 && Math.hypot(sampled[0][0] - px, sampled[0][1] - py) < 1e-6 ? 1 : 0;
         for (let i = startIdx; i < sampled.length; i++) pts.push(sampled[i]);
         const last = seg.points[seg.points.length - 1];
         px = last[0];
@@ -852,7 +848,7 @@ export class PathBuilder {
     if (subPaths.length === 0) throw new Error('Path needs at least 3 points');
 
     // Tessellate each sub-path
-    const tessellated = subPaths.map(segs => this.tessellateSegs(segs));
+    const tessellated = subPaths.map((segs) => this.tessellateSegs(segs));
 
     // First sub-path is the outer contour
     const outer = tessellated[0];
@@ -969,7 +965,7 @@ export class PathBuilder {
         py = seg.y;
       } else if (seg.kind === 'spline') {
         const sampled = sampleCatmullRomSegment(seg.points, seg.tension);
-        const startIdx = (sampled.length > 0 && Math.hypot(sampled[0][0] - px, sampled[0][1] - py) < 1e-6) ? 1 : 0;
+        const startIdx = sampled.length > 0 && Math.hypot(sampled[0][0] - px, sampled[0][1] - py) < 1e-6 ? 1 : 0;
         for (let i = startIdx; i < sampled.length; i++) pts.push(sampled[i]);
         const last = seg.points[seg.points.length - 1];
         px = last[0];
@@ -986,11 +982,7 @@ export function path(): PathBuilder {
 }
 
 /** Create a stroked polyline sketch from an array of 2D points. */
-export function stroke(
-  points: [number, number][],
-  width: number,
-  join: 'Round' | 'Square' = 'Square',
-): Sketch {
+export function stroke(points: [number, number][], width: number, join: 'Round' | 'Square' = 'Square'): Sketch {
   const builder = new PathBuilder();
   builder.moveTo(points[0][0], points[0][1]);
   for (let i = 1; i < points.length; i++) builder.lineTo(points[i][0], points[i][1]);

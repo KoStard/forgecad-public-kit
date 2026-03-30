@@ -12,13 +12,7 @@ import type { CollectedRobotExport } from '../export/robotExport';
 import type { SceneConfig } from '../scene';
 import type { SheetStockDef } from '../export/sheetStock';
 import type { ViewConfig } from '../scene/viewConfig';
-import type {
-  DebugHighlight3D,
-  DimensionDef,
-  HighlightDef,
-  Sketch,
-  SketchConstraintMeta,
-} from '../sketch';
+import type { DebugHighlight3D, DimensionDef, HighlightDef, Sketch, SketchConstraintMeta } from '../sketch';
 import type { GeometryInfo, Shape, ShapeMaterialProps } from '../kernel';
 import type { ParamDef } from '../params';
 import type { VerificationResult } from '../verification';

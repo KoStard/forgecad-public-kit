@@ -759,10 +759,19 @@ export class Assembly {
       const available = ports ? Object.keys(ports) : [];
       throw new Error(
         `Port reference "${ref}": no port "${portName}" on part "${partName}".` +
-        (available.length > 0 ? ` Available: ${available.join(', ')}` : ' No ports declared on this part.'),
+          (available.length > 0 ? ` Available: ${available.join(', ')}` : ' No ports declared on this part.'),
       );
     }
-    return { partName, portName, port: { ...ports[portName], origin: [...ports[portName].origin] as Vec3, axis: [...ports[portName].axis] as Vec3, up: [...ports[portName].up] as Vec3 } };
+    return {
+      partName,
+      portName,
+      port: {
+        ...ports[portName],
+        origin: [...ports[portName].origin] as Vec3,
+        axis: [...ports[portName].axis] as Vec3,
+        up: [...ports[portName].up] as Vec3,
+      },
+    };
   }
 
   /** Add a virtual reference frame (no geometry) to the assembly graph. */
@@ -862,10 +871,7 @@ export class Assembly {
     }
 
     // Determine joint type
-    const jointType: JointType = options.type
-      ?? child.port.kind
-      ?? parent.port.kind
-      ?? 'revolute';
+    const jointType: JointType = options.type ?? child.port.kind ?? parent.port.kind ?? 'revolute';
 
     // Determine joint name
     const jointName = options.as ?? `${parent.partName}_${child.partName}_${this._connectCounter++}`;
@@ -877,14 +883,7 @@ export class Assembly {
     // Compute frame and axis from port alignment
     const childAlign = options.childAlign ?? options.align ?? 'middle';
     const parentAlign = options.parentAlign ?? options.align ?? 'middle';
-    const { frame, axis } = computeConnectFrame(
-      childBase,
-      child.port,
-      parent.port,
-      options.flip ?? false,
-      childAlign,
-      parentAlign,
-    );
+    const { frame, axis } = computeConnectFrame(childBase, child.port, parent.port, options.flip ?? false, childAlign, parentAlign);
 
     // Determine limits (options override port hints)
     const min = options.min ?? child.port.min ?? parent.port.min;
@@ -1337,9 +1336,7 @@ export class Assembly {
       // parentWorld maps parent-local to world.
       const axisWorld = parentWorld.vector(j.frame.vector(j.axis));
       const axisLen = Math.hypot(axisWorld[0], axisWorld[1], axisWorld[2]);
-      const normalizedAxis: Vec3 = axisLen > 1e-10
-        ? [axisWorld[0] / axisLen, axisWorld[1] / axisLen, axisWorld[2] / axisLen]
-        : j.axis;
+      const normalizedAxis: Vec3 = axisLen > 1e-10 ? [axisWorld[0] / axisLen, axisWorld[1] / axisLen, axisWorld[2] / axisLen] : j.axis;
 
       const entry: JointViewInput = {
         name: j.name,
@@ -1363,11 +1360,13 @@ export class Assembly {
     }
 
     // Derive couplings from assembly couplings
-    const couplings: JointViewCouplingInput[] = options.couplings ?? def.jointCouplings.map((c) => ({
-      joint: c.joint,
-      terms: c.terms.map((t) => ({ joint: t.joint, ratio: t.ratio })),
-      offset: c.offset,
-    }));
+    const couplings: JointViewCouplingInput[] =
+      options.couplings ??
+      def.jointCouplings.map((c) => ({
+        joint: c.joint,
+        terms: c.terms.map((t) => ({ joint: t.joint, ratio: t.ratio })),
+        offset: c.offset,
+      }));
 
     jointsViewFn({
       enabled: options.enabled ?? true,
@@ -1521,16 +1520,12 @@ export class Assembly {
       } else {
         const aw = parentWorld.vector(j.frame.vector(j.axis));
         const al = Math.hypot(aw[0], aw[1], aw[2]);
-        const normalizedAxis: Vec3 = al > 1e-10
-          ? [aw[0] / al, aw[1] / al, aw[2] / al]
-          : j.axis;
+        const normalizedAxis: Vec3 = al > 1e-10 ? [aw[0] / al, aw[1] / al, aw[2] / al] : j.axis;
 
         const isFastener = isFastenerName(j.child);
         let max = j.max;
         if (j.type === 'revolute') {
-          max = isFastener
-            ? Math.max(max ?? 720, options.unscrewAngle ?? 720)
-            : Math.max(max ?? 90, options.swingAngle ?? 90);
+          max = isFastener ? Math.max(max ?? 720, options.unscrewAngle ?? 720) : Math.max(max ?? 90, options.swingAngle ?? 90);
         } else if (j.type === 'prismatic') {
           max = Math.max(max ?? 60, sepDist);
         }
@@ -1620,11 +1615,13 @@ export class Assembly {
       for (const kf of keyframes) Object.assign(endValues, kf.values);
       keyframes.push({ at: 1, values: endValues });
 
-      const couplings: JointViewCouplingInput[] = options.couplings ?? def.jointCouplings.map((c) => ({
-        joint: c.joint,
-        terms: c.terms.map((t) => ({ joint: t.joint, ratio: t.ratio })),
-        offset: c.offset,
-      }));
+      const couplings: JointViewCouplingInput[] =
+        options.couplings ??
+        def.jointCouplings.map((c) => ({
+          joint: c.joint,
+          terms: c.terms.map((t) => ({ joint: t.joint, ratio: t.ratio })),
+          offset: c.offset,
+        }));
 
       jointsViewFn({
         enabled: options.enabled ?? true,

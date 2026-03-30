@@ -112,11 +112,7 @@ function extractMeshFromShape(
           const transformedNormal = normal.Transformed(trsf);
           // Flip normal for reversed faces
           const sign = reversed ? -1 : 1;
-          allNormals.push(
-            transformedNormal.X() * sign,
-            transformedNormal.Y() * sign,
-            transformedNormal.Z() * sign,
-          );
+          allNormals.push(transformedNormal.X() * sign, transformedNormal.Y() * sign, transformedNormal.Z() * sign);
         } else {
           allNormals.push(0, 0, 0); // Placeholder — will be discarded if hasAllNormals is false
         }
@@ -199,11 +195,7 @@ function extractMeshFromShape(
  * where each consecutive pair of points forms one line segment (same format as
  * computeSharpEdges in geometryArrays.ts).
  */
-function extractEdgeCurvesFromShape(
-  oc: OCCTModule,
-  shape: any,
-  angularDeflection = EDGE_CURVE_ANGULAR_DEFLECTION,
-): Float32Array {
+function extractEdgeCurvesFromShape(oc: OCCTModule, shape: any, angularDeflection = EDGE_CURVE_ANGULAR_DEFLECTION): Float32Array {
   const segments: number[] = [];
 
   // Use TopExp.MapShapes to get unique edges — the explorer visits each edge
@@ -248,12 +240,7 @@ function extractEdgeCurvesFromShape(
  * the angular threshold, producing more points on high-curvature regions
  * and fewer on straight segments.
  */
-function sampleCurveAdaptive(
-  curve: any,
-  t0: number,
-  t1: number,
-  angularDeflection: number,
-): [number, number, number][] {
+function sampleCurveAdaptive(curve: any, t0: number, t1: number, angularDeflection: number): [number, number, number][] {
   const cosThreshold = Math.cos(angularDeflection);
 
   // Start with a reasonable initial subdivision
@@ -301,12 +288,7 @@ function subdivide(
 }
 
 /** Check if three points are approximately collinear (chord angle < threshold). */
-function isFlat(
-  p0: [number, number, number],
-  pMid: [number, number, number],
-  p1: [number, number, number],
-  cosThreshold: number,
-): boolean {
+function isFlat(p0: [number, number, number], pMid: [number, number, number], p1: [number, number, number], cosThreshold: number): boolean {
   // Direction from p0 to pMid
   const d1x = pMid[0] - p0[0];
   const d1y = pMid[1] - p0[1];

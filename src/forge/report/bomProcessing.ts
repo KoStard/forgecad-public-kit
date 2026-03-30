@@ -3,13 +3,7 @@
  */
 
 import type { BomDef } from '../bom';
-import {
-  BOM_TABLE_ROW_HEIGHT,
-  BOM_TABLE_HEADER_HEIGHT,
-  BOM_TABLE_BOTTOM_PAD,
-  BOM_MAX_ROWS_PER_PAGE,
-  type BomReportRow,
-} from './_internal';
+import { BOM_TABLE_ROW_HEIGHT, BOM_TABLE_HEADER_HEIGHT, BOM_TABLE_BOTTOM_PAD, BOM_MAX_ROWS_PER_PAGE, type BomReportRow } from './_internal';
 import { PAGE_HEIGHT, PAGE_MARGIN } from '../export/pdfUtils';
 import { HEADER_HEIGHT } from './_internal';
 

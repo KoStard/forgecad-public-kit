@@ -190,21 +190,52 @@
 }
 
 /* ─── highlight.js token colours (tuned for dark themes) ─── */
-.fc-mobile-editor-highlight .hljs-keyword  { color: #c586c0; }
-.fc-mobile-editor-highlight .hljs-string   { color: #ce9178; }
-.fc-mobile-editor-highlight .hljs-number   { color: #b5cea8; }
-.fc-mobile-editor-highlight .hljs-comment  { color: #6a9955; font-style: italic; }
-.fc-mobile-editor-highlight .hljs-function { color: #dcdcaa; }
-.fc-mobile-editor-highlight .hljs-title    { color: #dcdcaa; }
-.fc-mobile-editor-highlight .hljs-params   { color: #9cdcfe; }
-.fc-mobile-editor-highlight .hljs-built_in { color: #4ec9b0; }
-.fc-mobile-editor-highlight .hljs-literal  { color: #569cd6; }
-.fc-mobile-editor-highlight .hljs-attr     { color: #9cdcfe; }
-.fc-mobile-editor-highlight .hljs-property { color: #9cdcfe; }
-.fc-mobile-editor-highlight .hljs-variable { color: #9cdcfe; }
-.fc-mobile-editor-highlight .hljs-regexp   { color: #d16969; }
-.fc-mobile-editor-highlight .hljs-operator { color: #d4d4d4; }
-.fc-mobile-editor-highlight .hljs-punctuation { color: #d4d4d4; }
+.fc-mobile-editor-highlight .hljs-keyword {
+  color: #c586c0;
+}
+.fc-mobile-editor-highlight .hljs-string {
+  color: #ce9178;
+}
+.fc-mobile-editor-highlight .hljs-number {
+  color: #b5cea8;
+}
+.fc-mobile-editor-highlight .hljs-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+.fc-mobile-editor-highlight .hljs-function {
+  color: #dcdcaa;
+}
+.fc-mobile-editor-highlight .hljs-title {
+  color: #dcdcaa;
+}
+.fc-mobile-editor-highlight .hljs-params {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-built_in {
+  color: #4ec9b0;
+}
+.fc-mobile-editor-highlight .hljs-literal {
+  color: #569cd6;
+}
+.fc-mobile-editor-highlight .hljs-attr {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-property {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-variable {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-regexp {
+  color: #d16969;
+}
+.fc-mobile-editor-highlight .hljs-operator {
+  color: #d4d4d4;
+}
+.fc-mobile-editor-highlight .hljs-punctuation {
+  color: #d4d4d4;
+}
 
 /* ─── Viewport ─── */
 
@@ -406,8 +437,12 @@
 }
 
 @keyframes fc-mobile-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .fc-mobile-cmdpal-sheet {
@@ -423,8 +458,12 @@
 }
 
 @keyframes fc-mobile-slide-up {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 .fc-mobile-cmdpal-header {

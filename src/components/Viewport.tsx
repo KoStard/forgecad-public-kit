@@ -33,11 +33,7 @@ import { SectionPlaneGuides } from './viewport/SectionPlane';
 import { SketchObject } from './viewport/SketchObject';
 import { ToolpathObject } from './viewport/ToolpathObject';
 import { ZoomIndicatorPanel, ZoomSampler } from './viewport/ZoomIndicator';
-import {
-  FOCUS_MODE_DIM_OPACITY,
-  OBJECT_CONTEXT_MENU_MARGIN,
-  OBJECT_CONTEXT_MENU_WIDTH,
-} from './viewport/types';
+import { FOCUS_MODE_DIM_OPACITY, OBJECT_CONTEXT_MENU_MARGIN, OBJECT_CONTEXT_MENU_WIDTH } from './viewport/types';
 import { ViewController, ViewManager, ViewPersistence } from './viewport/ViewController';
 import { useViewportState } from './viewport/useViewportState';
 import { useViewportHandlers } from './viewport/useViewportHandlers';
@@ -836,4 +832,3 @@ export function Viewport() {
     </div>
   );
 }
-

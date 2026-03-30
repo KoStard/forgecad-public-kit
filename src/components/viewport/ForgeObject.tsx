@@ -72,7 +72,6 @@ export function ForgeObject({
         edgesGeo: null,
         hasSmoothNormals: false,
         cutSurfaces: [] as CutSurfaceDef[],
-
       };
     }
     let shapeForRender = obj.shape;
@@ -155,7 +154,6 @@ export function ForgeObject({
         edgesGeo: edges,
         hasSmoothNormals: smooth,
         cutSurfaces: fallbackToGpuClip ? [] : nextCutSurfaces,
-
       };
     } catch {
       if (!fallbackToGpuClip && hasCutPlanes) {
@@ -170,7 +168,6 @@ export function ForgeObject({
             edgesGeo: edges,
             hasSmoothNormals: smooth,
             cutSurfaces: [] as CutSurfaceDef[],
-
           };
         } catch {
           nextCutSurfaces.forEach((surface) => {
@@ -182,7 +179,6 @@ export function ForgeObject({
             edgesGeo: null,
             hasSmoothNormals: false,
             cutSurfaces: [] as CutSurfaceDef[],
-    
           };
         }
       }
@@ -195,7 +191,6 @@ export function ForgeObject({
         edgesGeo: null,
         hasSmoothNormals: false,
         cutSurfaces: [] as CutSurfaceDef[],
-
       };
     }
   }, [clippingTransformKey, cutPlanes, hasCutPlanes, obj.name, obj.shape]);

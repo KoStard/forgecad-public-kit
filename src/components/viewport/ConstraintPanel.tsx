@@ -260,9 +260,7 @@ export function ConstraintPanel({
           <span style={{ fontSize: 11, color: constraintStatusColor }}>
             {constraintMeta.status}
             {constraintMeta.dof !== 0 && (
-              <span style={{ marginLeft: 4, opacity: 0.75 }}>
-                {constraintMeta.dof > 0 ? `+${constraintMeta.dof}` : constraintMeta.dof}
-              </span>
+              <span style={{ marginLeft: 4, opacity: 0.75 }}>{constraintMeta.dof > 0 ? `+${constraintMeta.dof}` : constraintMeta.dof}</span>
             )}
           </span>
         </div>

@@ -192,9 +192,7 @@ function SpecGroup({ name, results, onNavigate }: SpecGroupProps) {
           {failures.map((v) => (
             <VerificationRow key={v.id} result={v} onNavigate={onNavigate} />
           ))}
-          {passes.length > 0 && failures.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--fc-border)', margin: '4px 0' }} />
-          )}
+          {passes.length > 0 && failures.length > 0 && <div style={{ borderTop: '1px solid var(--fc-border)', margin: '4px 0' }} />}
           {passes.map((v) => (
             <VerificationRow key={v.id} result={v} />
           ))}
@@ -315,9 +313,7 @@ export function VerificationsPanel() {
           ))}
 
           {/* Separator between groups and ungrouped */}
-          {groupOrder.length > 0 && ungrouped.length > 0 && (
-            <div style={{ borderTop: '1px solid var(--fc-border)', margin: '6px 0' }} />
-          )}
+          {groupOrder.length > 0 && ungrouped.length > 0 && <div style={{ borderTop: '1px solid var(--fc-border)', margin: '6px 0' }} />}
 
           {/* Ungrouped results (backward-compatible flat list) */}
           {ungroupedFailures.map((v) => (

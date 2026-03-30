@@ -21,11 +21,7 @@ const SVG_IMPORT_OPTION_KEYS = new Set([
   'invertY',
 ]);
 
-export function parseImportParamArgs(
-  importKind: string,
-  fileName: string,
-  args: unknown,
-): Record<string, number> {
+export function parseImportParamArgs(importKind: string, fileName: string, args: unknown): Record<string, number> {
   if (args == null) return {};
   if (typeof args !== 'object' || Array.isArray(args)) {
     throw new Error(`${importKind}("${fileName}") overrides must be an object: { "Param Name": number }`);

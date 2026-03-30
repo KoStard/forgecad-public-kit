@@ -29,12 +29,7 @@ export async function initMeshoptimizer(): Promise<void> {
  * @param maxError - Maximum geometric error as fraction of mesh extents
  * @returns Simplified triangle indices
  */
-export function simplifyMesh(
-  triVerts: Uint32Array,
-  vertProperties: Float32Array,
-  targetRatio: number,
-  maxError: number,
-): Uint32Array {
+export function simplifyMesh(triVerts: Uint32Array, vertProperties: Float32Array, targetRatio: number, maxError: number): Uint32Array {
   if (!_simplifier) {
     throw new Error('meshoptimizer not initialized — call initMeshoptimizer() first');
   }

@@ -10,11 +10,7 @@ import { writeFileSync, readFileSync, mkdtempSync, rmSync, existsSync } from 'fs
 import { resolve, dirname, join, extname } from 'path';
 import { execFileSync, execSync } from 'child_process';
 import { tmpdir } from 'os';
-import {
-  runScript,
-  type MeshExportObject,
-  type SceneConfig,
-} from '../src/forge/headless';
+import { runScript, type MeshExportObject, type SceneConfig } from '../src/forge/headless';
 import { buildObjString } from '../src/forge/export/exportMesh';
 import { initKernel, setActiveBackend, type ActiveBackend } from '../src/forge/kernel';
 import { collectProjectFiles } from './collect-files';
@@ -24,7 +20,18 @@ import { materializeNotebookPreviewScript } from './notebook-entry';
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
-type RenderPreset = 'studio' | 'outdoor' | 'dramatic' | 'clay' | 'wireframe' | 'glass' | 'metallic' | 'toon' | 'xray' | 'normals' | 'silhouette';
+type RenderPreset =
+  | 'studio'
+  | 'outdoor'
+  | 'dramatic'
+  | 'clay'
+  | 'wireframe'
+  | 'glass'
+  | 'metallic'
+  | 'toon'
+  | 'xray'
+  | 'normals'
+  | 'silhouette';
 
 interface ParsedArgs {
   scriptPath: string;
@@ -45,7 +52,19 @@ interface ParsedArgs {
   videoPitch: number;
 }
 
-const PRESETS: RenderPreset[] = ['studio', 'outdoor', 'dramatic', 'clay', 'wireframe', 'glass', 'metallic', 'toon', 'xray', 'normals', 'silhouette'];
+const PRESETS: RenderPreset[] = [
+  'studio',
+  'outdoor',
+  'dramatic',
+  'clay',
+  'wireframe',
+  'glass',
+  'metallic',
+  'toon',
+  'xray',
+  'normals',
+  'silhouette',
+];
 
 function parseArgs(argv: string[]): ParsedArgs {
   let scriptPath: string | undefined;
@@ -150,24 +169,41 @@ function parseArgs(argv: string[]): ParsedArgs {
   if (!scriptPath) {
     throw new Error(
       'Usage: forgecad render-hq <script.forge.js> [output.png] [options]\n' +
-      '  --preset <studio|outdoor|dramatic|clay|wireframe|glass|metallic>\n' +
-      '  --size <px>          Square output (sets both width and height)\n' +
-      '  --width <px>         Output width (default: 1920)\n' +
-      '  --height <px>        Output height (default: 1080)\n' +
-      '  --samples <n>        Render samples (default: 256)\n' +
-      '  --engine <cycles|eevee>  Render engine (default: cycles)\n' +
-      '  --transparent        Transparent background\n' +
-      '  --hdri <path.hdr>    Custom HDRI environment map\n' +
-      '  --video              Render orbit turntable video (MP4)\n' +
-      '  --frames <n>         Video frames (default: 72)\n' +
-      '  --fps <n>            Video FPS (default: 24)\n' +
-      '  --pitch <deg>        Camera pitch angle (default: 25)\n' +
-      '  --quality <default|live|high>  Mesh tessellation quality\n' +
-      '  --backend <manifold|occt>  Geometry backend',
+        '  --preset <studio|outdoor|dramatic|clay|wireframe|glass|metallic>\n' +
+        '  --size <px>          Square output (sets both width and height)\n' +
+        '  --width <px>         Output width (default: 1920)\n' +
+        '  --height <px>        Output height (default: 1080)\n' +
+        '  --samples <n>        Render samples (default: 256)\n' +
+        '  --engine <cycles|eevee>  Render engine (default: cycles)\n' +
+        '  --transparent        Transparent background\n' +
+        '  --hdri <path.hdr>    Custom HDRI environment map\n' +
+        '  --video              Render orbit turntable video (MP4)\n' +
+        '  --frames <n>         Video frames (default: 72)\n' +
+        '  --fps <n>            Video FPS (default: 24)\n' +
+        '  --pitch <deg>        Camera pitch angle (default: 25)\n' +
+        '  --quality <default|live|high>  Mesh tessellation quality\n' +
+        '  --backend <manifold|occt>  Geometry backend',
     );
   }
 
-  return { scriptPath, outputPath, width, height, samples, preset, engine, transparent, denoise, quality, backend, hdriPath, video, videoFrames, videoFps, videoPitch };
+  return {
+    scriptPath,
+    outputPath,
+    width,
+    height,
+    samples,
+    preset,
+    engine,
+    transparent,
+    denoise,
+    quality,
+    backend,
+    hdriPath,
+    video,
+    videoFrames,
+    videoFps,
+    videoPitch,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +215,9 @@ function findBlender(): string {
   try {
     const which = execSync('which blender 2>/dev/null', { encoding: 'utf-8' }).trim();
     if (which) return which;
-  } catch { /* not in PATH */ }
+  } catch {
+    /* not in PATH */
+  }
 
   // Common macOS locations
   const macPaths = [
@@ -198,9 +236,9 @@ function findBlender(): string {
 
   throw new Error(
     'Blender not found. Install it:\n' +
-    '  macOS:  brew install --cask blender\n' +
-    '  Linux:  sudo apt install blender  (or snap install blender)\n' +
-    '  All:    https://www.blender.org/download/',
+      '  macOS:  brew install --cask blender\n' +
+      '  Linux:  sudo apt install blender  (or snap install blender)\n' +
+      '  All:    https://www.blender.org/download/',
   );
 }
 
@@ -329,11 +367,7 @@ export async function runRenderHqCli(argv: string[]): Promise<void> {
     let blenderStdout = '';
     let blenderStderr = '';
     try {
-      const result2 = execFileSync(blenderPath, [
-        '--background',
-        '--python', renderScript,
-        '--', configPath,
-      ], {
+      const result2 = execFileSync(blenderPath, ['--background', '--python', renderScript, '--', configPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: args.video ? 3_600_000 : 600_000, // 1 hour for video, 10 min for still
         maxBuffer: 50 * 1024 * 1024,
@@ -371,7 +405,9 @@ export async function runRenderHqCli(argv: string[]): Promise<void> {
     // Cleanup temp files
     try {
       rmSync(tmpDir, { recursive: true, force: true });
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
 
     if (existsSync(outputPath)) {
       const stats = (await import('fs')).statSync(outputPath);

@@ -7,8 +7,7 @@
  */
 
 /** Regex patterns that match ForgeCAD import calls and ES/CJS imports. */
-const FORGE_IMPORT_RE =
-  /\b(?:importMesh|importSvgSketch)\s*\(\s*(?:"([^"]+)"|'([^']+)')/g;
+const FORGE_IMPORT_RE = /\b(?:importMesh|importSvgSketch)\s*\(\s*(?:"([^"]+)"|'([^']+)')/g;
 
 const REQUIRE_RE = /\brequire\s*\(\s*(?:"([^"]+)"|'([^']+)')/g;
 

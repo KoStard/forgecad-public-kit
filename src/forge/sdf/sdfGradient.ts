@@ -15,11 +15,7 @@ const { abs, sqrt, sign: mathSign } = Math;
  * The gradient points in the direction of increasing distance (outward from surface).
  * Returns a normalized normal vector and its raw length.
  */
-export function computeGradient(
-  evalFn: SdfEvalFn,
-  p: Vec3,
-  eps: number,
-): { nx: number; ny: number; nz: number; length: number } {
+export function computeGradient(evalFn: SdfEvalFn, p: Vec3, eps: number): { nx: number; ny: number; nz: number; length: number } {
   const gx = evalFn([p[0] + eps, p[1], p[2]]) - evalFn([p[0] - eps, p[1], p[2]]);
   const gy = evalFn([p[0], p[1] + eps, p[2]]) - evalFn([p[0], p[1] - eps, p[2]]);
   const gz = evalFn([p[0], p[1], p[2] + eps]) - evalFn([p[0], p[1], p[2] - eps]);
@@ -68,15 +64,10 @@ export function buildTangentFrame(
  * Weights are raised to `sharpness` power for crisper transitions.
  * Returns normalized weights that sum to 1.
  */
-export function triplanarWeights(
-  nx: number,
-  ny: number,
-  nz: number,
-  sharpness: number,
-): { wx: number; wy: number; wz: number } {
-  let wx = Math.pow(abs(nx), sharpness);
-  let wy = Math.pow(abs(ny), sharpness);
-  let wz = Math.pow(abs(nz), sharpness);
+export function triplanarWeights(nx: number, ny: number, nz: number, sharpness: number): { wx: number; wy: number; wz: number } {
+  const wx = abs(nx) ** sharpness;
+  const wy = abs(ny) ** sharpness;
+  const wz = abs(nz) ** sharpness;
   const sum = wx + wy + wz;
   if (sum < 1e-10) {
     return { wx: 1 / 3, wy: 1 / 3, wz: 1 / 3 };

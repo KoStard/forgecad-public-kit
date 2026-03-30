@@ -442,7 +442,13 @@ const commands: CommandDefinition[] = [
     ],
     completion: {
       options: [
-        { name: '--preset', description: 'Material/lighting preset', argument: 'required', valueLabel: '<name>', values: ['studio', 'outdoor', 'dramatic', 'clay', 'wireframe', 'glass', 'metallic', 'toon', 'xray', 'normals', 'silhouette'] },
+        {
+          name: '--preset',
+          description: 'Material/lighting preset',
+          argument: 'required',
+          valueLabel: '<name>',
+          values: ['studio', 'outdoor', 'dramatic', 'clay', 'wireframe', 'glass', 'metallic', 'toon', 'xray', 'normals', 'silhouette'],
+        },
         { name: '--size', description: 'Square output size in pixels', argument: 'required', valueLabel: '<px>' },
         { name: '--width', description: 'Output width in pixels', argument: 'required', valueLabel: '<px>' },
         { name: '--height', description: 'Output height in pixels', argument: 'required', valueLabel: '<px>' },
@@ -455,8 +461,20 @@ const commands: CommandDefinition[] = [
         { name: '--frames', description: 'Video frames per revolution', argument: 'required', valueLabel: '<n>' },
         { name: '--fps', description: 'Video frame rate', argument: 'required', valueLabel: '<n>' },
         { name: '--pitch', description: 'Camera pitch angle in degrees', argument: 'required', valueLabel: '<deg>' },
-        { name: '--quality', description: 'Mesh tessellation quality', argument: 'required', valueLabel: '<default|live|high>', values: ['default', 'live', 'high'] },
-        { name: '--backend', description: 'Geometry backend', argument: 'required', valueLabel: '<manifold|occt>', values: ['manifold', 'occt'] },
+        {
+          name: '--quality',
+          description: 'Mesh tessellation quality',
+          argument: 'required',
+          valueLabel: '<default|live|high>',
+          values: ['default', 'live', 'high'],
+        },
+        {
+          name: '--backend',
+          description: 'Geometry backend',
+          argument: 'required',
+          valueLabel: '<manifold|occt>',
+          values: ['manifold', 'occt'],
+        },
         { name: '--output', description: 'Output file path', argument: 'required', valueLabel: '<path>' },
       ],
       positionals: [
@@ -722,10 +740,7 @@ const commands: CommandDefinition[] = [
     group: 'Export',
     path: ['export', 'cutting-layout'],
     summary: 'Compute sheet cutting layout with sequenced cuts, export PDF and print cut list.',
-    usage: [
-      'forgecad export cutting-layout <script.forge.js> [output.pdf]',
-      '  [--sheet-width <mm>] [--sheet-height <mm>] [--kerf <mm>]',
-    ],
+    usage: ['forgecad export cutting-layout <script.forge.js> [output.pdf]', '  [--sheet-width <mm>] [--sheet-height <mm>] [--kerf <mm>]'],
     examples: [
       'forgecad export cutting-layout examples/my-cabinet.forge.js',
       'forgecad export cutting-layout examples/my-cabinet.forge.js --sheet-width 2440 --sheet-height 1220 --kerf 3',

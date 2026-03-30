@@ -58,11 +58,7 @@ function dot3(a: Vec3, b: Vec3): number {
 }
 
 function cross3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function sub3(a: Vec3, b: Vec3): Vec3 {
@@ -174,11 +170,7 @@ export function normalizePortInput(input: PortInput): PortDef {
 export function resolvePortAlignPoint(port: PortDef, align: PortAlign = 'middle'): Vec3 {
   if (align === 'middle' || port.extent == null) return port.origin;
   const offset = align === 'start' ? -port.extent : port.extent;
-  return [
-    port.origin[0] + port.axis[0] * offset,
-    port.origin[1] + port.axis[1] * offset,
-    port.origin[2] + port.axis[2] * offset,
-  ];
+  return [port.origin[0] + port.axis[0] * offset, port.origin[1] + port.axis[1] * offset, port.origin[2] + port.axis[2] * offset];
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +314,7 @@ export function computeConnectFrame(
 
   // Parent port vectors in parent-local space
   const pOrigin = parentAlignPt;
-  const pAxis: Vec3 = flip ? negate3(parentPort.axis) : [...parentPort.axis] as Vec3;
+  const pAxis: Vec3 = flip ? negate3(parentPort.axis) : ([...parentPort.axis] as Vec3);
   const pUp: Vec3 = [...parentPort.up] as Vec3;
   const pRight = normalize3(cross3(pAxis, pUp));
 
@@ -355,12 +347,7 @@ export function computeConnectFrame(
   // So m[0]=R[0][0], m[4]=R[0][1], m[8]=R[0][2], m[12]=tx
   //    m[1]=R[1][0], m[5]=R[1][1], m[9]=R[1][2], m[13]=ty
   //    m[2]=R[2][0], m[6]=R[2][1], m[10]=R[2][2],m[14]=tz
-  const frame = Transform.from([
-    r00, r10, r20, 0,
-    r01, r11, r21, 0,
-    r02, r12, r22, 0,
-    t[0], t[1], t[2], 1,
-  ] as any);
+  const frame = Transform.from([r00, r10, r20, 0, r01, r11, r21, 0, r02, r12, r22, 0, t[0], t[1], t[2], 1] as any);
 
   // Joint axis in intermediate space — the child port axis direction
   const axis = cAxis;

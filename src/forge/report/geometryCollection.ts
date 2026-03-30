@@ -49,9 +49,21 @@ function collectShapeTriangles(shape: Shape): ReportTriangle[] {
     const i1 = mesh.triVerts[t * 3 + 1];
     const i2 = mesh.triVerts[t * 3 + 2];
 
-    const a: [number, number, number] = [mesh.vertProperties[i0 * numProp], mesh.vertProperties[i0 * numProp + 1], mesh.vertProperties[i0 * numProp + 2]];
-    const b: [number, number, number] = [mesh.vertProperties[i1 * numProp], mesh.vertProperties[i1 * numProp + 1], mesh.vertProperties[i1 * numProp + 2]];
-    const c: [number, number, number] = [mesh.vertProperties[i2 * numProp], mesh.vertProperties[i2 * numProp + 1], mesh.vertProperties[i2 * numProp + 2]];
+    const a: [number, number, number] = [
+      mesh.vertProperties[i0 * numProp],
+      mesh.vertProperties[i0 * numProp + 1],
+      mesh.vertProperties[i0 * numProp + 2],
+    ];
+    const b: [number, number, number] = [
+      mesh.vertProperties[i1 * numProp],
+      mesh.vertProperties[i1 * numProp + 1],
+      mesh.vertProperties[i1 * numProp + 2],
+    ];
+    const c: [number, number, number] = [
+      mesh.vertProperties[i2 * numProp],
+      mesh.vertProperties[i2 * numProp + 1],
+      mesh.vertProperties[i2 * numProp + 2],
+    ];
 
     const n = norm(cross3(sub3(b, a), sub3(c, a)));
     tris.push({ a, b, c, normal: n });

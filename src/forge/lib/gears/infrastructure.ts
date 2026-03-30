@@ -120,10 +120,7 @@ export function addRootFilletPoints(
   return centerAngle;
 }
 
-function filletPointAt(
-  cx: number, cy: number, rf: number,
-  angStart: number, sweep: number, t: number,
-): [number, number] {
+function filletPointAt(cx: number, cy: number, rf: number, angStart: number, sweep: number, t: number): [number, number] {
   const a = angStart + sweep * t;
   return [cx + rf * Math.cos(a), cy + rf * Math.sin(a)];
 }

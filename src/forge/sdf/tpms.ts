@@ -32,7 +32,9 @@ export function diamond(x: number, y: number, z: number, cellSize: number, thick
 
 export function lidinoid(x: number, y: number, z: number, cellSize: number, thickness: number): number {
   const s = TAU / cellSize;
-  const sx2 = x * s, sy2 = y * s, sz2 = z * s;
+  const sx2 = x * s,
+    sy2 = y * s,
+    sz2 = z * s;
   const val =
     sin(2 * sx2) * cos(sy2) * sin(sz2) +
     sin(2 * sy2) * cos(sz2) * sin(sx2) +

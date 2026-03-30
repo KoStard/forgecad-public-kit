@@ -127,16 +127,12 @@ export function createTrackedScope(namePrefix: string, localOverrides: Record<st
  * was consumed by a param()/boolParam() call. Throws if any keys were not
  * recognized, with fuzzy-match suggestions.
  */
-export function validateConsumedOverrides(
-  scope: ParamScope,
-  importKind: string,
-  resolvedPath: string,
-): void {
+export function validateConsumedOverrides(scope: ParamScope, importKind: string, resolvedPath: string): void {
   const overrides = scope.localOverrides;
   const consumed = scope.consumedKeys;
   if (!overrides || !consumed) return;
 
-  const unconsumed = Object.keys(overrides).filter(k => !consumed.has(k));
+  const unconsumed = Object.keys(overrides).filter((k) => !consumed.has(k));
   if (unconsumed.length === 0) return;
 
   // Collect known param names for suggestions
@@ -149,15 +145,15 @@ export function validateConsumedOverrides(
   // Also include consumed keys (they are valid names)
   for (const k of consumed) knownNames.add(k);
 
-  const suggestions = unconsumed.map(name => {
+  const suggestions = unconsumed.map((name) => {
     const close = findClosestMatch(name, knownNames);
     return close ? `  "${name}" (did you mean "${close}"?)` : `  "${name}"`;
   });
 
   throw new Error(
     `${importKind}("${resolvedPath}"): unrecognized parameter override${unconsumed.length > 1 ? 's' : ''}:\n` +
-    suggestions.join('\n') +
-    `\n\nAvailable parameters: ${[...knownNames].map(n => `"${n}"`).join(', ') || '(none)'}`,
+      suggestions.join('\n') +
+      `\n\nAvailable parameters: ${[...knownNames].map((n) => `"${n}"`).join(', ') || '(none)'}`,
   );
 }
 
@@ -177,7 +173,8 @@ function findClosestMatch(input: string, candidates: Set<string>): string | null
 }
 
 function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
+  const m = a.length,
+    n = b.length;
   const dp: number[] = Array.from({ length: n + 1 }, (_, i) => i);
   for (let i = 1; i <= m; i++) {
     let prev = dp[0];
