@@ -149,6 +149,7 @@ export function MobileApp() {
         {/* Model tab */}
         <div className="fc-mobile-tab-panel" data-active={tab === 'model' ? 'true' : undefined}>
           <MobileViewport />
+          <MobileParams />
         </div>
       </div>
 

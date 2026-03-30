@@ -119,7 +119,7 @@ const DEFAULTS = {
   size: parseIntEnv(['FORGE_CAPTURE_SIZE', 'FORGE_GIF_SIZE'], 960),
   pixelRatio: parseFloatEnv(['FORGE_CAPTURE_PIXEL_RATIO'], 2),
   fps: parseIntEnv(['FORGE_CAPTURE_FPS', 'FORGE_GIF_FPS'], 24),
-  framesPerTurn: parseIntEnv(['FORGE_CAPTURE_FRAMES_PER_TURN', 'FORGE_GIF_FRAMES_PER_TURN'], 72),
+  framesPerTurn: parseIntEnv(['FORGE_CAPTURE_FRAMES_PER_TURN', 'FORGE_GIF_FRAMES_PER_TURN'], 100),
   holdFrames: parseIntEnv(['FORGE_CAPTURE_HOLD_FRAMES', 'FORGE_GIF_HOLD_FRAMES'], 6),
   pitchDeg: parseOptionalFloatEnv(['FORGE_CAPTURE_PITCH_DEG', 'FORGE_GIF_PITCH_DEG']),
   background: process.env.FORGE_CAPTURE_BACKGROUND || process.env.FORGE_GIF_BACKGROUND || '#252526',
@@ -183,7 +183,7 @@ Options:
   --scene <json>               Scene state JSON copied from the viewport; includes camera and object overrides
   --render-mode <solid|wireframe>
                                Primary render mode (default: solid)
-  --include-wireframe-pass     Append a second wireframe pass
+  --wireframe-pass             Enable an extra wireframe pass (off by default)
   --no-wireframe-pass          Disable the extra wireframe pass
   --size <px>                  Output frame size (default: ${DEFAULTS.size})
   --pixel-ratio <n>            Render supersampling factor (default: ${DEFAULTS.pixelRatio})
@@ -337,7 +337,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
       i += 1;
       continue;
     }
-    if (arg === '--include-wireframe-pass') {
+    if (arg === '--wireframe-pass' || arg === '--include-wireframe-pass') {
       includeWireframePass = true;
       continue;
     }
@@ -490,7 +490,7 @@ function parseCli(argv: string[], config: CaptureCliEntryConfig): CliOptions {
     format,
     capture,
     renderMode,
-    includeWireframePass: includeWireframePass ?? (format === 'gif' && capture === 'orbit'),
+    includeWireframePass: includeWireframePass ?? false,
     size,
     pixelRatio,
     fps,

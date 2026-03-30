@@ -376,11 +376,11 @@ When the input is a notebook, `forgecad capture gif` / `forgecad capture mp4` ca
 - `--camera <spec>` — exact camera pose, e.g. `proj=perspective;pos=120,80,120;target=0,0,0;up=0,0,1`
 - `--scene <json>` — full scene state copied from the viewport, including camera plus object visibility/opacity/color overrides
 - `--render-mode <solid|wireframe>` — primary render mode
-- `--include-wireframe-pass` / `--no-wireframe-pass` — control the extra wireframe pass
+- `--wireframe-pass` / `--no-wireframe-pass` — enable/disable the extra wireframe pass (off by default)
 - `--size <px>` — output frame resolution (default `960`)
 - `--pixel-ratio <n>` — render supersampling factor (default `2`)
 - `--fps <n>` — capture frame rate (default `24`)
-- `--frames-per-turn <n>` — frames per full orbit pass (default `72`)
+- `--frames-per-turn <n>` — frames per full orbit pass (default `100`)
 - `--hold-frames <n>` — freeze frames before each pass (default `6`)
 - `--pitch <deg>` — orbit elevation override
 - `--background <color>` — background color (default `#252526`)

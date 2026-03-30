@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 
-type ResizeEdge = 'left' | 'right';
+type ResizeEdge = 'left' | 'right' | 'top' | 'bottom';
 
 interface ResizablePanelProps {
   children: ReactNode;
@@ -23,8 +23,8 @@ interface ResizablePanelProps {
 
 interface DragState {
   pointerId: number;
-  startX: number;
-  startWidth: number;
+  startPos: number;
+  startSize: number;
 }
 
 interface BodyStyleState {
@@ -69,18 +69,19 @@ export function ResizablePanel({
   handleLabel,
   panelStyle,
 }: ResizablePanelProps) {
-  const [width, setWidth] = useState(() => readStoredWidth(storageKey, defaultWidth, minWidth, maxWidth));
+  const isVertical = edge === 'top' || edge === 'bottom';
+  const [size, setSize] = useState(() => readStoredWidth(storageKey, defaultWidth, minWidth, maxWidth));
   const [isDragging, setIsDragging] = useState(false);
   const dragStateRef = useRef<DragState | null>(null);
   const bodyStyleRef = useRef<BodyStyleState | null>(null);
 
   useEffect(() => {
-    setWidth((currentWidth) => clampWidth(currentWidth, minWidth, maxWidth));
+    setSize((current) => clampWidth(current, minWidth, maxWidth));
   }, [minWidth, maxWidth]);
 
   useEffect(() => {
-    persistStoredWidth(storageKey, width);
-  }, [storageKey, width]);
+    persistStoredWidth(storageKey, size);
+  }, [storageKey, size]);
 
   useEffect(() => {
     const restoreBodyStyles = () => {
@@ -99,9 +100,9 @@ export function ResizablePanel({
     const handlePointerMove = (event: PointerEvent) => {
       const dragState = dragStateRef.current;
       if (!dragState || dragState.pointerId !== event.pointerId) return;
-      const deltaX = event.clientX - dragState.startX;
-      const signedDelta = edge === 'right' ? deltaX : -deltaX;
-      setWidth(clampWidth(dragState.startWidth + signedDelta, minWidth, maxWidth));
+      const delta = isVertical ? event.clientY - dragState.startPos : event.clientX - dragState.startPos;
+      const signedDelta = edge === 'right' || edge === 'bottom' ? delta : -delta;
+      setSize(clampWidth(dragState.startSize + signedDelta, minWidth, maxWidth));
     };
 
     const handlePointerEnd = (event: PointerEvent) => {
@@ -119,12 +120,14 @@ export function ResizablePanel({
       window.removeEventListener('pointercancel', handlePointerEnd);
       stopDrag();
     };
-  }, [edge, minWidth, maxWidth]);
+  }, [edge, isVertical, minWidth, maxWidth]);
 
-  const nudgeWidth = (delta: number) => {
-    const signedDelta = edge === 'right' ? delta : -delta;
-    setWidth((currentWidth) => clampWidth(currentWidth + signedDelta, minWidth, maxWidth));
+  const nudgeSize = (delta: number) => {
+    const signedDelta = edge === 'right' || edge === 'bottom' ? delta : -delta;
+    setSize((current) => clampWidth(current + signedDelta, minWidth, maxWidth));
   };
+
+  const cursorStyle = isVertical ? 'row-resize' : 'col-resize';
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -135,14 +138,14 @@ export function ResizablePanel({
         cursor: document.body.style.cursor,
         userSelect: document.body.style.userSelect,
       };
-      document.body.style.cursor = 'col-resize';
+      document.body.style.cursor = cursorStyle;
       document.body.style.userSelect = 'none';
     }
 
     dragStateRef.current = {
       pointerId: event.pointerId,
-      startX: event.clientX,
-      startWidth: width,
+      startPos: isVertical ? event.clientY : event.clientX,
+      startSize: size,
     };
     setIsDragging(true);
   };
@@ -150,72 +153,99 @@ export function ResizablePanel({
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Home') {
       event.preventDefault();
-      setWidth(minWidth);
+      setSize(minWidth);
       return;
     }
     if (event.key === 'End') {
       event.preventDefault();
-      setWidth(maxWidth);
+      setSize(maxWidth);
       return;
     }
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const growKey = isVertical ? 'ArrowDown' : 'ArrowRight';
+    const shrinkKey = isVertical ? 'ArrowUp' : 'ArrowLeft';
+    if (event.key !== growKey && event.key !== shrinkKey) return;
 
     event.preventDefault();
     const step = event.shiftKey ? 48 : 16;
-    nudgeWidth(event.key === 'ArrowRight' ? step : -step);
+    nudgeSize(event.key === growKey ? step : -step);
   };
 
-  const handleStyle: CSSProperties = {
-    width: HANDLE_WIDTH,
-    flexShrink: 0,
-    cursor: 'col-resize',
-    background: isDragging ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
-    touchAction: 'none',
-    position: 'relative',
-    outline: 'none',
-    borderLeft: edge === 'left' ? '1px solid var(--fc-border)' : undefined,
-    borderRight: edge === 'right' ? '1px solid var(--fc-border)' : undefined,
-  };
+  const handleStyle: CSSProperties = isVertical
+    ? {
+        height: HANDLE_WIDTH,
+        flexShrink: 0,
+        cursor: cursorStyle,
+        background: isDragging ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+        touchAction: 'none',
+        position: 'relative',
+        outline: 'none',
+        borderTop: edge === 'top' ? '1px solid var(--fc-border)' : undefined,
+        borderBottom: edge === 'bottom' ? '1px solid var(--fc-border)' : undefined,
+      }
+    : {
+        width: HANDLE_WIDTH,
+        flexShrink: 0,
+        cursor: cursorStyle,
+        background: isDragging ? 'var(--fc-bgActive)' : 'var(--fc-bgOverlay)',
+        touchAction: 'none',
+        position: 'relative',
+        outline: 'none',
+        borderLeft: edge === 'left' ? '1px solid var(--fc-border)' : undefined,
+        borderRight: edge === 'right' ? '1px solid var(--fc-border)' : undefined,
+      };
+
+  const indicatorStyle: CSSProperties = isVertical
+    ? {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        height: 2,
+        width: 44,
+        borderRadius: 999,
+        background: isDragging ? 'var(--fc-accent)' : 'var(--fc-borderLight)',
+        transition: 'background 0.15s ease',
+      }
+    : {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 2,
+        height: 44,
+        borderRadius: 999,
+        background: isDragging ? 'var(--fc-accent)' : 'var(--fc-borderLight)',
+        transition: 'background 0.15s ease',
+      };
 
   const handle = (
     <div
       role="separator"
-      aria-orientation="vertical"
+      aria-orientation={isVertical ? 'horizontal' : 'vertical'}
       aria-label={handleLabel}
       aria-valuemin={minWidth}
       aria-valuemax={maxWidth}
-      aria-valuenow={width}
+      aria-valuenow={size}
       tabIndex={0}
       title={`${handleLabel}. Drag to resize, double-click to reset.`}
       onPointerDown={handlePointerDown}
-      onDoubleClick={() => setWidth(defaultWidth)}
+      onDoubleClick={() => setSize(defaultWidth)}
       onKeyDown={handleKeyDown}
       className="fc-resize-handle"
       style={handleStyle}
     >
-      <div
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 2,
-          height: 44,
-          borderRadius: 999,
-          background: isDragging ? 'var(--fc-accent)' : 'var(--fc-borderLight)',
-          transition: 'background 0.15s ease',
-        }}
-      />
+      <div style={indicatorStyle} />
     </div>
   );
+
+  const panelSizeStyle: CSSProperties = isVertical
+    ? { height: size, minHeight: minWidth, maxHeight: maxWidth, minWidth: 0 }
+    : { width: size, minWidth, maxWidth, minHeight: 0 };
 
   const panel = (
     <div
       style={{
-        width,
-        minWidth,
-        maxWidth,
-        minHeight: 0,
+        ...panelSizeStyle,
         display: 'flex',
         flexDirection: 'column',
         ...panelStyle,
@@ -225,15 +255,16 @@ export function ResizablePanel({
     </div>
   );
 
-  return edge === 'right' ? (
+  const handleFirst = edge === 'left' || edge === 'top';
+  return handleFirst ? (
     <>
-      {panel}
       {handle}
+      {panel}
     </>
   ) : (
     <>
-      {handle}
       {panel}
+      {handle}
     </>
   );
 }

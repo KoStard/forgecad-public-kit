@@ -130,6 +130,27 @@ text2d(content: string, options?: TextOptions): Sketch
 
 Build a 2-D filled Sketch from a text string. The Sketch origin is at the left end of the text baseline by default (see `align` and `baseline` options to adjust placement). Text is rendered using the bundled Inter font by default, or any TTF/OTF/WOFF font you provide. // Extruded nameplate text2d('FORGE CAD', { size: 8 }).extrude(1.2) // Centered label on the XY plane text2d('V 2.0', { size: 6, align: 'center', baseline: 'center' })
 
+<details><summary><code>TextOptions</code></summary>
+
+```ts
+interface TextOptions {
+  /** Cap height of the text in model units. All other dimensions (stroke weight, spacing) scale proportionally. */
+  size?: number;
+  /** Extra space between characters in model units. Negative values tighten the tracking. */
+  letterSpacing?: number;
+  /** Horizontal alignment relative to x = 0. - `'left'`   — left edge at x = 0 (default) - `'center'` — centred on x = 0 - `'right'`  — right edge at x = 0 */
+  align?: "left" | "center" | "right";
+  /** Vertical alignment relative to y = 0. - `'baseline'` — y = 0 is the text baseline (bottom of capital letters) - `'center'`   — y = 0 is the vertical midpoint of the cap height - `'top'`      — y = 0 is the top of capital letters */
+  baseline?: "baseline" | "center" | "top";
+  /** Font to use for text rendering. - `'sans-serif'` or `'inter'` — bundled Inter font (works everywhere, including browser) - **file path** — path to a TTF, OTF, or WOFF font file (CLI/Node only) - **Font object** — a previously loaded opentype.js Font (from `loadFont()`) - **omitted** — uses the bundled Inter font (same as `'sans-serif'`) text2d('Hello World', { size: 10 })                          // default Inter text2d('Custom Font', { size: 10, font: '/path/to/font.ttf' }) */
+  font?: string | opentype$1.Font;
+  /** Bezier flattening tolerance in model units. Smaller = more polygon segments = smoother curves. */
+  flattenTolerance?: number;
+}
+```
+
+</details>
+
 #### `textWidth()`
 
 ```ts
@@ -150,6 +171,17 @@ constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder
 
 Build a parametric 2D sketch with geometric constraints solved by the built-in constraint solver.
 
+<details><summary><code>ConstrainedSketchOptions</code></summary>
+
+```ts
+interface ConstrainedSketchOptions {
+  /** When true, adding a constraint that cannot be satisfied throws instead of silently discarding it. */
+  strict?: boolean;
+}
+```
+
+</details>
+
 #### `addRect()`
 
 ```ts
@@ -157,6 +189,50 @@ addRect(sk: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect
 ```
 
 Add an axis-aligned rectangle concept to the builder. Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, applies 4 structural constraints (`horizontal`/`vertical` on each side), enforces CCW winding, registers a loop and a shape, and returns a `ConstrainedRect` handle. ```ts const sk = constrainedSketch(); const rect = addRect(sk, { x: 0, y: 0, width: 100, height: 50 }); sk.fix(rect.bottomLeft, 0, 0); sk.length(rect.bottom, 120); ```
+
+<details><summary><code>RectOptions</code></summary>
+
+```ts
+interface RectOptions {
+  /** Bottom-left x coordinate. Default: 0. */
+  x?: number;
+  /** Bottom-left y coordinate. Default: 0. */
+  y?: number;
+  /** Width (along x). Default: 10. */
+  width?: number;
+  /** Height (along y). Default: 10. */
+  height?: number;
+  /** Prevent 180° rotation (ensures bottom edge points rightward). Default: false. */
+  blockRotation?: boolean;
+}
+```
+
+</details>
+
+<details><summary><code>ConstrainedRect</code></summary>
+
+```ts
+interface ConstrainedRect {
+  bottomLeft: PointId;
+  bottomRight: PointId;
+  topRight: PointId;
+  topLeft: PointId;
+  /** bottom-left → bottom-right */
+  bottom: LineId;
+  /** bottom-right → top-right */
+  right: LineId;
+  /** top-right → top-left */
+  top: LineId;
+  /** top-left → bottom-left */
+  left: LineId;
+  /** Center point constrained to the geometric center via `midpoint` on the diagonal. Can be used in further constraints: `sk.fix(rect.center, 0, 0)`, `sk.coincident(rect.center, other)`. */
+  center: PointId;
+  /** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
+  shape: ShapeId;
+}
+```
+
+</details>
 
 #### `addPolygon()`
 
@@ -166,6 +242,34 @@ addPolygon(sk: ConstrainedSketchBuilder, options: PolygonOptions): ConstrainedPo
 
 Add a general polygon concept to the builder. Creates n vertices and n sides (CCW: `sides[i]` from `vertices[i]` → `vertices[(i+1) % n]`). Applies a `ccw` constraint to enforce winding. The user is responsible for all dimensional constraints. ```ts const sk = constrainedSketch(); const tri = addPolygon(sk, { points: [[0,0],[100,0],[50,80]] }); sk.fix(tri.vertex(0), 0, 0); sk.length(tri.side(0), 100); ```
 
+<details><summary><code>PolygonOptions</code></summary>
+
+```ts
+interface PolygonOptions {
+  /** Whether to register a closed loop for sketch generation. Default: true. */
+  addLoop?: boolean;
+  /** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
+  blockRotation?: boolean;
+}
+```
+
+</details>
+
+<details><summary><code>ConstrainedPolygon</code></summary>
+
+```ts
+interface ConstrainedPolygon {
+  /** CCW-ordered PointIds. */
+  vertices: PointId[];
+  /** CCW-ordered LineIds. `sides[i]` runs from `vertices[i]` → `vertices[(i+1) % n]`. */
+  sides: LineId[];
+  /** ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. */
+  shape: ShapeId;
+}
+```
+
+</details>
+
 #### `addRegularPolygon()`
 
 ```ts
@@ -173,6 +277,39 @@ addRegularPolygon(sk: ConstrainedSketchBuilder, options: RegularPolygonOptions):
 ```
 
 Add a regular n-gon concept to the builder. Vertices are placed at `(cx + r·cos(startAngle + i·2π/n), cy + r·sin(...))`. Equal-side constraints enforce regularity. The center point is constrained to the centroid via midpoint constraints on the first diagonal. ```ts const sk = constrainedSketch(); const hex = addRegularPolygon(sk, { sides: 6, radius: 25, cx: 0, cy: 0 }); sk.fix(hex.center, 0, 0); sk.length(hex.side(0), 30);  // changes all sides (equal constraint) ```
+
+<details><summary><code>RegularPolygonOptions</code></summary>
+
+```ts
+interface RegularPolygonOptions {
+  /** Number of sides (minimum 3). */
+  sides: number;
+  /** Circumradius — distance from center to vertex. Default: 10. */
+  radius?: number;
+  /** Center x coordinate. Default: 0. */
+  cx?: number;
+  /** Center y coordinate. Default: 0. */
+  cy?: number;
+  /** Angle (in degrees) of vertex[0] measured from the +X axis (CCW positive). Default: 0 (rightmost vertex). */
+  startAngle?: number;
+  /** Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. */
+  blockRotation?: boolean;
+}
+```
+
+</details>
+
+
+<details><summary><code>ConstrainedRegularPolygon</code> extends ConstrainedPolygon</summary>
+
+```ts
+interface ConstrainedRegularPolygon extends ConstrainedPolygon {
+  /** Center point. Use `sk.fix(poly.center, x, y)` to pin location, or `sk.coincident(poly.center, other)` to align with other geometry. */
+  center: PointId;
+}
+```
+
+</details>
 
 ### 2D Geometry Helpers
 

@@ -18,6 +18,25 @@ spline2d(points: Vec2[], options?: Spline2DOptions): Sketch
 
 Build a smooth Catmull-Rom spline sketch from 2D control points. A closed spline (default) returns a filled profile. An open spline requires a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5) to control curve tightness.
 
+<details><summary><code>Spline2DOptions</code></summary>
+
+```ts
+interface Spline2DOptions {
+  /** Closed loop (default true). */
+  closed?: boolean;
+  /** Catmull-Rom tension in [0, 1]. 0 = very round, 1 = linear-ish. Default 0.5. */
+  tension?: number;
+  /** Samples per segment (minimum 3). Default 16. */
+  samplesPerSegment?: number;
+  /** For open splines, provide stroke width to return a solid Sketch. If omitted for open splines, an error is thrown. */
+  strokeWidth?: number;
+  /** Stroke join for open splines. Default 'Round'. */
+  join?: "Round" | "Square";
+}
+```
+
+</details>
+
 #### `spline3d()`
 
 ```ts
@@ -25,6 +44,19 @@ spline3d(points: Vec3$3[], options?: Spline3DOptions): Curve3D
 ```
 
 Create a reusable 3D spline curve object (Catmull-Rom). The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for downstream use in sweep() or manual path operations.
+
+<details><summary><code>Spline3DOptions</code></summary>
+
+```ts
+interface Spline3DOptions {
+  /** Closed loop (default false). */
+  closed?: boolean;
+  /** Catmull-Rom tension in [0, 1]. 0 = very round, 1 = linear-ish. Default 0.5. */
+  tension?: number;
+}
+```
+
+</details>
 
 #### `loft()`
 
@@ -34,6 +66,19 @@ loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape
 
 Loft between multiple sketches along Z stations. Profiles can differ in topology and vertex count: interpolation is done on signed-distance fields and meshed with level-set extraction. Heights must be strictly increasing. Compatible loft stacks can export through the OCCT exact route. Performance note: loft is significantly heavier than primitive/extrude/revolve. If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
 
+<details><summary><code>LoftOptions</code></summary>
+
+```ts
+interface LoftOptions {
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+}
+```
+
+</details>
+
 #### `sweep()`
 
 ```ts
@@ -41,6 +86,23 @@ sweep(profile: Sketch, path: Curve3D | Vec3$3[], options?: SweepOptions): Shape
 ```
 
 Sweep a 2D profile along a 3D path to create a solid. Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline). The profile is interpreted in the local frame normal plane. Compatible sweeps can export through the OCCT exact route using the canonical path representation. Performance note: sweep uses level-set meshing internally. Prefer direct primitives/extrude/revolve when they can express the same shape.
+
+<details><summary><code>SweepOptions</code></summary>
+
+```ts
+interface SweepOptions {
+  /** Number of samples when path is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /** Preferred "up" vector for local profile frame. Auto fallback is used near parallel segments. */
+  up?: Vec3$3;
+}
+```
+
+</details>
 
 ---
 

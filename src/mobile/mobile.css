@@ -147,23 +147,64 @@
   opacity: 0.5;
 }
 
-/* ─── Code editor ─── */
+/* ─── Code editor (overlay pattern: highlighted pre + transparent textarea) ─── */
 
-.fc-mobile-editor {
+.fc-mobile-editor-wrap {
   flex: 1;
-  width: 100%;
-  background: var(--fc-bgInput, var(--fc-bg));
-  color: var(--fc-text);
-  border: none;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.fc-mobile-editor-highlight,
+.fc-mobile-editor {
+  position: absolute;
+  inset: 0;
+  margin: 0;
   padding: 12px;
   font-family: "SF Mono", "Menlo", "Consolas", monospace;
   font-size: 13px;
   line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  border: none;
+  -webkit-text-size-adjust: none;
+  tab-size: 2;
+  word-wrap: normal;
+}
+
+.fc-mobile-editor-highlight {
+  background: var(--fc-bgInput, var(--fc-bg));
+  color: var(--fc-text);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fc-mobile-editor {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--fc-text);
+  z-index: 1;
   resize: none;
   outline: none;
-  overflow: auto;
-  -webkit-text-size-adjust: none;
 }
+
+/* ─── highlight.js token colours (tuned for dark themes) ─── */
+.fc-mobile-editor-highlight .hljs-keyword  { color: #c586c0; }
+.fc-mobile-editor-highlight .hljs-string   { color: #ce9178; }
+.fc-mobile-editor-highlight .hljs-number   { color: #b5cea8; }
+.fc-mobile-editor-highlight .hljs-comment  { color: #6a9955; font-style: italic; }
+.fc-mobile-editor-highlight .hljs-function { color: #dcdcaa; }
+.fc-mobile-editor-highlight .hljs-title    { color: #dcdcaa; }
+.fc-mobile-editor-highlight .hljs-params   { color: #9cdcfe; }
+.fc-mobile-editor-highlight .hljs-built_in { color: #4ec9b0; }
+.fc-mobile-editor-highlight .hljs-literal  { color: #569cd6; }
+.fc-mobile-editor-highlight .hljs-attr     { color: #9cdcfe; }
+.fc-mobile-editor-highlight .hljs-property { color: #9cdcfe; }
+.fc-mobile-editor-highlight .hljs-variable { color: #9cdcfe; }
+.fc-mobile-editor-highlight .hljs-regexp   { color: #d16969; }
+.fc-mobile-editor-highlight .hljs-operator { color: #d4d4d4; }
+.fc-mobile-editor-highlight .hljs-punctuation { color: #d4d4d4; }
 
 /* ─── Viewport ─── */
 

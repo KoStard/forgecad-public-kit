@@ -18,6 +18,38 @@ bomToCsv(rows: BomRow[]): string
 
 Convert BOM rows from a solved assembly into a CSV string.
 
+<details><summary><code>BomRow</code></summary>
+
+```ts
+interface BomRow {
+  part: string;
+  qty: number;
+  material?: string;
+  process?: string;
+  tolerance?: string;
+  notes?: string;
+  metadata?: PartMetadata;
+}
+```
+
+</details>
+
+<details><summary><code>PartMetadata</code></summary>
+
+```ts
+interface PartMetadata {
+  material?: string;
+  process?: string;
+  tolerance?: string;
+  qty?: number;
+  notes?: string;
+  densityKgM3?: number;
+  massKg?: number;
+}
+```
+
+</details>
+
 #### `assembly()`
 
 ```ts
@@ -33,6 +65,20 @@ joint(name: string, shape: Shape, pivot: [ number, number, number ], opts?: Revo
 ```
 
 Create a revolute (hinge) joint. Auto-creates a param slider and rotates the shape.
+
+<details><summary><code>RevoluteJointOpts</code></summary>
+
+```ts
+interface RevoluteJointOpts {
+  min?: number;
+  max?: number;
+  default?: number;
+  unit?: string;
+  reverse?: boolean;
+}
+```
+
+</details>
 
 ---
 

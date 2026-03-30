@@ -88,11 +88,49 @@ function simplifySig(sig) {
   return result;
 }
 
+// ── Interface field parser ──────────────────────────────────────────────────
+
+function parseInterfaceFields(bodyLines) {
+  const fields = [];
+  let doc = "";
+  for (let j = 0; j < bodyLines.length; j++) {
+    const bl = bodyLines[j].trim();
+    if (!bl || bl === "}") continue;
+    if (bl.startsWith("/**")) {
+      const jdLines = [];
+      while (j < bodyLines.length) {
+        jdLines.push(bodyLines[j]);
+        if (bodyLines[j].includes("*/")) { j++; break; }
+        j++;
+      }
+      doc = parseJsdoc(jdLines.join("\n"));
+      j--;
+      continue;
+    }
+    // Skip method signatures (they have parens before colon)
+    if (bl.includes("(")) { doc = ""; continue; }
+    const fieldMatch = bl.match(/^(?:readonly\s+)?(\w+)(\?)?:\s*(.+);$/);
+    if (fieldMatch) {
+      fields.push({
+        name: fieldMatch[1],
+        optional: !!fieldMatch[2],
+        type: fieldMatch[3],
+        jsdoc: doc,
+      });
+      doc = "";
+    } else {
+      doc = "";
+    }
+  }
+  return fields;
+}
+
 // ── Main parser ─────────────────────────────────────────────────────────────
 
 const functions = [];
 const classMap = new Map();
 const constants = [];
+const interfaceDefs = new Map(); // name → { fields: [{name, type, optional, jsdoc}], extends?: string }
 
 let pendingJsdoc = "";
 let i = 0;
@@ -171,6 +209,17 @@ while (i < lines.length) {
         const cls = classMap.get(ifName);
         cls.methods.push(...parsed.methods);
       }
+      // Store interface definition for type reference docs
+      if (!interfaceDefs.has(ifName)) {
+        const extendsMatch = line.match(/extends\s+([\w,\s]+)\s*\{/);
+        const body = lines.slice(i + 1, endIdx);
+        const fields = parseInterfaceFields(body);
+        interfaceDefs.set(ifName, {
+          fields,
+          extends: extendsMatch ? extendsMatch[1].trim() : undefined,
+          jsdoc: pendingJsdoc,
+        });
+      }
       i = endIdx + 1;
     } else {
       i++;
@@ -194,7 +243,7 @@ while (i < lines.length) {
     continue;
   }
 
-  pendingJsdoc = "";
+  if (trimmed) pendingJsdoc = "";  // Preserve doc across blank lines
   i++;
 }
 
@@ -220,7 +269,8 @@ function parseClassBody(bodyLines) {
       continue;
     }
 
-    if (!bl || bl === "}" || bl.startsWith("private ")) { doc = ""; j++; continue; }
+    if (!bl) { j++; continue; }  // Preserve doc across blank lines
+    if (bl === "}" || bl.startsWith("private ")) { doc = ""; j++; continue; }
 
     if (bl.startsWith("constructor(")) {
       let depth = 0;
@@ -299,8 +349,8 @@ function parseConstBody(bodyLines) {
       }
       members.push({ name: mMatch[1], signature: compactSig(fullSig), jsdoc: doc });
       doc = "";
-    } else {
-      doc = "";
+    } else if (bl) {
+      doc = "";  // Only reset on non-empty unrecognized lines
     }
   }
 
@@ -479,7 +529,76 @@ for (const fn of functions) {
 
 // ── Render helpers ───────────────────────────────────────────────────────────
 
-function renderFunction(fn) {
+/** Collect all interface names referenced in a signature (params + return type). */
+function findReferencedTypes(sig) {
+  // Match capitalized identifiers that look like type names (PascalCase)
+  const matches = sig.match(/\b[A-Z]\w+\b/g) || [];
+  const seen = new Set();
+  const result = [];
+  for (const m of matches) {
+    // Skip well-known built-in / class types that aren't options interfaces
+    if (["Shape", "Sketch", "Assembly", "TrackedShape", "Curve3D", "PathBuilder",
+         "SheetMetalPart", "ConstrainedSketchBuilder", "ConstraintSketch",
+         "Transform", "ShapeGroup", "Promise", "Record", "Array", "Map", "Set",
+         "Partial", "Required", "Readonly", "Pick", "Omit",
+         "SketchGroupBuilder", "Point2D", "Line2D", "Circle2D", "Rectangle2D",
+         "ImportedAssembly", "SolvedAssembly", "MateBuilder",
+         "HermiteCurve3D", "QuinticHermiteCurve3D",
+        ].includes(m)) continue;
+    if (seen.has(m)) continue;
+    if (interfaceDefs.has(m)) {
+      seen.add(m);
+      result.push(m);
+    }
+  }
+  return result;
+}
+
+function renderInterfaceDef(name, alreadyRendered) {
+  if (alreadyRendered.has(name)) return "";
+  const def = interfaceDefs.get(name);
+  if (!def) return "";
+  alreadyRendered.add(name);
+
+  const out = [];
+
+  // If it extends another interface, render that first
+  if (def.extends) {
+    for (const parent of def.extends.split(",").map(s => s.trim())) {
+      out.push(renderInterfaceDef(parent, alreadyRendered));
+    }
+  }
+
+  // Build the interface block
+  const extendsClause = def.extends ? ` extends ${def.extends}` : "";
+  out.push(`<details><summary><code>${name}</code>${extendsClause}</summary>`);
+  out.push("");
+  out.push("```ts");
+  out.push(`interface ${name}${extendsClause} {`);
+  for (const f of def.fields) {
+    const opt = f.optional ? "?" : "";
+    if (f.jsdoc) out.push(`  /** ${f.jsdoc} */`);
+    out.push(`  ${f.name}${opt}: ${f.type};`);
+  }
+  out.push("}");
+  out.push("```");
+  out.push("");
+  out.push("</details>");
+  out.push("");
+
+  // Recursively render types referenced in field types
+  for (const f of def.fields) {
+    const fieldRefs = findReferencedTypes(f.type);
+    for (const ref of fieldRefs) {
+      const block = renderInterfaceDef(ref, alreadyRendered);
+      if (block) out.push(block);
+    }
+  }
+
+  return out.join("\n");
+}
+
+function renderFunction(fn, sharedRendered) {
   const out = [];
   out.push(`#### \`${fn.name}()\``);
   out.push("");
@@ -488,6 +607,17 @@ function renderFunction(fn) {
   out.push("```");
   if (fn.jsdoc) { out.push(""); out.push(fn.jsdoc); }
   out.push("");
+
+  // Render referenced type definitions inline
+  const refs = findReferencedTypes(fn.signature);
+  if (refs.length > 0) {
+    const rendered = sharedRendered || new Set();
+    for (const typeName of refs) {
+      const block = renderInterfaceDef(typeName, rendered);
+      if (block) out.push(block);
+    }
+  }
+
   return out.join("\n");
 }
 
@@ -570,7 +700,8 @@ function renderModule(mod) {
       out.push(`### ${cat.title}`);
       out.push("");
       if (cat.desc) { out.push(cat.desc); out.push(""); }
-      for (const fn of fns) out.push(renderFunction(fn));
+      const renderedTypes = new Set();
+      for (const fn of fns) out.push(renderFunction(fn, renderedTypes));
     }
   }
 
@@ -578,7 +709,8 @@ function renderModule(mod) {
   if (mod.slug === "core" && uncategorizedFns.length > 0) {
     out.push("### Other");
     out.push("");
-    for (const fn of uncategorizedFns) out.push(renderFunction(fn));
+    const renderedTypes = new Set();
+    for (const fn of uncategorizedFns) out.push(renderFunction(fn, renderedTypes));
   }
 
   const clsEntries = mod.classNames.map((n) => classMap.get(n)).filter(Boolean);

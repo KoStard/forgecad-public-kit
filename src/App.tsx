@@ -325,6 +325,7 @@ function FullApp() {
   const maxViewPanelWidth = 460;
   const notebookMode = isNotebookFile(activeFile);
   const meshPreviewFile = useForgeStore((s) => s.meshPreviewFile);
+  const verticalLayout = useFeatureFlag('verticalLayout');
 
   useEffect(() => {
     Promise.all([initKernel(), initSolverWasm()]).then(() => {
@@ -482,8 +483,8 @@ function FullApp() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }}>
       <Toolbar />
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-        {fileExplorerOpen && (
+      <div style={{ display: 'flex', flexDirection: verticalLayout ? 'column' : 'row', flex: 1, minHeight: 0 }}>
+        {fileExplorerOpen && !verticalLayout && (
           <ResizablePanel
             storageKey={FILE_EXPLORER_PANEL_WIDTH_KEY}
             defaultWidth={280}
@@ -497,13 +498,13 @@ function FullApp() {
         )}
         {!meshPreviewFile && (
           <ResizablePanel
-            storageKey={CODE_PANEL_WIDTH_KEY}
-            defaultWidth={520}
-            minWidth={minCodePanelWidth}
-            maxWidth={maxCodePanelWidth}
-            edge="right"
+            storageKey={verticalLayout ? 'fc-layout-code-panel-height-v1' : CODE_PANEL_WIDTH_KEY}
+            defaultWidth={verticalLayout ? 320 : 520}
+            minWidth={verticalLayout ? 160 : minCodePanelWidth}
+            maxWidth={verticalLayout ? 600 : maxCodePanelWidth}
+            edge={verticalLayout ? 'bottom' : 'right'}
             handleLabel="Resize code editor panel"
-            panelStyle={{ borderRight: '1px solid var(--fc-border)' }}
+            panelStyle={verticalLayout ? { borderBottom: '1px solid var(--fc-border)' } : { borderRight: '1px solid var(--fc-border)' }}
           >
             <div style={{ flex: 1, minHeight: 0 }}>{notebookMode ? <NotebookEditor /> : <CodeEditor />}</div>
             <ParamPanel />
@@ -512,11 +513,11 @@ function FullApp() {
             <ExportPanel />
           </ResizablePanel>
         )}
-        <div style={{ flex: 1, display: 'flex', minWidth: 0 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', minWidth: 0, minHeight: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
             <Viewport />
           </div>
-          {viewPanelOpen && (
+          {viewPanelOpen && !verticalLayout && (
             <ResizablePanel
               storageKey={VIEW_PANEL_WIDTH_KEY}
               defaultWidth={280}

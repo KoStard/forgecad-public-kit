@@ -11,9 +11,9 @@
  */
 
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
+import { dirname, resolve, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -81,17 +81,61 @@ content = content
   .replace(/^export (class |function |const |let |var )/gm, 'declare $1')
   .trim();
 
+// ── Recover JSDoc from source files ─────────────────────────────────────────
+// dts-bundle-generator drops JSDoc on functions it synthesises for `typeof`
+// references. This helper reads all .ts files under a directory and extracts
+// the JSDoc block immediately preceding `export function <name>`.
+
+function collectTsFiles(dir) {
+  const results = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) results.push(...collectTsFiles(full));
+    else if (entry.name.endsWith('.ts')) results.push(full);
+  }
+  return results;
+}
+
+function findJsdocInDir(dir, fnName) {
+  for (const file of collectTsFiles(dir)) {
+    const src = readFileSync(file, 'utf-8');
+    // Match the JSDoc block immediately before `export function <name>`.
+    // The JSDoc must be the last thing before the function (only whitespace between).
+    const regex = new RegExp(
+      `(/\\*\\*(?:[^*]|\\*(?!/))*\\*/)\n\\s*export function ${fnName}\\s*[(<]`
+    );
+    const m = src.match(regex);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 // ── Remove lib-only declarations from global scope ──────────────────────────
 // Members of `partLibrary` (exposed as `lib.*`) are NOT in the global eval
 // context — only `lib` itself is. Remove standalone top-level `declare
 // function` globals for each lib member and inline their signatures directly
 // into the partLibrary object type so Monaco shows `lib.foo(...)` correctly
 // but never offers `foo(...)` as a global.
+//
+// dts-bundle-generator synthesises these `declare function` stubs to resolve
+// `typeof` references inside the `partLibrary` const type, but the synthesis
+// drops JSDoc. We recover JSDoc from the original source files.
 const libBlockMatch = content.match(/declare const partLibrary:\s*\{([^}]+)\}/s);
 if (libBlockMatch) {
   const libMembers = new Set(
     [...libBlockMatch[1].matchAll(/^\s{1,4}(\w+):/gm)].map(m => m[1])
   );
+
+  // Recover JSDoc from source files for lib functions.
+  // The bundler's synthetic `declare function` stubs don't carry JSDoc,
+  // so we read it from the original `export function` definitions.
+  const libSrcDir = resolve(root, 'src/forge/lib');
+  const libJsdocs = new Map();
+  for (const name of libMembers) {
+    const jsdoc = findJsdocInDir(libSrcDir, name);
+    if (jsdoc) libJsdocs.set(name, jsdoc);
+  }
+
   // Collect signatures before removing — uses findTopLevelDecl to handle
   // multi-line declarations (e.g. inline object-type parameters spanning lines)
   const signatures = new Map();
@@ -108,11 +152,16 @@ if (libBlockMatch) {
       content = content.replace(decl + '\n', '');
     }
   }
-  // Replace `name: typeof name` with the inlined method signature
+  // Replace `name: typeof name` with the inlined method signature,
+  // prepending the recovered JSDoc comment.
   for (const [name, sig] of signatures) {
+    const jsdoc = libJsdocs.get(name);
+    const replacement = jsdoc
+      ? `\n${jsdoc}\n$1${sig};`
+      : `$1${sig};`;
     content = content.replace(
       new RegExp(`(\\s+)${name}: typeof ${name};`, 'g'),
-      `$1${sig};`,
+      replacement,
     );
   }
 }

@@ -1,15 +1,22 @@
 /**
- * Lightweight mobile code editor — plain textarea with monospace font.
- * No Monaco, no syntax highlighting. Sufficient for viewing/tweaking params.
+ * Mobile code editor with syntax highlighting.
+ *
+ * Uses a transparent <textarea> overlaid on a highlight.js-rendered <pre>.
+ * The user types into the textarea; the pre behind it shows coloured tokens.
  */
-import { useCallback } from 'react';
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import { useCallback, useMemo, useRef } from 'react';
 import { useForgeStore } from '../store/forgeStore';
+
+hljs.registerLanguage('javascript', javascript);
 
 export function MobileCodeEditor() {
   const activeFile = useForgeStore((s) => s.activeFile);
   const files = useForgeStore((s) => s.files);
   const updateFileCode = useForgeStore((s) => s.updateFileCode);
   const code = files[activeFile] ?? '';
+  const preRef = useRef<HTMLPreElement>(null);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -20,17 +27,38 @@ export function MobileCodeEditor() {
     [activeFile, updateFileCode],
   );
 
+  const handleScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (preRef.current) {
+      preRef.current.scrollTop = e.currentTarget.scrollTop;
+      preRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  }, []);
+
+  const highlighted = useMemo(() => {
+    if (!code) return '';
+    return hljs.highlight(code, { language: 'javascript' }).value;
+  }, [code]);
+
   return (
-    <textarea
-      className="fc-mobile-editor"
-      value={code}
-      onChange={handleChange}
-      spellCheck={false}
-      autoCapitalize="off"
-      autoCorrect="off"
-      autoComplete="off"
-      placeholder="// No file selected"
-      data-gramm="false"
-    />
+    <div className="fc-mobile-editor-wrap">
+      <pre
+        ref={preRef}
+        className="fc-mobile-editor-highlight"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
+      />
+      <textarea
+        className="fc-mobile-editor"
+        value={code}
+        onChange={handleChange}
+        onScroll={handleScroll}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        placeholder="// No file selected"
+        data-gramm="false"
+      />
+    </div>
   );
 }

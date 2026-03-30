@@ -74,6 +74,33 @@ filletEdgeSegment(shape: ShapeArg, segment: EdgeSegment, radius: number, segment
 
 Apply a fillet (rounded edge) to a mesh-selected edge. Works on any straight edge of any shape — not limited to tracked box edges. The edge must have been obtained from selectEdge() / selectEdges().
 
+<details><summary><code>EdgeSegment</code></summary>
+
+```ts
+interface EdgeSegment {
+  /** Stable index within the extraction (deterministic for a given mesh). */
+  index: number;
+  start: Vec3;
+  end: Vec3;
+  midpoint: Vec3;
+  /** Normalized direction from start → end. */
+  direction: Vec3;
+  length: number;
+  /** Dihedral angle in degrees (0 = coplanar, 180 = knife edge). */
+  dihedralAngle: number;
+  /** true = outside corner (convex), false = inside corner (concave). */
+  convex: boolean;
+  /** Normal of first adjacent face. */
+  normalA: Vec3;
+  /** Normal of second adjacent face (same as normalA for boundary edges). */
+  normalB: Vec3;
+  /** true if this is a boundary (unmatched) edge — unusual for closed solids. */
+  boundary: boolean;
+}
+```
+
+</details>
+
 #### `chamferEdgeSegment()`
 
 ```ts
@@ -89,6 +116,56 @@ selectEdges(shape: Shape | TrackedShape, query?: EdgeQuery): EdgeSegment[]
 ```
 
 Select all edges from a shape that match the given query. Extracts sharp edges from the mesh (dihedral angle > 1°), applies filters, and returns the matching EdgeSegment array.
+
+<details><summary><code>EdgeQuery</code></summary>
+
+```ts
+interface EdgeQuery {
+  /** Sort by proximity to this point (closest first). */
+  near?: Vec3;
+  /** Filter: edge direction approximately parallel to this vector. */
+  parallel?: Vec3;
+  /** Filter: edge direction approximately perpendicular to this vector. */
+  perpendicular?: Vec3;
+  /** Filter: only convex (outside corner) edges. */
+  convex?: boolean;
+  /** Filter: only concave (inside corner) edges. */
+  concave?: boolean;
+  /** Filter: minimum dihedral angle in degrees. */
+  minAngle?: number;
+  /** Filter: maximum dihedral angle in degrees. */
+  maxAngle?: number;
+  /** Filter: minimum edge length. */
+  minLength?: number;
+  /** Filter: maximum edge length. */
+  maxLength?: number;
+  /** Filter: edge midpoint must be within this bounding region. */
+  within?: BoundingRegion;
+  /** Shorthand: edge midpoint Z ≈ this value (within tolerance). */
+  atZ?: number;
+  /** Tolerance for approximate matches (default: 1.0). */
+  tolerance?: number;
+  /** Angular tolerance in degrees for parallel/perpendicular (default: 10). */
+  angleTolerance?: number;
+}
+```
+
+</details>
+
+<details><summary><code>BoundingRegion</code></summary>
+
+```ts
+interface BoundingRegion {
+  xMin?: number;
+  xMax?: number;
+  yMin?: number;
+  yMax?: number;
+  zMin?: number;
+  zMax?: number;
+}
+```
+
+</details>
 
 #### `selectEdge()`
 
@@ -122,6 +199,18 @@ filletEdge(shape: ShapeArg$2, edge: EdgeRef, radius: number, quadrant?: [ number
 
 Round a named edge of a shape with a circular fillet of the given radius. Requires a compile-covered target.
 
+<details><summary><code>EdgeRef</code></summary>
+
+```ts
+interface EdgeRef {
+  name: EdgeName;
+  /** Compiler-owned edge query when available. */
+  query?: EdgeQueryRef;
+}
+```
+
+</details>
+
 #### `chamferEdge()`
 
 ```ts
@@ -137,6 +226,18 @@ filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch
 ```
 
 Create a polygon from points with specified corners rounded to arc fillets. Each corner spec identifies a vertex index and radius.
+
+<details><summary><code>FilletCornerSpec</code></summary>
+
+```ts
+interface FilletCornerSpec {
+  index: number;
+  radius: number;
+  segments?: number;
+}
+```
+
+</details>
 
 #### `linearPattern()`
 
@@ -181,6 +282,41 @@ importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch
 ```
 
 Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification.
+
+<details><summary><code>SvgImportOptions</code></summary>
+
+```ts
+interface SvgImportOptions {
+  /** Which geometry channels to include: - `auto`: prefer fills; if no fill geometry exists, fall back to strokes - `fill`: import only filled regions - `stroke`: import only stroke geometry - `fill-and-stroke`: include both */
+  include?: "auto" | "fill" | "stroke" | "fill-and-stroke";
+  /** Keep all disconnected regions, or only the largest. */
+  regionSelection?: "all" | "largest";
+  /** Keep at most this many regions (largest-first). */
+  maxRegions?: number;
+  /** Drop regions below this absolute area threshold. */
+  minRegionArea?: number;
+  /** Drop regions below this ratio of largest-region area. */
+  minRegionAreaRatio?: number;
+  /** Curve flattening tolerance in SVG user units. Smaller = more segments, higher fidelity. */
+  flattenTolerance?: number;
+  /** Minimum segment count for arc discretization. */
+  arcSegments?: number;
+  /** Global scale applied after SVG parsing. */
+  scale?: number;
+  /** Maximum imported sketch width. If exceeded, geometry is uniformly downscaled to fit. */
+  maxWidth?: number;
+  /** Maximum imported sketch height. If exceeded, geometry is uniformly downscaled to fit. */
+  maxHeight?: number;
+  /** Recenter imported geometry so its 2D bounds center is at CAD origin. */
+  centerOnOrigin?: boolean;
+  /** Simplification tolerance for final sketch cleanup. */
+  simplify?: number;
+  /** Flip SVG Y-down coordinates to CAD Y-up. Enabled by default. */
+  invertY?: boolean;
+}
+```
+
+</details>
 
 ### Parameters
 
@@ -250,6 +386,34 @@ Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul
 portFactory(input: PortInput): PortDef
 ```
 
+<details><summary><code>PortInput</code></summary>
+
+```ts
+interface PortInput {
+  kind?: JointType;
+  min?: number;
+  max?: number;
+}
+```
+
+</details>
+
+<details><summary><code>PortDef</code></summary>
+
+```ts
+interface PortDef {
+  origin: Vec3;
+  axis: Vec3;
+  up: Vec3;
+  extent?: number;
+  kind?: JointType;
+  min?: number;
+  max?: number;
+}
+```
+
+</details>
+
 #### `fillet()`
 
 ```ts
@@ -290,6 +454,23 @@ loftAlongSpine(profiles: Sketch[], spine: Curve3D | Vec3$3[], tValues: number[],
 
 Loft between multiple profiles positioned along an arbitrary 3D spine curve. Unlike loft() which only supports Z heights, loftAlongSpine() places each profile at a position along a 3D spine, oriented perpendicular to the spine tangent. This enables lofting along curved paths — e.g., a wing root-to-tip transition that follows a swept-back leading edge. The tValues array specifies where each profile sits along the spine (0 = start, 1 = end). Must have the same length as profiles and be in [0, 1]. Internally uses variableSweep infrastructure with SDF interpolation. Performance note: uses level-set meshing, heavier than simple loft().
 
+<details><summary><code>LoftAlongSpineOptions</code></summary>
+
+```ts
+interface LoftAlongSpineOptions {
+  /** Number of samples when spine is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /** Preferred "up" vector for local profile frame. Auto fallback is used near parallel segments. */
+  up?: Vec3$3;
+}
+```
+
+</details>
+
 #### `variableSweep()`
 
 ```ts
@@ -297,6 +478,36 @@ variableSweep(spine: Curve3D | Vec3$3[], sections: VariableSweepSection[], optio
 ```
 
 Sweep a variable cross-section along a 3D spine curve. Unlike sweep(), which uses a single constant profile, variableSweep() interpolates between multiple profiles at different stations along the spine. This enables organic shapes like tapering tubes, bone-like structures, and sculptural forms. Each section specifies a t parameter (0 = start, 1 = end of spine) and a 2D profile sketch. The SDF-based level-set mesher smoothly blends between profiles at intermediate positions. Performance note: like sweep(), this uses level-set meshing internally.
+
+<details><summary><code>VariableSweepSection</code></summary>
+
+```ts
+interface VariableSweepSection {
+  /** Parameter along the spine (0 = start, 1 = end). */
+  t: number;
+  /** Cross-section profile at this station. */
+  profile: Sketch;
+}
+```
+
+</details>
+
+<details><summary><code>VariableSweepOptions</code></summary>
+
+```ts
+interface VariableSweepOptions {
+  /** Number of samples when spine is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /** Preferred "up" vector for local profile frame. Auto fallback is used near parallel segments. */
+  up?: Vec3$3;
+}
+```
+
+</details>
 
 #### `loadFont()`
 
@@ -314,6 +525,23 @@ hermiteTransition(a: EdgeEndpoint, b: EdgeEndpoint): HermiteCurve3D
 
 Create a Hermite transition curve between two edge endpoints. The curve starts at `a.point` tangent to `a.tangent` and ends at `b.point` tangent to `b.tangent`, with smooth G1-continuous interpolation. Weight controls: - weight = 1.0 (default): balanced transition - weight > 1.0: curve follows this edge's direction longer before turning - weight < 1.0: curve turns sooner, shorter tangent influence
 
+<details><summary><code>EdgeEndpoint</code></summary>
+
+```ts
+interface EdgeEndpoint {
+  /** Connection point on the edge */
+  point: Vec3$4;
+  /** Tangent direction along the edge at the connection point */
+  tangent: Vec3$4;
+  /** Surface normal at the connection point (optional, for future G2 support) */
+  normal?: Vec3$4;
+  /** Weight controlling how far the curve follows this edge's tangent. Default 1.0. */
+  weight?: number;
+}
+```
+
+</details>
+
 #### `hermiteTransitionG2()`
 
 ```ts
@@ -321,6 +549,23 @@ hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoi
 ```
 
 Create a quintic Hermite transition curve between two edge endpoints (G2 continuity). The curve starts at `a.point` tangent to `a.tangent` with curvature `a.curvature`, and ends at `b.point` tangent to `b.tangent` with curvature `b.curvature`, with smooth G2-continuous interpolation matching position, tangent, and curvature.
+
+<details><summary><code>QuinticHermiteCurveEndpoint</code></summary>
+
+```ts
+interface QuinticHermiteCurveEndpoint {
+  /** Position */
+  point: Vec3$4;
+  /** Tangent direction (will be normalized internally) */
+  tangent: Vec3$4;
+  /** Second derivative / curvature vector. Default [0, 0, 0]. */
+  curvature?: Vec3$4;
+  /** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
+  weight?: number;
+}
+```
+
+</details>
 
 #### `linearPattern2d()`
 
@@ -346,6 +591,19 @@ surfacePatch(curves: { ... }, options?: SurfacePatchOptions): Shape
 
 Create a smooth surface patch from 4 boundary curves (Coons patch). The four curves form the boundary of a quadrilateral patch: - bottom: u=0..1 at v=0 (from corner00 to corner10) - top: u=0..1 at v=1 (from corner01 to corner11) - left: v=0..1 at u=0 (from corner00 to corner01) - right: v=0..1 at u=1 (from corner10 to corner11) The interior is filled using bilinear Coons patch interpolation: P(u,v) = Lc(u,v) + Ld(u,v) - B(u,v) The result is a thin solid created by offsetting the surface mesh along its normals by the specified thickness. Note: curves should meet at corners. Small gaps are tolerated.
 
+<details><summary><code>SurfacePatchOptions</code></summary>
+
+```ts
+interface SurfacePatchOptions {
+  /** Number of samples along each direction. Default 24. */
+  resolution?: number;
+  /** Thickness of the generated solid. Default 0.5. */
+  thickness?: number;
+}
+```
+
+</details>
+
 #### `transitionCurve()`
 
 ```ts
@@ -354,6 +612,36 @@ transitionCurve(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: Transiti
 
 Create a smooth transition curve between two edges. Returns a `HermiteCurve3D` that starts at `edgeA.point` tangent to `edgeA.tangent` and ends at `edgeB.point` tangent to `edgeB.tangent`. The curve maintains G1 continuity (matching tangent direction) at both endpoints. Weight parameters control the shape of the transition. ```js // Connect two edges with a balanced transition const curve = transitionCurve( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 0], tangent: [1, 0, 0] }, ); // Weighted: curve hugs edge A longer const weighted = transitionCurve( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 0], tangent: [1, 0, 0] }, { weightA: 2.0, weightB: 0.5 }, ); ```
 
+<details><summary><code>TransitionEdge</code></summary>
+
+```ts
+interface TransitionEdge {
+  /** Connection point on the edge. Can be any point along the edge where the transition should connect. */
+  point: Vec3$6;
+  /** Tangent direction at the connection point. This is the direction the curve should initially follow when leaving this edge. For a straight edge, this is typically the edge direction pointing "outward" (away from the body of the edge, toward the other edge). */
+  tangent: Vec3$6;
+  /** Surface normal at the connection point (optional). Used as a hint for the sweep frame's up vector. */
+  normal?: Vec3$6;
+}
+```
+
+</details>
+
+<details><summary><code>TransitionCurveOptions</code></summary>
+
+```ts
+interface TransitionCurveOptions {
+  /** Weight for the start edge. Controls tangent magnitude at the start. - 1.0 (default): balanced transition - > 1.0: curve follows start edge longer before turning - < 1.0: curve turns sooner at the start */
+  weightA?: number;
+  /** Weight for the end edge. Controls tangent magnitude at the end. - 1.0 (default): balanced transition - > 1.0: curve follows end edge longer before turning - < 1.0: curve turns sooner at the end */
+  weightB?: number;
+  /** Number of sample points for the output polyline. Default 64. Higher values give smoother curves at the cost of more geometry. */
+  samples?: number;
+}
+```
+
+</details>
+
 #### `transitionSurface()`
 
 ```ts
@@ -361,6 +649,28 @@ transitionSurface(edgeA: TransitionEdge, edgeB: TransitionEdge, options?: Transi
 ```
 
 Create a solid transition surface between two edges by sweeping a profile along a Hermite transition curve. This produces a watertight solid that smoothly connects the two edges. Works with both Manifold and OCCT backends. ```js // Circular tube connecting two edges const tube = transitionSurface( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 3], tangent: [0, 1, 0] }, { radius: 0.5 }, ); // Custom profile with weights const custom = transitionSurface( { point: [0, 0, 0], tangent: [1, 0, 0] }, { point: [10, 5, 3], tangent: [0, 1, 0] }, { profile: mySketch, weightA: 1.5, weightB: 0.8 }, ); ```
+
+
+<details><summary><code>TransitionSurfaceOptions</code> extends TransitionCurveOptions</summary>
+
+```ts
+interface TransitionSurfaceOptions extends TransitionCurveOptions {
+  /** Cross-section profile to sweep along the transition curve. If omitted, a circular profile with `radius` is used. */
+  profile?: Sketch;
+  /** Radius of circular cross-section (used when `profile` is omitted). Default: 5% of chord length. */
+  radius?: number;
+  width: number;
+  height: number;
+  /** Preferred up vector for the sweep frame. Default: auto-detected. */
+  up?: Vec3$6;
+  /** Edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Extra bounds padding for level-set meshing. */
+  boundsPadding?: number;
+}
+```
+
+</details>
 
 #### `transitionCurveFromPoints()`
 
@@ -378,6 +688,35 @@ pickEdge(edge: EdgeRef, options?: EdgePickOptions): TransitionEdge
 
 Pick a connection point from an EdgeRef (tracked topology edge). EdgeRef has `start` and `end` positions. The tangent is inferred from the edge direction. ```js const box1 = rect(10, 10).extrude(10); const topEdge = box1.edge('top-front'); // Connect from the start of the top-front edge, tangent along the edge const edgeA = pickEdge(topEdge, { end: 'start' }); // Connect from the end, with flipped tangent const edgeB = pickEdge(topEdge, { end: 'end', flip: true }); ```
 
+<details><summary><code>EdgeRef</code></summary>
+
+```ts
+interface EdgeRef {
+  name: EdgeName;
+  /** Compiler-owned edge query when available. */
+  query?: EdgeQueryRef;
+}
+```
+
+</details>
+
+<details><summary><code>EdgePickOptions</code></summary>
+
+```ts
+interface EdgePickOptions {
+  /** Which end of the edge to connect. Default: 'start'. */
+  end?: EdgeEnd;
+  /** How to determine the tangent direction. Default: 'along'. - 'along': tangent follows the edge direction - 'outward': tangent points along surface normal (requires EdgeSegment) - 'auto': automatically computed (toward the other edge) */
+  tangentMode?: TangentMode;
+  /** Explicit tangent override (ignores tangentMode). */
+  tangent?: Vec3$6;
+  /** Flip the computed tangent direction (useful for 'along' mode). */
+  flip?: boolean;
+}
+```
+
+</details>
+
 #### `pickEdgeSegment()`
 
 ```ts
@@ -386,11 +725,64 @@ pickEdgeSegment(edge: EdgeSegment, options?: EdgePickOptions): TransitionEdge
 
 Pick a connection point from an EdgeSegment (from selectEdge/selectEdges). EdgeSegment has richer data including surface normals on both sides, enabling 'outward' tangent mode for transitions that leave the surface. ```js const myBox = box(20, 20, 20); const topEdge = selectEdge(myBox, { atZ: 20, parallel: [1, 0, 0] }); // Connect from edge start, tangent along the edge direction const edgeA = pickEdgeSegment(topEdge, { end: 'start' }); // Connect from midpoint, tangent pointing outward (away from surface) const edgeB = pickEdgeSegment(topEdge, { end: 'mid', tangentMode: 'outward' }); ```
 
+<details><summary><code>EdgeSegment</code></summary>
+
+```ts
+interface EdgeSegment {
+  /** Stable index within the extraction (deterministic for a given mesh). */
+  index: number;
+  start: Vec3;
+  end: Vec3;
+  midpoint: Vec3;
+  /** Normalized direction from start → end. */
+  direction: Vec3;
+  length: number;
+  /** Dihedral angle in degrees (0 = coplanar, 180 = knife edge). */
+  dihedralAngle: number;
+  /** true = outside corner (convex), false = inside corner (concave). */
+  convex: boolean;
+  /** Normal of first adjacent face. */
+  normalA: Vec3;
+  /** Normal of second adjacent face (same as normalA for boundary edges). */
+  normalB: Vec3;
+  /** true if this is a boundary (unmatched) edge — unusual for closed solids. */
+  boundary: boolean;
+}
+```
+
+</details>
+
 #### `connectEdges()`
 
 ```ts
 connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptions): Shape
 ```
+
+
+<details><summary><code>ConnectEdgesOptions</code> extends TransitionSurfaceOptions</summary>
+
+```ts
+interface ConnectEdgesOptions extends TransitionSurfaceOptions {
+  /** Which end of edge A to connect. Default: 'start'. */
+  endA?: EdgeEnd;
+  /** Which end of edge B to connect. Default: 'start'. */
+  endB?: EdgeEnd;
+  /** Tangent mode for edge A. Default: 'along'. */
+  tangentModeA?: TangentMode;
+  /** Tangent mode for edge B. Default: 'along'. */
+  tangentModeB?: TangentMode;
+  /** Explicit tangent for edge A. */
+  tangentA?: Vec3$6;
+  /** Explicit tangent for edge B. */
+  tangentB?: Vec3$6;
+  /** Flip tangent A. */
+  flipA?: boolean;
+  /** Flip tangent B. */
+  flipB?: boolean;
+}
+```
+
+</details>
 
 #### `spec()`
 
@@ -399,6 +791,17 @@ spec(name: string, checkFn: (...args: any[]) => void): Spec
 ```
 
 Create a named spec — a reusable bundle of verification checks. ```js const fitSpec = spec("Fits enclosure", (shape) => { verify.lessThan("Width",  shape.boundingBox().max[0] - shape.boundingBox().min[0], 200); verify.notEmpty("Has geometry", shape); }); fitSpec.check(myShape);   // grouped as "Fits enclosure" in the Checks panel fitSpec.check(otherShape); // can be reused on multiple shapes ``` calls `verify.*` methods. Any verify calls made inside this function are tagged with the spec name for grouped display.
+
+<details><summary><code>Spec</code></summary>
+
+```ts
+interface Spec {
+  /** The display name of this spec */
+  name: string;
+}
+```
+
+</details>
 
 #### `faceProfile()`
 
@@ -429,6 +832,20 @@ highlight(entityId: string, opts?: HighlightOptions): void
 ```
 
 Highlight any geometry for visual debugging in the viewport. Supported inputs: - `string` — sketch entity ID (e.g. `'L0'`, `'P0'`, `'C0'`) - `[x, y, z]` — 3D point - `[[x1,y1,z1], [x2,y2,z2]]` — edge (line segment) - `{ normal: [x,y,z], offset: number }` — plane by normal + distance from origin - `{ normal: [x,y,z], point: [x,y,z] }` — plane by normal + point on plane - `Shape` or `TrackedShape` — highlight entire 3D shape - `FaceRef` (from `shape.face('top')`) — highlight as plane at face center - `EdgeRef` (from `shape.edge('left')`) — highlight as edge segment
+
+<details><summary><code>HighlightOptions</code></summary>
+
+```ts
+interface HighlightOptions {
+  color?: string;
+  label?: string;
+  pulse?: boolean;
+  /** Size hint for points (radius in mm) or planes (disc radius in mm). */
+  size?: number;
+}
+```
+
+</details>
 
 #### `highlight()`
 
@@ -465,6 +882,36 @@ highlight(shape: Shape | TrackedShape, opts?: HighlightOptions): void
 ```ts
 highlight(face: FaceRef, opts?: HighlightOptions): void
 ```
+
+<details><summary><code>FaceRef</code></summary>
+
+```ts
+interface FaceRef {
+  name: FaceName;
+  /** Compiler-owned face query when available. */
+  query?: FaceQueryRef;
+  /** True when the face can host a 2D sketch placement frame */
+  planar?: boolean;
+  /** Shared descendant-resolution metadata when this face is a semantic region/set. */
+  descendant?: FaceDescendantMetadata;
+}
+```
+
+</details>
+
+<details><summary><code>FaceDescendantMetadata</code></summary>
+
+```ts
+interface FaceDescendantMetadata {
+  kind: "single" | "face-set";
+  semantic: FaceDescendantSemantic;
+  memberCount: number;
+  memberNames: string[];
+  coplanar: boolean;
+}
+```
+
+</details>
 
 #### `highlight()`
 

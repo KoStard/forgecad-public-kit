@@ -31,6 +31,10 @@ export const FLAG_DEFINITIONS: Record<string, FeatureFlagDef> = {
     label: 'Draw Mode (interactive sketch editor)',
     defaultEnabled: false,
   },
+  verticalLayout: {
+    label: 'Vertical Layout (for portrait recording)',
+    defaultEnabled: false,
+  },
 };
 
 // ---------------------------------------------------------------------------

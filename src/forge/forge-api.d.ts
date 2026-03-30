@@ -4370,20 +4370,62 @@ interface FastenerSetResult {
 }
 /** All library parts, keyed by name */
 declare const partLibrary: {
+/** Through-hole cylinder centered at origin, intended as a cutter (subtract from part). */
+
 	boltHole(diameter: number, depth: number): Shape;
+/**
+ * Standardized metric fastener hole (through-hole/tap drill + optional counterbore/countersink).
+ * Returns hole geometry intended as a cutter (subtract from part).
+ */
+
 	fastenerHole(opts: FastenerHoleOptions): Shape;
+/** Counterbore hole — through-hole with a wider recess at the top */
+
 	counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape;
+/** Rectangular tube / hollow box */
+
 	tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape;
+/** Pipe — hollow cylinder */
+
 	pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape;
+/**
+ * Deterministic exploded-view transform for arrays / named assemblies / ShapeGroup trees.
+ * Returns the same structure type as input, with translated shapes/sketches.
+ */
+
 	explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options?: ExplodeOptions): T;
+/** Hex nut via intersection of three rotated slabs with a center bore. */
+
 	hexNut(acrossFlats: number, height: number, holeDia: number): Shape;
+/** Box with all 12 edges filleted. */
+
 	roundedBox(x: number, y: number, z: number, radius: number): Shape;
+/** L-shaped mounting bracket with optional through-holes in both the base and wall. */
+
 	bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape;
+/** Grid of cylindrical holes intended as a cutter pattern (subtract from part). */
+
 	holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape;
+/**
+ * External thread via twisted extrusion — no SDF grid artifacts.
+ *
+ * The idea: build a cross-section that's a circle at the root diameter
+ * with one trapezoidal bump out to the crest diameter. Then twist-extrude
+ * it so the bump traces a helix. Manifold's extrude+twist produces clean
+ * structured geometry — quads split into triangles that follow the thread.
+ *
+ * Returns a threaded cylinder along +Z from z=0 to z=length.
+ */
+
 	thread(diameter: number, pitch: number, length: number, options?: {
 	depth?: number;
 	segments?: number;
 }): Shape;
+/**
+ * Hex bolt with real helical threads.
+ * Head at z=0..headHeight, shaft extends downward along -Z.
+ */
+
 	bolt(diameter: number, length: number, options?: {
 	pitch?: number;
 	headHeight?: number;
@@ -4391,17 +4433,46 @@ declare const partLibrary: {
 	threadLength?: number;
 	segments?: number;
 }): Shape;
+/**
+ * Hex nut with threaded bore.
+ * Centered at origin, height along Z.
+ */
+
 	nut(diameter: number, options?: {
 	pitch?: number;
 	height?: number;
 	acrossFlats?: number;
 	segments?: number;
 }): Shape;
+/**
+ * Flat washer (DIN 125-A by default).
+ * Returns a flat ring centered at the origin, thickness along Z.
+ * Use `size` to select a standard metric thread size.
+ */
+
 	washer(size: MetricSize, options?: {
 	standard?: WasherStandard;
 	segments?: number;
 }): Shape;
+/**
+ * Complete ISO metric fastener set — bolt, nut, optional washers, and matching hole cutters.
+ *
+ * All shapes are returned un-positioned (each centered on the Z-axis at z=0 or the
+ * convention described in `FastenerSetResult`). Place them yourself using `.translate()`.
+ *
+ * @param size   - ISO metric thread size, e.g. 'M5'.
+ * @param boltLength - Nominal shaft length in mm (head not included).
+ * @param options - Optional configuration.
+ */
+
 	fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult;
+/**
+ * Route a pipe (solid or hollow) through 3D waypoints with smooth bends.
+ *
+ * Each interior waypoint gets a torus-section bend. Straight segments connect them.
+ * Returns a single unioned Shape.
+ */
+
 	pipeRoute(points: [
 	number,
 	number,
@@ -4411,6 +4482,21 @@ declare const partLibrary: {
 	wall?: number;
 	segments?: number;
 }): Shape;
+/**
+ * Pipe elbow — a curved pipe section (torus arc) for connecting two pipe directions.
+ *
+ * By default creates a bend in the XZ plane: incoming along +Z, outgoing rotated by `angle`.
+ * The bend starts at the origin, curving away from it.
+ *
+ * @param pipeRadius  - Pipe outer radius
+ * @param bendRadius  - Centerline bend radius (distance from arc center to pipe center)
+ * @param angle       - Bend angle in degrees (e.g. 90 for a right-angle bend)
+ * @param options.wall     - Wall thickness for hollow pipe
+ * @param options.segments - Circumferential segments (default 32)
+ * @param options.from     - Incoming direction vector (default [0,0,1])
+ * @param options.to       - Outgoing direction vector (overrides angle if both from/to given)
+ */
+
 	elbow(pipeRadius: number, bendRadius: number, angle?: number | {
 	from?: [
 		number,
@@ -4438,19 +4524,85 @@ declare const partLibrary: {
 		number
 	];
 }): Shape;
+/**
+ * Build a 2D T-slot cross-section sketch.
+ *
+ * Default parameters describe a 20x20 B-type profile with slot 6.
+ * Use this when you want a drawing-ready profile sketch before extrusion.
+ */
+
 	tSlotProfile(options?: TSlotProfileOptions): Sketch;
+/**
+ * Build a T-slot extrusion from the generated 2D profile.
+ * Extrudes along +Z by default.
+ */
+
 	tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape;
+/**
+ * Accurate-ish 2D profile for 20x20 B-type slot 6.
+ *
+ * Returns a drawing-ready Sketch centered at origin.
+ */
+
 	profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch;
+/**
+ * 20x20 B-type slot 6 extrusion with profile-accurate defaults.
+ *
+ * Pass option overrides if your supplier's profile differs slightly.
+ */
+
 	profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape;
+/**
+ * Involute external spur gear with optional center bore.
+ *
+ * Specify module, teeth, faceWidth as required parameters. Optional tuning includes
+ * pressureAngleDeg (default 20), backlash, clearance, addendum, dedendum, boreDiameter,
+ * and segmentsPerTooth (default 10).
+ */
+
 	spurGear(options: SpurGearOptions): Shape;
+/** Conical bevel gear generated from a tapered involute extrusion. Specify pitchAngleDeg directly or derive it from mateTeeth + shaftAngleDeg. */
+
 	bevelGear(options: BevelGearOptions): Shape;
+/**
+ * Face gear (crown style) where teeth are on one face (top or bottom) instead of the outer rim.
+ *
+ * Uses the same involute tooth sizing as spurGear, then projects the tooth band axially from one side.
+ * Alias for sideGear (which is kept for backward compatibility).
+ */
+
 	faceGear(options: FaceGearOptions): Shape;
+/**
+ * Crown/face style gear where the teeth project from one side of the disk
+ * instead of the outer cylindrical rim.
+ */
+
 	sideGear(options: SideGearOptions): Shape;
+/** Internal ring gear with involute-derived tooth spaces. Specify rimWidth or outerDiameter for the annular body. */
+
 	ringGear(options: RingGearOptions): Shape;
+/** Linear rack gear with pressure-angle flanks. Use with spurGear for rack-and-pinion mechanisms. */
+
 	rackGear(options: RackGearOptions): Shape;
+/**
+ * Build or validate a spur-gear pair and return ratio, backlash, and mesh diagnostics.
+ *
+ * Accepts either shapes from spurGear() or analytical specs for each member.
+ * When place is true (default), the gear is auto-positioned at the correct center distance.
+ */
+
 	gearPair(options: GearPairOptions): GearPairResult;
+/** Build or validate a bevel-gear pair and return ratio diagnostics plus recommended joint placement vectors. */
+
 	bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult;
+/** Build or validate a perpendicular pair between a face gear and a vertical spur gear. */
+
 	faceGearPair(options: FaceGearPairOptions): FaceGearPairResult;
+/**
+ * Pair helper for side (crown/face) gear + perpendicular "vertical" spur gear.
+ * Auto-placement rotates the spur around +Y and positions it to mesh at the side tooth band.
+ */
+
 	sideGearPair(options: SideGearPairOptions): SideGearPairResult;
 };
 /**

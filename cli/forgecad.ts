@@ -165,7 +165,7 @@ const CAPTURE_COMMON_OPTIONS: CompletionOptionDefinition[] = [
     valueLabel: '<solid|wireframe>',
     values: RENDER_MODE_VALUES,
   },
-  { name: '--include-wireframe-pass', description: 'Append an extra wireframe pass' },
+  { name: '--wireframe-pass', description: 'Enable an extra wireframe pass (off by default)' },
   { name: '--no-wireframe-pass', description: 'Disable the extra wireframe pass' },
   { name: '--size', description: 'Output frame size in pixels', argument: 'required', valueLabel: '<px>' },
   { name: '--pixel-ratio', description: 'Render supersampling factor', argument: 'required', valueLabel: '<n>' },
