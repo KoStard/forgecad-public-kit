@@ -52,11 +52,30 @@ export function EmbedViewer() {
     }
   }, []);
 
+  // Listen for postMessage from parent window (e.g. Claude artifacts, external embeds).
+  // Message format: { type: 'forgecad:load', code: string, filename?: string }
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      const data = event.data;
+      if (data && typeof data === 'object' && data.type === 'forgecad:load' && typeof data.code === 'string') {
+        const filename = typeof data.filename === 'string' ? data.filename : 'model.forge.js';
+        updateFileCode(filename, data.code);
+        setActiveFile(filename);
+        // Trigger execution after state update settles
+        setTimeout(() => execute(), 0);
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [updateFileCode, setActiveFile, execute]);
+
   // Init kernel
   useEffect(() => {
     Promise.all([initKernel(), initSolverWasm()]).then(() => {
       setKernelReady(true);
       execute();
+      // Notify parent that the embed viewer is ready to receive code via postMessage
+      window.parent?.postMessage({ type: 'forgecad:ready' }, '*');
     });
   }, []);
 
