@@ -155,8 +155,12 @@ export function FileExplorer() {
   }, [selection]);
 
   const handleCreate = () => {
-    const name = normalizePath(newName.trim());
+    let name = normalizePath(newName.trim());
     if (!name) return;
+    // Auto-append .forge.js for bare names (no extension) when creating files
+    if (creating === 'file' && !name.includes('.')) {
+      name = `${name}.forge.js`;
+    }
     const parent = focusedFolder ? normalizePath(focusedFolder) : '';
     const fullPath = parent ? normalizePath(`${parent}/${name}`) : name;
     if (files[fullPath]) return;
@@ -300,6 +304,44 @@ export function FileExplorer() {
     [flatVisiblePaths, setActiveFile, setMeshPreview],
   );
 
+  const renderCreationInput = (depth: number) => {
+    const paddingLeft = 8 + depth * 12 + 14 + 6; // match file item indent (base + depth + chevron + gap)
+    return (
+      <div key="__creating__" style={{ padding: '2px 8px', paddingLeft }}>
+        <input
+          autoFocus
+          placeholder={creating === 'folder' ? 'Folder name' : 'gear, utils.js, or asset.svg'}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate();
+            if (e.key === 'Escape') {
+              setCreating(null);
+              setNewName('');
+            }
+          }}
+          onBlur={() => {
+            if (!newName.trim()) {
+              setCreating(null);
+              setNewName('');
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '100%',
+            background: 'var(--fc-bg)',
+            border: '1px solid var(--fc-accent)',
+            color: 'var(--fc-text)',
+            fontSize: 11,
+            padding: '3px 6px',
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
+    );
+  };
+
   const renderNode = (node: TreeNode, depth: number) => {
     const isFolder = node.type === 'folder';
     const isExpanded = !isFolder || expandedFolders.includes(node.path);
@@ -425,7 +467,12 @@ export function FileExplorer() {
             </>
           )}
         </div>
-        {isFolder && isExpanded && node.children?.map((child) => renderNode(child, depth + 1))}
+        {isFolder && isExpanded && (
+          <>
+            {creating && focusedFolder === node.path && renderCreationInput(depth + 1)}
+            {node.children?.map((child) => renderNode(child, depth + 1))}
+          </>
+        )}
       </div>
     );
   };
@@ -617,11 +664,11 @@ export function FileExplorer() {
       >
         <span style={{ fontWeight: 600, color: 'var(--fc-textMuted)', fontSize: 12 }}>Project Files</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <span onClick={() => setCreating('file')} style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }} title="New file">
+          <span onClick={() => { setFocusedFolder(''); setCreating('file'); }} style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }} title="New file">
             + File
           </span>
           <span
-            onClick={() => setCreating('folder')}
+            onClick={() => { setFocusedFolder(''); setCreating('folder'); }}
             style={{ cursor: 'pointer', color: 'var(--fc-accent)', fontSize: 12 }}
             title="New folder"
           >
@@ -630,40 +677,13 @@ export function FileExplorer() {
         </div>
       </div>
 
-      {creating && (
-        <div style={{ padding: '4px 12px', borderBottom: '1px solid var(--fc-borderLight)' }}>
-          <input
-            autoFocus
-            placeholder={creating === 'folder' ? 'Folder name' : 'name.forge.js, utils.js, name.forge-notebook.json, or asset.svg'}
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleCreate();
-              if (e.key === 'Escape') setCreating(null);
-            }}
-            onBlur={() => {
-              if (!newName.trim()) setCreating(null);
-            }}
-            style={{
-              width: '100%',
-              background: 'var(--fc-bg)',
-              border: '1px solid var(--fc-accent)',
-              color: 'var(--fc-text)',
-              fontSize: 11,
-              padding: '3px 6px',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-        </div>
-      )}
-
       <div style={{ flex: 1, overflow: 'auto' }}>
-        {tree.length === 0 && (
+        {tree.length === 0 && !creating && (
           <div style={{ padding: '10px 12px', color: 'var(--fc-textDim)', fontSize: 12 }}>
             No files yet. Create a file or drop one here.
           </div>
         )}
+        {creating && !focusedFolder && renderCreationInput(0)}
         {tree.map((node) => renderNode(node, 0))}
       </div>
     </div>
