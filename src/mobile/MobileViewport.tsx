@@ -53,7 +53,11 @@ function MobileForgeObject({ obj, matrix }: { obj: SceneObject; matrix: THREE.Ma
   );
 }
 
-export function MobileViewport() {
+interface MobileViewportProps {
+  jointMatrices: Record<string, THREE.Matrix4>;
+}
+
+export function MobileViewport({ jointMatrices }: MobileViewportProps) {
   const result = useForgeStore((s) => s.lastValidResult);
   const isEvaluating = useForgeStore((s) => s.isEvaluating);
   const objects = useMemo(() => result?.objects ?? [], [result]);
@@ -68,10 +72,12 @@ export function MobileViewport() {
   const objectMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
     objects.forEach((obj) => {
-      out[obj.id] = obj.sketch ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)) : new THREE.Matrix4();
+      const baseMatrix = obj.sketch ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)) : new THREE.Matrix4();
+      const jointMatrix = jointMatrices[obj.id] ?? new THREE.Matrix4();
+      out[obj.id] = jointMatrix.clone().multiply(baseMatrix);
     });
     return out;
-  }, [objects]);
+  }, [objects, jointMatrices]);
 
   const themeBg = getComputedStyle(document.documentElement).getPropertyValue('--fc-viewportBg').trim() || '#1e1e1e';
 

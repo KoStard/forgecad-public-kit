@@ -54,6 +54,11 @@ export const buildRevoluteMatrix = (axisWorld: THREE.Vector3, pivotWorld: THREE.
   return toPivot.multiply(rotation).multiply(fromPivot);
 };
 
+export const resolveJointRange = (type: 'revolute' | 'prismatic', min?: number, max?: number): { min: number; max: number } => ({
+  min: min ?? (type === 'prismatic' ? -100 : 0),
+  max: max ?? (type === 'prismatic' ? 100 : 360),
+});
+
 export const computeJointNodeMatrices = (joints: JointViewDef[], jointValues: Record<string, number>): Map<string, THREE.Matrix4> => {
   const byChild = new Map<string, JointViewDef>();
   joints.forEach((joint) => {

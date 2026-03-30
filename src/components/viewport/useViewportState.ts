@@ -1,11 +1,9 @@
 import type { CutPlaneDef } from '@forge/cutPlane';
-import type { ExplodeViewOptions, JointViewDef, SceneObject } from '@forge/index';
+import type { ExplodeViewOptions } from '@forge/index';
 import { DEFAULT_VIEW_CONFIG } from '@forge/index';
-import { findJointAnimationClip, resolveJointAnimation } from '@forge/assembly/jointAnimation';
-import { resolveJointViewValues } from '@forge/assembly/jointsView';
 import type { SceneConfig } from '@forge/scene';
 import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useDrawStore } from '../../draw/drawStore';
 import { useFeatureFlag } from '../../featureFlags';
@@ -15,6 +13,7 @@ import { expandBoundsByTransformedAabb } from './geometryUtils';
 import { computeJointNodeMatrices } from './jointUtils';
 import { isObjectExcludedFromCutPlane, SECTION_EXPLORER_PLANE_NAME, toClippingPlane } from './sectionUtils';
 import { type HoveredJointOverlayState, IDENTITY_MATRIX, ZERO_OFFSET, type ViewportPerformanceInfo } from './types';
+import { computeObjectJointMatrices, useJointAnimationLoop, useJointAnimationValues, useJointsConfig } from './useJointAnimation';
 
 export function useViewportState() {
   const measureMode = useForgeStore((s) => s.measureMode);
@@ -73,7 +72,7 @@ export function useViewportState() {
   const debugHighlights3D = useMemo(() => result?.debugHighlights3D ?? [], [result]);
   const cutPlaneDefs = useMemo((): CutPlaneDef[] => result?.cutPlanes ?? [], [result]);
   const explodeConfig = useMemo((): ExplodeViewOptions | null => result?.explodeView ?? null, [result]);
-  const jointsConfig = useMemo(() => result?.jointsView ?? null, [result]);
+  const { jointsConfig, joints, jointCouplings, animationClips: jointAnimations } = useJointsConfig();
   const jointOverlayConfig = useMemo(() => result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay, [result]);
   const sceneConfig = useMemo((): SceneConfig | null => result?.sceneConfig ?? null, [result]);
 
@@ -82,22 +81,11 @@ export function useViewportState() {
   const handleDefaultLightsOverridden = useCallback((v: boolean) => setDefaultLightsOverridden(v), []);
   const handleDefaultEnvironmentOverridden = useCallback((v: boolean) => setDefaultEnvironmentOverridden(v), []);
 
-  const joints = useMemo(() => (jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? [])), [jointsConfig]);
-  const jointCouplings = useMemo(() => (jointsConfig?.enabled === false ? [] : (jointsConfig?.couplings ?? [])), [jointsConfig]);
-  const jointAnimations = useMemo(() => (jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? [])), [jointsConfig]);
-
-  const activeJointAnimation = useMemo(
-    () => findJointAnimationClip(jointAnimations, jointAnimationClip),
-    [jointAnimationClip, jointAnimations],
-  );
-  const animatedJointValues = useMemo(
-    () => resolveJointAnimation(activeJointAnimation, jointAnimationProgress, jointValues),
-    [activeJointAnimation, jointAnimationProgress, jointValues],
-  );
-  const effectiveJointValues = useMemo(
-    () => resolveJointViewValues(joints, jointCouplings, animatedJointValues, { clamp: false }),
-    [animatedJointValues, jointCouplings, joints],
-  );
+  const {
+    activeAnimationClip: activeJointAnimation,
+    animatedJointValues,
+    effectiveJointValues,
+  } = useJointAnimationValues(joints, jointCouplings, jointAnimations);
 
   const shapeHighlightByIndex = useMemo(() => {
     const map = new Map<number, { color: string; pulse?: boolean }>();
@@ -166,32 +154,7 @@ export function useViewportState() {
 
   const jointNodeMatrices = useMemo(() => computeJointNodeMatrices(joints, effectiveJointValues), [effectiveJointValues, joints]);
 
-  const jointMatrices = useMemo(() => {
-    const out: Record<string, THREE.Matrix4> = {};
-    objects.forEach((obj) => {
-      out[obj.id] = new THREE.Matrix4();
-    });
-
-    if (joints.length === 0 || objects.length === 0) return out;
-
-    const jointByChild = new Map<string, JointViewDef>();
-    joints.forEach((joint) => {
-      jointByChild.set(joint.child, joint);
-    });
-
-    objects.forEach((obj) => {
-      let nodeName: string | null = null;
-      if (jointByChild.has(obj.name)) {
-        nodeName = obj.name;
-      } else if (obj.groupName && jointByChild.has(obj.groupName)) {
-        nodeName = obj.groupName;
-      }
-      if (!nodeName) return;
-      out[obj.id] = jointNodeMatrices.get(nodeName)?.clone() ?? new THREE.Matrix4();
-    });
-
-    return out;
-  }, [jointNodeMatrices, joints, objects]);
+  const jointMatrices = useMemo(() => computeObjectJointMatrices(joints, objects, jointNodeMatrices), [jointNodeMatrices, joints, objects]);
 
   const objectMatrices = useMemo(() => {
     const out: Record<string, THREE.Matrix4> = {};
@@ -211,41 +174,7 @@ export function useViewportState() {
   );
 
   // Joint animation RAF loop
-  useEffect(() => {
-    if (!jointAnimationPlaying || !activeJointAnimation) return;
-
-    let raf = 0;
-    let lastTs = performance.now();
-    let cancelled = false;
-
-    const tick = (now: number) => {
-      if (cancelled) return;
-      const dtSec = Math.max(0, (now - lastTs) / 1000);
-      lastTs = now;
-
-      const step = (dtSec * jointAnimationSpeed) / Math.max(1e-6, activeJointAnimation.duration);
-      let next = useForgeStore.getState().jointAnimationProgress + step;
-      if (next >= 1) {
-        if (!activeJointAnimation.loop) {
-          next = 1;
-          setJointAnimationPlaying(false);
-        } else if (!activeJointAnimation.continuous) {
-          next = next % 1;
-        }
-      }
-      setJointAnimationProgress(next);
-
-      if (useForgeStore.getState().jointAnimationPlaying) {
-        raf = requestAnimationFrame(tick);
-      }
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-    };
-  }, [activeJointAnimation, jointAnimationPlaying, jointAnimationSpeed, setJointAnimationPlaying, setJointAnimationProgress]);
+  useJointAnimationLoop(activeJointAnimation);
 
   const anySectionActive = activeCutPlaneDefs.length > 0;
   const sectionGuideBoundsKey = (sectionPlaneGuidesEnabled || sectionExplorerEnabled) && anySectionActive ? objectMatrices : null;

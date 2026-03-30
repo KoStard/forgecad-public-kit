@@ -381,6 +381,121 @@
   text-align: right;
 }
 
+/* ─── Joint / Animation controls ─── */
+
+.fc-mobile-joints {
+  border-top: 1px solid var(--fc-border);
+  background: var(--fc-bgPanel);
+  max-height: 40vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fc-mobile-joints-section {
+  padding: 8px 12px;
+}
+
+.fc-mobile-joints-section + .fc-mobile-joints-section {
+  border-top: 1px solid var(--fc-borderLight, var(--fc-border));
+}
+
+.fc-mobile-joints-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fc-textDim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.fc-mobile-joints-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.fc-mobile-joints-select {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--fc-bgInput, var(--fc-bg));
+  border: 1px solid var(--fc-border);
+  border-radius: 6px;
+  color: var(--fc-text);
+  font-size: 13px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.fc-mobile-joints-playbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--fc-bgInput, var(--fc-bg));
+  border: 1px solid var(--fc-border);
+  border-radius: 6px;
+  color: var(--fc-text);
+  cursor: pointer;
+}
+
+.fc-mobile-joints-playbtn.active {
+  background: var(--fc-accent);
+  border-color: var(--fc-accent);
+  color: var(--fc-accentText, #fff);
+}
+
+.fc-mobile-joints-playbtn:disabled {
+  opacity: 0.4;
+}
+
+.fc-mobile-joints-slider {
+  flex: 1;
+  height: 36px;
+  accent-color: var(--fc-accent);
+}
+
+.fc-mobile-joints-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fc-textDim);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.fc-mobile-joints-info {
+  font-size: 11px;
+  color: var(--fc-textDim);
+  margin-top: 4px;
+}
+
+.fc-mobile-joint-item {
+  margin-bottom: 6px;
+}
+
+.fc-mobile-joint-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.fc-mobile-joint-name {
+  font-size: 12px;
+  color: var(--fc-text);
+}
+
+.fc-mobile-joint-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  color: var(--fc-accent);
+}
+
 /* ─── Status indicator ─── */
 
 .fc-mobile-status {
