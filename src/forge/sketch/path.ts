@@ -1204,18 +1204,9 @@ export function routePerimeter(steps: PerimeterStep[]): Sketch {
     const d = Math.hypot(dx, dy);
     if (d < cSmall.radius + 1e-9) throw new Error('routePerimeter: tangent approach requires non-overlapping circles');
 
-    // Step 1: Fillet center via circle-circle intersection (externally tangent to BOTH circles).
-    // This guarantees the fillet arc never enters either circle.
-    // The "right" side is relative to the PERIMETER direction (cA→cB), not cSmall→cBig.
-    const [left, right] = circleCircleIntersect(
-      cSmall.center[0], cSmall.center[1], cSmall.radius + rf,
-      cBig.center[0], cBig.center[1], cBig.radius + rf,
-    );
-    // When aIsSmaller, perimeter goes cSmall→cBig → right is correct.
-    // When !aIsSmaller, perimeter goes cBig→cSmall → left of cSmall→cBig = right of cBig→cSmall.
-    const fc = thetaSign < 0 ? right : left;
+    const Rb = cBig.radius;
 
-    // Step 2: Tangent point T on cSmall.
+    // Step 1: Tangent point T on cSmall.
     // The tangent line passes through cBig center and is tangent to cSmall.
     const theta = Math.atan2(dy, dx);
     const alpha = Math.acos(Math.min(1, cSmall.radius / d));
@@ -1225,16 +1216,31 @@ export function routePerimeter(steps: PerimeterStep[]): Sketch {
       cSmall.center[1] + cSmall.radius * Math.sin(tangentAngle),
     ];
 
-    // Step 3: Line-fillet junction = projection of fillet center onto the tangent line.
+    // Tangent line direction: T toward cBig center
     const ldx = cBig.center[0] - T[0];
     const ldy = cBig.center[1] - T[1];
     const lLen = Math.hypot(ldx, ldy);
     const lux = ldx / lLen, luy = ldy / lLen;
+
+    // Step 2: Fillet center — tangent to the line AND externally tangent to cBig.
+    // Offset the tangent line by rf in the exterior direction (away from perimeter interior).
+    const nx = thetaSign * luy, ny = -thetaSign * lux; // inward normal (toward perimeter interior)
+    const ox = T[0] + rf * nx, oy = T[1] + rf * ny;    // offset line base point
+    // Intersect offset line (base ox,oy dir lux,luy) with circle (cBig center, Rb + rf)
+    const ax = ox - cBig.center[0], ay = oy - cBig.center[1];
+    const b = ax * lux + ay * luy;
+    const c = ax * ax + ay * ay - (Rb + rf) * (Rb + rf);
+    const disc = b * b - c;
+    if (disc < 0) throw new Error('routePerimeter: tangent fillet has no solution (fillet radius too large?)');
+    // Pick the solution closer to cBig (larger parameter = further along T→cBig direction)
+    const s = -b + Math.sqrt(disc);
+    const fc: [number, number] = [ox + s * lux, oy + s * luy];
+
+    // Step 3: Line-fillet junction = projection of fillet center onto the tangent line.
     const t = (fc[0] - T[0]) * lux + (fc[1] - T[1]) * luy;
     const lineEnd: [number, number] = [T[0] + t * lux, T[1] + t * luy];
 
     // Step 4: Fillet tangent point on cBig (from cBig center toward fillet center).
-    const Rb = cBig.radius;
     const fbX = fc[0] - cBig.center[0], fbY = fc[1] - cBig.center[1];
     const fbLen = Math.hypot(fbX, fbY);
     const filletOnBig: [number, number] = [cBig.center[0] + (fbX / fbLen) * Rb, cBig.center[1] + (fbY / fbLen) * Rb];

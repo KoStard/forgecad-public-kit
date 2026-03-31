@@ -250,6 +250,10 @@ for (const nsMatch of [...content.matchAll(nsReExportRegex)]) {
 // explicit alias so Monaco autocompletes `lib.*` in user scripts.
 content += '\n/** All library parts. Access via `lib.xxx()` in scripts. */\ndeclare const lib: typeof partLibrary;\n';
 
+// ── Alias `route` → `routeStepFactories` ───────────────────────────────────
+// runner.ts injects `route` as an alias for `routeStepFactories`.
+content += '\n/** Route step factories. Access via `route.line()`, `route.fillet()`, etc. */\ndeclare const route: typeof routeStepFactories;\n';
+
 // Prepend header and stubs for external types
 const header = '// AUTO-GENERATED — do not edit by hand.\n// Regenerate: npm run gen:types  (source: src/forge/forge-public-api.ts)\n';
 if (importStubs.length > 0) {

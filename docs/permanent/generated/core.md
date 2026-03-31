@@ -32,7 +32,7 @@ Create a cylinder or cone with named faces and edges. When radiusTop differs fro
 sphere$1(radius: number, segments?: number): Shape
 ```
 
-Create a sphere centered at the origin. Use segments for lower-poly approximations.
+Create a sphere centered at the origin. Use segments for lower-poly approximations. @concept primitive
 
 ### Boolean Operations
 
@@ -44,7 +44,7 @@ Combine shapes using set operations.
 union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 ```
 
-Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays.
+Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays. @concept boolean
 
 #### `difference()`
 
@@ -52,7 +52,7 @@ Combine shapes into a single solid (additive boolean). Accepts individual shapes
 difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 ```
 
-Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted.
+Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted. @concept boolean
 
 #### `intersection()`
 
@@ -60,7 +60,7 @@ Subtract shapes from a base shape. The first shape is the base; all subsequent s
 intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape
 ```
 
-Keep only the overlapping volume of the input shapes (intersection boolean).
+Keep only the overlapping volume of the input shapes (intersection boolean). @concept boolean
 
 ### Patterns & Topology
 
@@ -286,7 +286,7 @@ Import model files and SVG assets from other files.
 require$1(path: string, paramOverrides?: Record<string, number>): any
 ```
 
-Import a module with optional ForgeCAD parameter overrides. Returns the module's exports.
+Import a module with optional ForgeCAD parameter overrides. Returns the module's exports. @concept import
 
 #### `importSvgSketch()`
 
@@ -294,7 +294,7 @@ Import a module with optional ForgeCAD parameter overrides. Returns the module's
 importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch
 ```
 
-Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification.
+Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification. @concept import
 
 <details><summary><code>SvgImportOptions</code></summary>
 
@@ -909,7 +909,7 @@ faceProfile(shape: Shape | TrackedShape, face: FaceSelector): Sketch
 torus$1(majorRadius: number, minorRadius: number, segments?: number): Shape
 ```
 
-Create a torus (donut shape) centered at the origin, lying in the XY plane.
+Create a torus (donut shape) centered at the origin, lying in the XY plane. @concept primitive
 
 #### `importMesh()`
 
@@ -917,7 +917,7 @@ Create a torus (donut shape) centered at the origin, lying in the XY plane.
 importMesh(fileName: string, options?: { scale?: number; center?: boolean; }): Shape
 ```
 
-Import an external mesh file (STL, OBJ, 3MF) as a Shape.
+Import an external mesh file (STL, OBJ, 3MF) as a Shape. @concept import
 
 #### `highlight()`
 

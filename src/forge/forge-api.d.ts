@@ -3759,75 +3759,6 @@ interface BomOpts {
  * @param opts optional unit and explicit grouping key
  */
 declare function bom(quantity: number, description: string, opts?: BomOpts): void;
-type CutPlaneExcludeInput = string | string[];
-interface CutPlaneOptions {
-	/** Optional offset along the plane normal (primarily for object-form overload). */
-	offset?: number;
-	/** Object names to keep uncut for this plane. */
-	exclude?: CutPlaneExcludeInput;
-}
-/**
- * Define a named section/cut plane. Appears as a toggle in the View Panel.
- * When enabled, geometry on the positive side of the plane is clipped away.
- *
- * @param name   Display name in the View Panel
- * @param normal Plane normal direction [x, y, z] — geometry on this side is removed
- * @param offset Distance from origin along the normal. Default: 0
- * @param options.exclude Names of returned scene objects to keep uncut for this plane
- */
-declare function cutPlane(name: string, normal: [
-	number,
-	number,
-	number
-], offset?: number, options?: CutPlaneOptions): void;
-declare function cutPlane(name: string, normal: [
-	number,
-	number,
-	number
-], options?: CutPlaneOptions): void;
-interface EdgeSegment {
-	/** Stable index within the extraction (deterministic for a given mesh). */
-	index: number;
-	start: Vec3;
-	end: Vec3;
-	midpoint: Vec3;
-	/** Normalized direction from start → end. */
-	direction: Vec3;
-	length: number;
-	/** Dihedral angle in degrees (0 = coplanar, 180 = knife edge). */
-	dihedralAngle: number;
-	/** true = outside corner (convex), false = inside corner (concave). */
-	convex: boolean;
-	/** Normal of first adjacent face. */
-	normalA: Vec3;
-	/** Normal of second adjacent face (same as normalA for boundary edges). */
-	normalB: Vec3;
-	/** true if this is a boundary (unmatched) edge — unusual for closed solids. */
-	boundary: boolean;
-}
-type ShapeArg = Shape | TrackedShape;
-/**
- * Apply a fillet (rounded edge) to a mesh-selected edge.
- *
- * Works on any straight edge of any shape — not limited to tracked box edges.
- * The edge must have been obtained from selectEdge() / selectEdges().
- *
- * @param shape - The solid to modify
- * @param segment - Edge segment from selectEdge() / selectEdges()
- * @param radius - Fillet radius
- * @param segments - Number of arc segments (default: 16)
- */
-declare function filletEdgeSegment(shape: ShapeArg, segment: EdgeSegment, radius: number, segments?: number): Shape;
-/**
- * Apply a chamfer (beveled edge) to a mesh-selected edge.
- *
- * Works on any straight edge of any shape — not limited to tracked box edges.
- *
- * @param shape - The solid to modify
- * @param segment - Edge segment from selectEdge() / selectEdges()
- * @param size - Chamfer size (distance from edge)
- */
-declare function chamferEdgeSegment(shape: ShapeArg, segment: EdgeSegment, size: number): Shape;
 interface RobotLinkExportOptions {
 	massKg?: number;
 	densityKgM3?: number;
@@ -3915,6 +3846,75 @@ interface CollectedRobotExport {
  * Configures inertial properties, joint limits, and optional plugins (e.g. diff-drive for Gazebo).
  */
 declare function robotExport(options: RobotExportOptions): CollectedRobotExport;
+type CutPlaneExcludeInput = string | string[];
+interface CutPlaneOptions {
+	/** Optional offset along the plane normal (primarily for object-form overload). */
+	offset?: number;
+	/** Object names to keep uncut for this plane. */
+	exclude?: CutPlaneExcludeInput;
+}
+/**
+ * Define a named section/cut plane. Appears as a toggle in the View Panel.
+ * When enabled, geometry on the positive side of the plane is clipped away.
+ *
+ * @param name   Display name in the View Panel
+ * @param normal Plane normal direction [x, y, z] — geometry on this side is removed
+ * @param offset Distance from origin along the normal. Default: 0
+ * @param options.exclude Names of returned scene objects to keep uncut for this plane
+ */
+declare function cutPlane(name: string, normal: [
+	number,
+	number,
+	number
+], offset?: number, options?: CutPlaneOptions): void;
+declare function cutPlane(name: string, normal: [
+	number,
+	number,
+	number
+], options?: CutPlaneOptions): void;
+interface EdgeSegment {
+	/** Stable index within the extraction (deterministic for a given mesh). */
+	index: number;
+	start: Vec3;
+	end: Vec3;
+	midpoint: Vec3;
+	/** Normalized direction from start → end. */
+	direction: Vec3;
+	length: number;
+	/** Dihedral angle in degrees (0 = coplanar, 180 = knife edge). */
+	dihedralAngle: number;
+	/** true = outside corner (convex), false = inside corner (concave). */
+	convex: boolean;
+	/** Normal of first adjacent face. */
+	normalA: Vec3;
+	/** Normal of second adjacent face (same as normalA for boundary edges). */
+	normalB: Vec3;
+	/** true if this is a boundary (unmatched) edge — unusual for closed solids. */
+	boundary: boolean;
+}
+type ShapeArg = Shape | TrackedShape;
+/**
+ * Apply a fillet (rounded edge) to a mesh-selected edge.
+ *
+ * Works on any straight edge of any shape — not limited to tracked box edges.
+ * The edge must have been obtained from selectEdge() / selectEdges().
+ *
+ * @param shape - The solid to modify
+ * @param segment - Edge segment from selectEdge() / selectEdges()
+ * @param radius - Fillet radius
+ * @param segments - Number of arc segments (default: 16)
+ */
+declare function filletEdgeSegment(shape: ShapeArg, segment: EdgeSegment, radius: number, segments?: number): Shape;
+/**
+ * Apply a chamfer (beveled edge) to a mesh-selected edge.
+ *
+ * Works on any straight edge of any shape — not limited to tracked box edges.
+ *
+ * @param shape - The solid to modify
+ * @param segment - Edge segment from selectEdge() / selectEdges()
+ * @param size - Chamfer size (distance from edge)
+ */
+declare function chamferEdgeSegment(shape: ShapeArg, segment: EdgeSegment, size: number): Shape;
 interface PocketOptions {
 	/**
 	 * Shrink the face boundary inward by this many mm before extruding.
@@ -6610,29 +6610,31 @@ type _ShapeOperand = Shape | TrackedShape;
  * When center is false (default), one corner sits at the origin.
  * Returns a TrackedShape with faces (top, bottom, side-left, side-right, side-top, side-bottom)
  * and edges (vert-bl, vert-br, vert-tr, vert-tl, etc.).
+ * @concept primitive
  */
 declare function box$1(x: number, y: number, z: number, center?: boolean): TrackedShape;
 /**
  * Create a cylinder or cone with named faces and edges.
  * When radiusTop differs from radius, creates a tapered cone. Use segments for regular prisms.
  * Returns a TrackedShape with faces (top, bottom, side) and edges (top-rim, bottom-rim).
+ * @concept primitive
  */
 declare function cylinder$1(height: number, radius: number, radiusTop?: number, segments?: number, center?: boolean): TrackedShape;
-/** Create a sphere centered at the origin. Use segments for lower-poly approximations. */
+/** Create a sphere centered at the origin. Use segments for lower-poly approximations. @concept primitive */
 declare function sphere$1(radius: number, segments?: number): Shape;
-/** Create a torus (donut shape) centered at the origin, lying in the XY plane. */
+/** Create a torus (donut shape) centered at the origin, lying in the XY plane. @concept primitive */
 declare function torus$1(majorRadius: number, minorRadius: number, segments?: number): Shape;
-/** Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays. */
+/** Combine shapes into a single solid (additive boolean). Accepts individual shapes or arrays. @concept boolean */
 declare function union(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
-/** Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted. */
+/** Subtract shapes from a base shape. The first shape is the base; all subsequent shapes are subtracted. @concept boolean */
 declare function difference(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
-/** Keep only the overlapping volume of the input shapes (intersection boolean). */
+/** Keep only the overlapping volume of the input shapes (intersection boolean). @concept boolean */
 declare function intersection(...shapes: (_ShapeOperand | _ShapeOperand[])[]): Shape;
-/** Import a module with optional ForgeCAD parameter overrides. Returns the module's exports. */
+/** Import a module with optional ForgeCAD parameter overrides. Returns the module's exports. @concept import */
 declare function require$1(path: string, paramOverrides?: Record<string, number>): any;
-/** Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification. */
+/** Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification. @concept import */
 declare function importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch;
-/** Import an external mesh file (STL, OBJ, 3MF) as a Shape. */
+/** Import an external mesh file (STL, OBJ, 3MF) as a Shape. @concept import */
 declare function importMesh(fileName: string, options?: {
 	scale?: number;
 	center?: boolean;
@@ -6918,4 +6920,7 @@ declare namespace sdf {
 }
 /** All library parts. Access via `lib.xxx()` in scripts. */
 declare const lib: typeof partLibrary;
+
+/** Route step factories. Access via `route.line()`, `route.fillet()`, etc. */
+declare const route: typeof routeStepFactories;
 

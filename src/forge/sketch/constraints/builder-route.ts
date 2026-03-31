@@ -483,6 +483,7 @@ proto.route = function (this: any, steps: RouteStep[]): any {
         r = t.radius;
         const centerPt = this.point(cx, cy, true);
         circleId = this.circle(centerPt, r, true); // construction=true
+        this.radius(circleId, r); // Pin the radius — without this the solver drifts it
       }
 
       // Look ahead/behind for direction estimates (wrapping for closed loops)
