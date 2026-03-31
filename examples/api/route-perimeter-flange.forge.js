@@ -23,14 +23,26 @@ let body = constrainedSketch()
     lugBR,  route.fillet(5, 'tangent'),
     core,   route.fillet(5, 'tangent'),
   ])
-  .solve()
+  .solve();
 
 // Subtract center bore
 body = body.subtract(circle2d(R_CORE_IN))
+
+const solidCutRectangle = rect(200, 8, true);
+const solidRing = circle2d(R_CORE)
+  .subtract(circle2d(R_CORE_IN))
+  // .subtract(solidCutRectangle)
+  // .subtract(solidCutRectangle.rotate(60))
+  // .subtract(solidCutRectangle.rotate(120));
+  ;
 
 // Subtract bolt holes
 for (const angle of [60, 120, 240, 300]) {
   body = body.subtract(circle2d(R_BOLT).translate(...polar(LUG_DIST, angle)))
 }
 
-return body.extrude(15)
+return union(body
+  .extrude(15),
+  solidRing
+    .extrude(15).
+    translate(0, 0, 15));
