@@ -469,6 +469,7 @@ Convert radians to degrees
 - `referenceLine()` — referenceLine(x1: number, y1: number, x2: number, y2: number): LineId
 - `referenceFrom()` — referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | nu
 - `referenceAllFrom()` — referenceAllFrom(source: ConstraintSketch): { points: Map<string, PointId>; line
+- `route()` — Route a profile through a sequence of geometric elements. The solver computes all tangent points and intersections automatically. Steps can include: - `{ point: [x, y] }` — route through a point - `{ axis: 'x'|'y', offset: n }` — follow a construction line - `{ line: {...}, until: n }` — follow a line clipped to a coordinate - `{ tangent: { center, radius } }` — tangent arc onto a construction circle - `{ fillet: radius }` — fillet between adjacent elements - `{ tangentArc: radius }` — free tangent arc (solver finds center) Returns `this` for chaining. Call `.solve()` after to get the Sketch.
 - `point()` — point(x?: number, y?: number, fixed?: boolean): PointId
 - `pointAt()` — pointAt(index: number): PointId
 - `line()` — line(a: PointId, b: PointId, construction?: boolean, name?: string): LineId

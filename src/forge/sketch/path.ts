@@ -240,6 +240,11 @@ export class PathBuilder {
   private dirX = 1;
   private dirY = 0;
 
+  /** Current cursor X position. */
+  getX(): number { return this.x; }
+  /** Current cursor Y position. */
+  getY(): number { return this.y; }
+
   // ── Basic drawing ─────────────────────────────────────────────────────────
 
   moveTo(x: number, y: number): this {
@@ -321,6 +326,54 @@ export class PathBuilder {
     this.dirX = dx;
     this.dirY = dy;
     return this;
+  }
+
+  /**
+   * Arc around a known center point, sweeping by the given angle.
+   * Radius is derived from the distance between the current position and the center.
+   * Positive sweep = CCW (math convention), negative = CW.
+   *
+   * ```js
+   * // Arc 90° CCW around (50, 50)
+   * path().moveTo(70, 50).arcAround(50, 50, 90)
+   * // Arc 45° CW around the origin
+   * path().moveTo(10, 0).arcAround(0, 0, -45)
+   * ```
+   */
+  arcAround(cx: number, cy: number, sweepDeg: number): this {
+    const radius = Math.hypot(this.x - cx, this.y - cy);
+    if (radius < 1e-9) throw new Error('arcAround: current position coincides with center');
+    if (Math.abs(sweepDeg) < 1e-9) return this; // no-op
+
+    const startAngle = Math.atan2(this.y - cy, this.x - cx);
+    const sweepRad = (sweepDeg * Math.PI) / 180;
+    const endAngle = startAngle + sweepRad;
+    const x = cx + radius * Math.cos(endAngle);
+    const y = cy + radius * Math.sin(endAngle);
+    const clockwise = sweepDeg < 0;
+
+    this.segs.push({ kind: 'arc', x, y, cx, cy, clockwise });
+    const [dx, dy] = arcEndTangent(x, y, cx, cy, clockwise);
+    this.x = x;
+    this.y = y;
+    this.dirX = dx;
+    this.dirY = dy;
+    return this;
+  }
+
+  /**
+   * Arc around a center point given as an offset from the current position.
+   * `(dx, dy)` is the vector from the current point to the center.
+   * Positive sweep = CCW (math convention), negative = CW.
+   *
+   * ```js
+   * // Arc 90° CCW around a center 20 units to the right
+   * path().moveTo(50, 50).arcAroundRelative(20, 0, 90)
+   * // Equivalent to: path().moveTo(50, 50).arcAround(70, 50, 90)
+   * ```
+   */
+  arcAroundRelative(dx: number, dy: number, sweepDeg: number): this {
+    return this.arcAround(this.x + dx, this.y + dy, sweepDeg);
   }
 
   /**
@@ -979,6 +1032,304 @@ export class PathBuilder {
 /** Create a path builder for constructing 2D outlines. */
 export function path(): PathBuilder {
   return new PathBuilder();
+}
+
+// ── Route-perimeter types & implementation ──────────────────────────────────
+
+export interface PerimeterCircle {
+  center: [number, number];
+  radius: number;
+}
+
+export interface PerimeterFillet {
+  fillet: number;
+  /** When 'tangent', adds a tangent line from the previous circle (radial to the next circle) before the fillet. */
+  approach?: 'tangent';
+}
+
+export type PerimeterStep = PerimeterCircle | PerimeterFillet;
+
+function isCircle(s: PerimeterStep): s is PerimeterCircle {
+  return 'radius' in s;
+}
+
+/**
+ * Intersect two circles (c1, r1) and (c2, r2).
+ * Returns the two intersection points, or throws if they don't intersect.
+ * The first point is the one to the LEFT of the c1→c2 vector (CCW side).
+ */
+function circleCircleIntersect(
+  c1x: number, c1y: number, r1: number,
+  c2x: number, c2y: number, r2: number,
+): [[number, number], [number, number]] {
+  const dx = c2x - c1x;
+  const dy = c2y - c1y;
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-9) throw new Error('routePerimeter: two circles have the same center');
+  if (d > r1 + r2 + 1e-9) throw new Error(`routePerimeter: circles too far apart to intersect (d=${d.toFixed(3)}, r1+r2=${(r1 + r2).toFixed(3)})`);
+  if (d < Math.abs(r1 - r2) - 1e-9) throw new Error('routePerimeter: one circle is inside the other');
+
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const hSq = r1 * r1 - a * a;
+  const h = Math.sqrt(Math.max(0, hSq));
+
+  // Unit vectors: along c1→c2 and perpendicular (left = CCW)
+  const ux = dx / d;
+  const uy = dy / d;
+  const px = -uy; // left perpendicular
+  const py = ux;
+
+  const mx = c1x + a * ux;
+  const my = c1y + a * uy;
+
+  return [
+    [mx + h * px, my + h * py], // left (CCW) candidate
+    [mx - h * px, my - h * py], // right (CW) candidate
+  ];
+}
+
+/**
+ * Compute the signed angle (radians, CCW-positive) from angle `a` to angle `b`,
+ * constrained to (0, 2π]. Used to walk CCW arcs on construction circles.
+ */
+function ccwSweep(fromRad: number, toRad: number): number {
+  let sweep = toRad - fromRad;
+  // Normalize to (0, 2π]
+  while (sweep <= 1e-9) sweep += 2 * Math.PI;
+  while (sweep > 2 * Math.PI + 1e-9) sweep -= 2 * Math.PI;
+  return sweep;
+}
+
+/**
+ * Route a smooth closed perimeter around a sequence of construction circles,
+ * connected by tangent fillet arcs.
+ *
+ * Steps must alternate: circle, fillet, circle, fillet, ...
+ * The sequence wraps — the last fillet connects back to the first circle.
+ *
+ * ```js
+ * const outline = routePerimeter([
+ *   { center: [0, 0], radius: 45 },
+ *   { fillet: 5 },
+ *   { center: polar(60, 60), radius: 18 },
+ *   { fillet: 17 },
+ *   { center: polar(60, 120), radius: 18 },
+ *   { fillet: 5 },
+ * ])
+ * ```
+ */
+export function routePerimeter(steps: PerimeterStep[]): Sketch {
+  if (steps.length < 4) throw new Error('routePerimeter: need at least 2 circles and 2 fillets');
+  if (steps.length % 2 !== 0) throw new Error('routePerimeter: steps must alternate circle, fillet (even count)');
+
+  // Separate circles and fillets
+  const circles: PerimeterCircle[] = [];
+  const filletSteps: PerimeterFillet[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (i % 2 === 0) {
+      if (!isCircle(s)) throw new Error(`routePerimeter: step ${i} should be a circle, got fillet`);
+      circles.push(s);
+    } else {
+      if (isCircle(s)) throw new Error(`routePerimeter: step ${i} should be a fillet, got circle`);
+      filletSteps.push(s);
+    }
+  }
+
+  const n = circles.length;
+
+  // Per-connection data between circle[i] and circle[(i+1)%n]
+  // Segments emitted between the circle arcs: line segments and/or fillet arcs
+  type Segment =
+    | { type: 'line'; to: [number, number] }
+    | { type: 'fillet'; center: [number, number]; to: [number, number] };
+
+  interface Connection {
+    entryOnA: [number, number];
+    exitOnB: [number, number];
+    segments: Segment[];
+  }
+  const connections: Connection[] = [];
+
+  // Helper: compute tangent-line + fillet connection.
+  // The tangent line is tangent to cSmall and radial to cBig (passes through cBig center).
+  // The fillet smooths the line-to-cBig junction.
+  // Returns: tangent point T on cSmall, fillet center, line-fillet junction, fillet point on cBig.
+  function tangentFilletGeometry(
+    cSmall: PerimeterCircle, cBig: PerimeterCircle, rf: number, thetaSign: number,
+  ) {
+    const dx = cBig.center[0] - cSmall.center[0];
+    const dy = cBig.center[1] - cSmall.center[1];
+    const d = Math.hypot(dx, dy);
+    if (d < cSmall.radius + 1e-9) throw new Error('routePerimeter: tangent approach requires non-overlapping circles');
+
+    // Step 1: Fillet center via circle-circle intersection (externally tangent to BOTH circles).
+    // This guarantees the fillet arc never enters either circle.
+    // The "right" side is relative to the PERIMETER direction (cA→cB), not cSmall→cBig.
+    const [left, right] = circleCircleIntersect(
+      cSmall.center[0], cSmall.center[1], cSmall.radius + rf,
+      cBig.center[0], cBig.center[1], cBig.radius + rf,
+    );
+    // When aIsSmaller, perimeter goes cSmall→cBig → right is correct.
+    // When !aIsSmaller, perimeter goes cBig→cSmall → left of cSmall→cBig = right of cBig→cSmall.
+    const fc = thetaSign < 0 ? right : left;
+
+    // Step 2: Tangent point T on cSmall.
+    // The tangent line passes through cBig center and is tangent to cSmall.
+    const theta = Math.atan2(dy, dx);
+    const alpha = Math.acos(Math.min(1, cSmall.radius / d));
+    const tangentAngle = theta + thetaSign * alpha;
+    const T: [number, number] = [
+      cSmall.center[0] + cSmall.radius * Math.cos(tangentAngle),
+      cSmall.center[1] + cSmall.radius * Math.sin(tangentAngle),
+    ];
+
+    // Step 3: Line-fillet junction = projection of fillet center onto the tangent line.
+    const ldx = cBig.center[0] - T[0];
+    const ldy = cBig.center[1] - T[1];
+    const lLen = Math.hypot(ldx, ldy);
+    const lux = ldx / lLen, luy = ldy / lLen;
+    const t = (fc[0] - T[0]) * lux + (fc[1] - T[1]) * luy;
+    const lineEnd: [number, number] = [T[0] + t * lux, T[1] + t * luy];
+
+    // Step 4: Fillet tangent point on cBig (from cBig center toward fillet center).
+    const Rb = cBig.radius;
+    const fbX = fc[0] - cBig.center[0], fbY = fc[1] - cBig.center[1];
+    const fbLen = Math.hypot(fbX, fbY);
+    const filletOnBig: [number, number] = [cBig.center[0] + (fbX / fbLen) * Rb, cBig.center[1] + (fbY / fbLen) * Rb];
+
+    return { T, lineEnd, filletCenter: fc, filletOnBig };
+  }
+
+  for (let i = 0; i < n; i++) {
+    const cA = circles[i];
+    const cB = circles[(i + 1) % n];
+    const fStep = filletSteps[i];
+    const rf = fStep.fillet;
+
+    if (fStep.approach === 'tangent') {
+      // Tangent line on the smaller circle, fillet at the larger circle.
+      const aIsSmaller = cA.radius <= cB.radius;
+      const cSmall = aIsSmaller ? cA : cB;
+      const cBig = aIsSmaller ? cB : cA;
+
+      // thetaSign: for CCW perimeter, right side of A→B = -1 when tangent is on cA, +1 when on cB
+      const thetaSign = aIsSmaller ? -1 : 1;
+      const { T, lineEnd, filletCenter, filletOnBig } = tangentFilletGeometry(cSmall, cBig, rf, thetaSign);
+
+      if (aIsSmaller) {
+        // Tangent on cA side: cA arc → line → fillet → cB arc
+        // Path: entryOnA=T, line to lineEnd, fillet arc to filletOnBig=exitOnB
+        connections.push({
+          entryOnA: T,
+          exitOnB: filletOnBig,
+          segments: [
+            { type: 'line', to: lineEnd },
+            { type: 'fillet', center: filletCenter, to: filletOnBig },
+          ],
+        });
+      } else {
+        // Tangent on cB side: cA arc → fillet → line → cB arc
+        // Path: entryOnA=filletOnBig (on cA=cBig), fillet arc to lineEnd, line to T=exitOnB
+        connections.push({
+          entryOnA: filletOnBig,
+          exitOnB: T,
+          segments: [
+            { type: 'fillet', center: filletCenter, to: lineEnd },
+            { type: 'line', to: T },
+          ],
+        });
+      }
+    } else {
+      // ── Simple fillet: circle-circle intersection ──
+      const [, right] = circleCircleIntersect(
+        cA.center[0], cA.center[1], cA.radius + rf,
+        cB.center[0], cB.center[1], cB.radius + rf,
+      );
+      const fc = right;
+
+      const dxA = fc[0] - cA.center[0];
+      const dyA = fc[1] - cA.center[1];
+      const lenA = Math.hypot(dxA, dyA);
+      const entryOnA: [number, number] = [cA.center[0] + (dxA / lenA) * cA.radius, cA.center[1] + (dyA / lenA) * cA.radius];
+
+      const dxB = fc[0] - cB.center[0];
+      const dyB = fc[1] - cB.center[1];
+      const lenB = Math.hypot(dxB, dyB);
+      const exitOnB: [number, number] = [cB.center[0] + (dxB / lenB) * cB.radius, cB.center[1] + (dyB / lenB) * cB.radius];
+
+      connections.push({
+        entryOnA, exitOnB,
+        segments: [{ type: 'fillet', center: fc, to: exitOnB }],
+      });
+    }
+  }
+
+  // Centroid of all circle centers — used to determine exterior vs interior arcs
+  let centroidX = 0, centroidY = 0;
+  for (const c of circles) { centroidX += c.center[0]; centroidY += c.center[1]; }
+  centroidX /= n; centroidY /= n;
+
+  // Build the path: for each circle, arc from the previous connection's exit to this connection's entry,
+  // then emit the connection (optional line + fillet arc).
+  const p = new PathBuilder();
+  const lastConn = connections[n - 1];
+  p.moveTo(lastConn.exitOnB[0], lastConn.exitOnB[1]);
+
+  for (let i = 0; i < n; i++) {
+    const prevConn = connections[(i + n - 1) % n];
+    const conn = connections[i];
+    const circ = circles[i];
+
+    // Arc along construction circle from prevConn.exitOnB to conn.entryOnA.
+    // Choose CCW vs CW based on which arc midpoint is farther from the centroid (exterior).
+    const fromAngle = Math.atan2(
+      prevConn.exitOnB[1] - circ.center[1],
+      prevConn.exitOnB[0] - circ.center[0],
+    );
+    const toAngle = Math.atan2(
+      conn.entryOnA[1] - circ.center[1],
+      conn.entryOnA[0] - circ.center[0],
+    );
+    const ccwSweepAngle = ccwSweep(fromAngle, toAngle);
+    const cwSweepAngle = ccwSweepAngle - 2 * Math.PI;
+
+    const ccwMidAngle = fromAngle + ccwSweepAngle / 2;
+    const cwMidAngle = fromAngle + cwSweepAngle / 2;
+    const ccwDist = Math.hypot(
+      circ.center[0] + circ.radius * Math.cos(ccwMidAngle) - centroidX,
+      circ.center[1] + circ.radius * Math.sin(ccwMidAngle) - centroidY,
+    );
+    const cwDist = Math.hypot(
+      circ.center[0] + circ.radius * Math.cos(cwMidAngle) - centroidX,
+      circ.center[1] + circ.radius * Math.sin(cwMidAngle) - centroidY,
+    );
+    const circSweepDeg = (cwDist > ccwDist ? cwSweepAngle : ccwSweepAngle) * (180 / Math.PI);
+
+    if (Math.abs(circSweepDeg) > 0.01) {
+      p.arcAround(circ.center[0], circ.center[1], circSweepDeg);
+    }
+
+    // Emit connection segments (lines and fillet arcs)
+    for (const seg of conn.segments) {
+      if (seg.type === 'line') {
+        p.lineTo(seg.to[0], seg.to[1]);
+      } else {
+        // Fillet arc: always take the shorter arc (fillets are small roundings)
+        const fFromAngle = Math.atan2(p.getY() - seg.center[1], p.getX() - seg.center[0]);
+        const fToAngle = Math.atan2(seg.to[1] - seg.center[1], seg.to[0] - seg.center[0]);
+        const ccwA = ccwSweep(fFromAngle, fToAngle);
+        const cwA = ccwA - 2 * Math.PI;
+        // Pick the shorter sweep
+        const fSweepDeg = (Math.abs(cwA) < Math.abs(ccwA) ? cwA : ccwA) * (180 / Math.PI);
+        if (Math.abs(fSweepDeg) > 0.01) {
+          p.arcAround(seg.center[0], seg.center[1], fSweepDeg);
+        }
+      }
+    }
+  }
+
+  return p.close();
 }
 
 /** Create a stroked polyline sketch from an array of 2D points. */

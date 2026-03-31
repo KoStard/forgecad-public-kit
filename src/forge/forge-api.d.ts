@@ -5660,6 +5660,10 @@ declare class PathBuilder {
 	/** Current departure tangent unit vector. */
 	private dirX;
 	private dirY;
+	/** Current cursor X position. */
+	getX(): number;
+	/** Current cursor Y position. */
+	getY(): number;
 	moveTo(x: number, y: number): this;
 	lineTo(x: number, y: number): this;
 	lineH(dx: number): this;
@@ -5809,6 +5813,8 @@ interface PerimeterCircle {
 }
 interface PerimeterFillet {
 	fillet: number;
+	/** When 'tangent', adds a tangent line from the previous circle (radial to the next circle) before the fillet. */
+	approach?: "tangent";
 }
 type PerimeterStep = PerimeterCircle | PerimeterFillet;
 /**

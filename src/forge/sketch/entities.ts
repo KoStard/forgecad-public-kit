@@ -344,6 +344,23 @@ export function radians(rad: number): number {
   return rad * (180 / Math.PI);
 }
 
+/**
+ * Compute a point by moving a given distance at a given angle from a start point.
+ * Angle is in degrees, measured CCW from the +X axis (standard math convention).
+ * Returns `[x, y]`.
+ *
+ * ```js
+ * polar(10, 45)            // [7.07, 7.07] — from origin
+ * polar(10, 45, [5, 5])    // [12.07, 12.07] — from (5,5)
+ * ```
+ */
+export function polar(length: number, angleDeg: number, from?: [number, number]): [number, number] {
+  const rad = (angleDeg * Math.PI) / 180;
+  const x = (from?.[0] ?? 0) + length * Math.cos(rad);
+  const y = (from?.[1] ?? 0) + length * Math.sin(rad);
+  return [x, y];
+}
+
 // ─── Constraint helpers (global functions) ───────────────────────
 
 /**

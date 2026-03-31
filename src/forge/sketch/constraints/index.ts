@@ -10,6 +10,7 @@ import './builder-path';
 import './builder-geometric';
 import './builder-dimensional';
 import './builder-reference';
+import './builder-route';
 
 import type { SketchConstraint } from './types';
 
@@ -57,6 +58,17 @@ export {
 } from './sketch';
 
 export { registerConstraint, installBuilderMethod, getConstraintDef } from './registry';
+
+export type {
+  RouteStep,
+  RouteLine,
+  RouteCircle,
+  RouteTangent,
+  RouteFillet,
+  RouteTangentArc,
+  RoutePoint,
+  RouteUntil,
+} from './builder-route';
 
 export { analyzeRigidity } from './rigidity';
 export type { RigidityResult } from './rigidity';

@@ -180,6 +180,8 @@ A quintic Hermite curve in 3D space. Interpolates between two endpoints matching
 
 **Methods:**
 
+- `getX()` — Current cursor X position.
+- `getY()` — Current cursor Y position.
 - `moveTo()` — moveTo(x: number, y: number): this
 - `lineTo()` — lineTo(x: number, y: number): this
 - `lineH()` — lineH(dx: number): this
@@ -190,6 +192,8 @@ A quintic Hermite curve in 3D space. Interpolates between two endpoints matching
 - `bezierBy()` — bezierBy(dcp1x: number, dcp1y: number, dcp2x: number, dcp2y: number, dx: number,
 - `arcTo()` — Draw a circular arc from the current position to (x, y) with the given radius. `clockwise=true`  → arc curves to the right of the start→end direction. `clockwise=false` → arc curves to the left  of the start→end direction.
 - `tangentArcTo()` — G1-continuous arc — radius derived from current tangent + endpoint. Throws if endpoint is collinear with current direction.
+- `arcAround()` — Arc around a known center point, sweeping by the given angle. Radius is derived from the distance between the current position and the center. Positive sweep = CCW (math convention), negative = CW. ```js // Arc 90° CCW around (50, 50) path().moveTo(70, 50).arcAround(50, 50, 90) // Arc 45° CW around the origin path().moveTo(10, 0).arcAround(0, 0, -45) ```
+- `arcAroundRelative()` — Arc around a center point given as an offset from the current position. `(dx, dy)` is the vector from the current point to the center. Positive sweep = CCW (math convention), negative = CW. ```js // Arc 90° CCW around a center 20 units to the right path().moveTo(50, 50).arcAroundRelative(20, 0, 90) // Equivalent to: path().moveTo(50, 50).arcAround(70, 50, 90) ```
 - `smoothCapTo()` — Smooth three-arc end cap from the current position to (endX, endY). Inserts: small corner arc → large cap arc → small corner arc, all G1-continuous.
 - `bezierTo()` — Cubic bezier from current position to (x, y) via two control points.
 - `tangentBezierTo()` — G1-continuous cubic bezier — first control point is auto-derived from the current tangent direction. `weight` controls how far the auto-placed control point extends along the tangent (default: 1/3 of the chord). The second control point `(cp2x, cp2y)` must be provided — it controls the arrival curvature. For a fully automatic smooth curve, see `smoothThrough`.
