@@ -1735,6 +1735,8 @@ interface RouteTangent {
 }
 interface RouteFillet {
 	fillet: number;
+	/** When 'tangent', adds a tangent line from the smaller circle before the fillet arc. */
+	approach?: "tangent";
 }
 interface RouteTangentArc {
 	tangentArc: number;
@@ -1749,7 +1751,30 @@ interface RouteUntil {
 	line: RouteLine | LineId;
 	until: number;
 }
-type RouteStep = RouteLine | RouteCircle | RouteTangent | RouteFillet | RouteTangentArc | RoutePoint | RouteUntil;
+type RouteStep = RouteLine | RouteCircle | CircleId | RouteTangent | RouteFillet | RouteTangentArc | RoutePoint | RouteUntil;
+/** Typed factory functions for route steps. Provides autocomplete and type safety. */
+declare const routeStepFactories: {
+	/** Construction circle for routing. */
+	circle(center: [
+		number,
+		number
+	], radius: number): RouteCircle;
+	/** Fillet arc connecting adjacent elements. */
+	fillet(radius: number, approach?: "tangent"): RouteFillet;
+	/** Tangent entry onto a construction circle. */
+	tangent(circle: RouteCircle | CircleId): RouteTangent;
+	/** Free tangent arc (solver finds center). */
+	tangentArc(radius: number): RouteTangentArc;
+	/** Route through a specific point. */
+	point(xy: [
+		number,
+		number
+	]): RoutePoint;
+	/** Construction line. */
+	line(axis: "x" | "y", offset: number): RouteLine;
+	/** Follow a line clipped to a coordinate. */
+	until(line: RouteLine | LineId, value: number): RouteUntil;
+};
 interface ConstrainedSketchBuilder {
 	/**
 	 * Route a profile through a sequence of geometric elements.
@@ -5753,6 +5778,17 @@ declare class PathBuilder {
 	 */
 	tangentArcTo(x: number, y: number): this;
 	/**
+	 * Draw an arc defined by center, radius, and angle range (no trig needed).
+	 * If the path has no segments yet, automatically moves to the arc start.
+	 * Positive sweep (startDeg < endDeg) = CCW, negative = CW.
+	 *
+	 * ```js
+	 * // Arc centered at (10, 0), radius 50, from -30° to +30°
+	 * path().arc(10, 0, 50, -30, 30).stroke(8, 'Round')
+	 * ```
+	 */
+	arc(cx: number, cy: number, radius: number, startDeg: number, endDeg: number): this;
+	/**
 	 * Arc around a known center point, sweeping by the given angle.
 	 * Radius is derived from the distance between the current position and the center.
 	 * Positive sweep = CCW (math convention), negative = CW.
@@ -5945,7 +5981,11 @@ declare function circularPattern(shape: ShapeArg$3, count: number, centerXOrOpts
 /** Repeat a sketch in a linear pattern */
 declare function linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch;
 /** Repeat a sketch in a circular pattern around a center point */
-declare function circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: number): Sketch;
+declare function circularPattern2d(sketch: Sketch, count: number, centerXOrOpts?: number | {
+	centerX?: number;
+	centerY?: number;
+	startDeg?: number;
+}, centerY?: number): Sketch;
 /** Mirror a shape across a plane defined by its normal and union the mirror with the original. */
 declare function mirrorCopy(shape: ShapeArg$3, normal: [
 	number,

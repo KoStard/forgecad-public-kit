@@ -101,17 +101,34 @@ export function linearPattern2d(sketch: Sketch, count: number, dx: number, dy: n
 }
 
 /** Repeat a sketch in a circular pattern around a center point */
-export function circularPattern2d(sketch: Sketch, count: number, centerX: number = 0, centerY: number = 0): Sketch {
+export function circularPattern2d(
+  sketch: Sketch,
+  count: number,
+  centerXOrOpts: number | { centerX?: number; centerY?: number; startDeg?: number } = 0,
+  centerY: number = 0,
+): Sketch {
   if (count <= 0) return sketch;
+  let cx: number;
+  let cy: number;
+  let startDeg: number;
+  if (typeof centerXOrOpts === 'object') {
+    cx = centerXOrOpts.centerX ?? 0;
+    cy = centerXOrOpts.centerY ?? 0;
+    startDeg = centerXOrOpts.startDeg ?? 0;
+  } else {
+    cx = centerXOrOpts;
+    cy = centerY;
+    startDeg = 0;
+  }
   const step = 360 / count;
   const copies: Sketch[] = [];
   for (let i = 0; i < count; i++) {
-    const angle = step * i;
+    const angle = startDeg + step * i;
     if (angle === 0) {
       copies.push(sketch);
     } else {
       // Translate to origin, rotate, translate back
-      copies.push(sketch.translate(-centerX, -centerY).rotate(angle).translate(centerX, centerY));
+      copies.push(sketch.translate(-cx, -cy).rotate(angle).translate(cx, cy));
     }
   }
   return union2d(...copies);

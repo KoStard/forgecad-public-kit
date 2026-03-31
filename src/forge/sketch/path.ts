@@ -1,5 +1,6 @@
 import { Sketch } from './core';
-import { polygon } from './primitives';
+import { union2d } from './booleans';
+import { circle2d, polygon } from './primitives';
 
 // ── Typed segment store ───────────────────────────────────────────────────────
 
@@ -323,6 +324,41 @@ export class PathBuilder {
     const [dx, dy] = arcEndTangent(x, y, cx, cy, clockwise);
     this.x = x;
     this.y = y;
+    this.dirX = dx;
+    this.dirY = dy;
+    return this;
+  }
+
+  /**
+   * Draw an arc defined by center, radius, and angle range (no trig needed).
+   * If the path has no segments yet, automatically moves to the arc start.
+   * Positive sweep (startDeg < endDeg) = CCW, negative = CW.
+   *
+   * ```js
+   * // Arc centered at (10, 0), radius 50, from -30° to +30°
+   * path().arc(10, 0, 50, -30, 30).stroke(8, 'Round')
+   * ```
+   */
+  arc(cx: number, cy: number, radius: number, startDeg: number, endDeg: number): this {
+    const DEG_TO_RAD = Math.PI / 180;
+    const sx = cx + radius * Math.cos(startDeg * DEG_TO_RAD);
+    const sy = cy + radius * Math.sin(startDeg * DEG_TO_RAD);
+    const ex = cx + radius * Math.cos(endDeg * DEG_TO_RAD);
+    const ey = cy + radius * Math.sin(endDeg * DEG_TO_RAD);
+    const clockwise = endDeg < startDeg;
+
+    // Auto-move to arc start if this is the first segment
+    if (this.segs.length === 0) {
+      this.moveTo(sx, sy);
+    } else if (Math.abs(this.x - sx) > 1e-6 || Math.abs(this.y - sy) > 1e-6) {
+      // If cursor isn't at arc start, line to it
+      this.lineTo(sx, sy);
+    }
+
+    this.segs.push({ kind: 'arc', x: ex, y: ey, cx, cy, clockwise });
+    const [dx, dy] = arcEndTangent(ex, ey, cx, cy, clockwise);
+    this.x = ex;
+    this.y = ey;
     this.dirX = dx;
     this.dirY = dy;
     return this;
@@ -973,7 +1009,12 @@ export class PathBuilder {
     ensureCCW(poly);
 
     let result = polygon(poly);
-    if (join === 'Round') result = result.offset(-hw / 2, 'Round').offset(hw / 2, 'Round');
+    if (join === 'Round') {
+      // Add semicircle endcaps at start and end points
+      const startCap = circle2d(hw).translate(pts[0][0], pts[0][1]);
+      const endCap = circle2d(hw).translate(pts[n - 1][0], pts[n - 1][1]);
+      result = union2d(result, startCap, endCap);
+    }
     return result;
   }
 

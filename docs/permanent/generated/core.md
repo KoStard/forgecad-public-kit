@@ -664,7 +664,7 @@ Repeat a sketch in a linear pattern
 #### `circularPattern2d()`
 
 ```ts
-circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: number): Sketch
+circularPattern2d(sketch: Sketch, count: number, centerXOrOpts?: number | { centerX?: number; centerY?: number; startDeg?: number; }, centerY?: number): Sketch
 ```
 
 Repeat a sketch in a circular pattern around a center point
