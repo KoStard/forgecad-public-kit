@@ -1,4 +1,5 @@
 pub mod analytical;
+pub mod constructive;
 pub mod coord_reduction;
 pub mod decompose;
 pub mod graph;
@@ -16,6 +17,7 @@ use crate::types::{
     SolveOptions, SolveStatus, Problem,
 };
 use analytical::run_analytical_presolve;
+use constructive::run_constructive_presolve;
 use decompose::build_solve_plan;
 
 /// Expand group local points/lines into the main problem arrays.
@@ -2107,6 +2109,7 @@ fn run_presolve(
                 }
             }
         }
+        run_constructive_presolve(points, lines, shapes, constraints);
         propagate_midpoint_bridged_opening(points, lines, constraints);
         propagate_light_locked_camera(points, lines, constraints);
     }
