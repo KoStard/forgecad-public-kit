@@ -37,6 +37,8 @@ export interface RouteTangent {
 /** Fillet arc connecting two adjacent route segments. */
 export interface RouteFillet {
   fillet: number;
+  /** When 'tangent', adds a tangent line from the smaller circle before the fillet arc. */
+  approach?: 'tangent';
 }
 
 /** Free tangent arc (solver finds center). */
@@ -58,6 +60,7 @@ export interface RouteUntil {
 export type RouteStep =
   | RouteLine
   | RouteCircle
+  | CircleId
   | RouteTangent
   | RouteFillet
   | RouteTangentArc
@@ -67,32 +70,70 @@ export type RouteStep =
 // ── Type guards ─────────────────────────────────────────────────────────────
 
 function isRouteLine(s: RouteStep): s is RouteLine {
-  return 'axis' in s && 'offset' in s;
+  return typeof s === 'object' && 'axis' in s && 'offset' in s;
+}
+
+function isCircleId(s: RouteStep): s is CircleId {
+  return typeof s === 'string';
 }
 
 function isRouteCircle(s: RouteStep): s is RouteCircle {
-  return 'center' in s && 'radius' in s;
+  return typeof s === 'object' && 'center' in s && 'radius' in s;
 }
 
 function isRouteTangent(s: RouteStep): s is RouteTangent {
-  return 'tangent' in s;
+  return typeof s === 'object' && 'tangent' in s;
 }
 
 function isRouteFillet(s: RouteStep): s is RouteFillet {
-  return 'fillet' in s;
+  return typeof s === 'object' && 'fillet' in s;
 }
 
 function isRouteTangentArc(s: RouteStep): s is RouteTangentArc {
-  return 'tangentArc' in s;
+  return typeof s === 'object' && 'tangentArc' in s;
 }
 
 function isRoutePoint(s: RouteStep): s is RoutePoint {
-  return 'point' in s;
+  return typeof s === 'object' && 'point' in s;
 }
 
 function isRouteUntil(s: RouteStep): s is RouteUntil {
-  return 'line' in s && 'until' in s;
+  return typeof s === 'object' && 'line' in s && 'until' in s;
 }
+
+// ── Typed factory functions ──────────────────────────────────────────────────
+
+/** Typed factory functions for route steps. Provides autocomplete and type safety. */
+export const routeStepFactories = {
+  /** Construction circle for routing. */
+  circle(center: [number, number], radius: number): RouteCircle {
+    return { center, radius };
+  },
+  /** Fillet arc connecting adjacent elements. */
+  fillet(radius: number, approach?: 'tangent'): RouteFillet {
+    return approach ? { fillet: radius, approach } : { fillet: radius };
+  },
+  /** Tangent entry onto a construction circle. */
+  tangent(circle: RouteCircle | CircleId): RouteTangent {
+    return { tangent: circle };
+  },
+  /** Free tangent arc (solver finds center). */
+  tangentArc(radius: number): RouteTangentArc {
+    return { tangentArc: radius };
+  },
+  /** Route through a specific point. */
+  point(xy: [number, number]): RoutePoint {
+    return { point: xy };
+  },
+  /** Construction line. */
+  line(axis: 'x' | 'y', offset: number): RouteLine {
+    return { axis, offset };
+  },
+  /** Follow a line clipped to a coordinate. */
+  until(line: RouteLine | LineId, value: number): RouteUntil {
+    return { line, until: value };
+  },
+};
 
 // ── Internal types for the routing algorithm ─────────────────────────────────
 
@@ -182,22 +223,33 @@ function estimateFilletCenter(
 proto.route = function (this: any, steps: RouteStep[]): any {
   if (steps.length < 2) throw new Error('route(): need at least 2 steps');
 
+  // ─── Resolve CircleId steps → RouteCircle using the builder's circles ──
+  const resolveCircleStep = (s: RouteStep): RouteStep => {
+    if (!isCircleId(s)) return s;
+    const circ = this.circles.find((c: any) => c.id === s);
+    if (!circ) throw new Error(`route(): circle "${s}" not found in sketch`);
+    const center = this.getPoint(circ.center);
+    if (!center) throw new Error(`route(): center point for circle "${s}" not found`);
+    return { center: [center.x, center.y] as [number, number], radius: circ.radius };
+  };
+  const resolved = steps.map(resolveCircleStep);
+
   // ─── Fast path: closed circle+fillet loops use analytical geometry ────
   // Detect: even-length, alternating circles and fillets
   const isClosedCircleFillet =
-    steps.length >= 4 &&
-    steps.length % 2 === 0 &&
-    steps.every((s, i) => (i % 2 === 0 ? isRouteCircle(s) : isRouteFillet(s)));
+    resolved.length >= 4 &&
+    resolved.length % 2 === 0 &&
+    resolved.every((s, i) => (i % 2 === 0 ? isRouteCircle(s) : isRouteFillet(s)));
 
   if (isClosedCircleFillet) {
     // Convert to PerimeterStep format and use routePerimeter
-    const perimeterSteps: PerimeterStep[] = steps.map((s, i) => {
+    const perimeterSteps: PerimeterStep[] = resolved.map((s, i) => {
       if (i % 2 === 0) {
         const c = s as RouteCircle;
         return { center: c.center, radius: c.radius };
       }
       const f = s as RouteFillet;
-      return { fillet: f.fillet };
+      return { fillet: f.fillet, approach: f.approach };
     });
     // Store the analytical result — solve() will return it
     this._routeSketch = routePerimeter(perimeterSteps);

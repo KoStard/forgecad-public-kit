@@ -2,7 +2,7 @@
  * arc-chain-demo.forge.js
  *
  * Demonstrates chaining arcs in constrainedSketch():
- *   two parallel lines connected on one end by a triple-arc cap
+*   two parallel lines connected on one end by a triple-arc cap
  *   (small corner arc → large center arc → small corner arc)
  *
  * This is the idiomatic way to do arc chains in ForgeCAD today,

@@ -70,6 +70,8 @@ export type {
   RouteUntil,
 } from './builder-route';
 
+export { routeStepFactories } from './builder-route';
+
 export { analyzeRigidity } from './rigidity';
 export type { RigidityResult } from './rigidity';
 

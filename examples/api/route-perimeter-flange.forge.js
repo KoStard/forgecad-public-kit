@@ -1,4 +1,4 @@
-// Flange coupling — demonstrates route() on constrainedSketch with construction circles and fillet arcs
+// Flange coupling — demonstrates route() with typed step factories and tangent approach
 
 const R_CORE = 45
 const R_CORE_IN = 27.5
@@ -6,22 +6,22 @@ const R_LUG = 18
 const LUG_DIST = 60
 const R_BOLT = 10
 
-const core  = { center: [0, 0],               radius: R_CORE }
-const lugTR = { center: polar(LUG_DIST, 60),   radius: R_LUG }
-const lugTL = { center: polar(LUG_DIST, 120),  radius: R_LUG }
-const lugBL = { center: polar(LUG_DIST, 240),  radius: R_LUG }
-const lugBR = { center: polar(LUG_DIST, 300),  radius: R_LUG }
+const core  = route.circle([0, 0], R_CORE)
+const lugTR = route.circle(polar(LUG_DIST, 60), R_LUG)
+const lugTL = route.circle(polar(LUG_DIST, 120), R_LUG)
+const lugBL = route.circle(polar(LUG_DIST, 240), R_LUG)
+const lugBR = route.circle(polar(LUG_DIST, 300), R_LUG)
 
 // Route the outer perimeter: circles connected by fillet arcs
-// The solver computes all tangent points automatically
+// Tangent approach adds a straight tangent line from each lug to the core body
 let body = constrainedSketch()
   .route([
-    lugTR,  { fillet: 17 },
-    lugTL,  { fillet: 5 },
-    core,   { fillet: 5 },
-    lugBL,  { fillet: 17 },
-    lugBR,  { fillet: 5 },
-    core,   { fillet: 5 },
+    lugTR,  route.fillet(17),
+    lugTL,  route.fillet(5, 'tangent'),
+    core,   route.fillet(5, 'tangent'),
+    lugBL,  route.fillet(17),
+    lugBR,  route.fillet(5, 'tangent'),
+    core,   route.fillet(5, 'tangent'),
   ])
   .solve()
 
