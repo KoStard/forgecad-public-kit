@@ -20,8 +20,6 @@ import type { ViewportPerformanceInfo } from './types';
 
 interface UseViewportHandlersInput {
   containerRef: RefObject<HTMLDivElement | null>;
-  hoverTooltipRef: RefObject<HTMLDivElement | null>;
-  hoverTooltipIdRef: RefObject<string | null>;
   contextMenuRef: RefObject<HTMLDivElement | null>;
   measureMode: boolean;
   isViewportInteracting: boolean;
@@ -33,6 +31,7 @@ interface UseViewportHandlersInput {
   focusObject: (id: string, opts?: { additive?: boolean }) => void;
   clearFocusedObject: () => void;
   setHoveredObjectId: (id: string | null) => void;
+  setHoverLabel: (label: { id: string; name: string; x: number; y: number } | null) => void;
   setObjectVisibility: (id: string, visible: boolean) => void;
   requestViewCommand: (cmd: any) => void;
   viewPersistenceResolved: boolean;
@@ -67,8 +66,6 @@ export interface ViewportHandlers {
   faceInfoLoading: boolean;
   sketchEntityInfo: SketchEntityInfoPanel | null;
   setSketchEntityInfo: (v: SketchEntityInfoPanel | null) => void;
-  hideHoverTooltip: (id?: string | null) => void;
-  showHoverTooltip: (label: { id: string; name: string; x: number; y: number }) => void;
   updateHoverLabel: (obj: SceneObject, event: ThreeEvent<PointerEvent>) => void;
   clearHoverLabel: (obj: SceneObject, event: ThreeEvent<PointerEvent>) => void;
   handleObjectClick: (obj: SceneObject, event: ThreeEvent<MouseEvent>) => void;
@@ -84,8 +81,6 @@ export interface ViewportHandlers {
 
 export function useViewportHandlers({
   containerRef,
-  hoverTooltipRef,
-  hoverTooltipIdRef,
   contextMenuRef,
   measureMode,
   isViewportInteracting,
@@ -97,6 +92,7 @@ export function useViewportHandlers({
   focusObject,
   clearFocusedObject,
   setHoveredObjectId,
+  setHoverLabel,
   setObjectVisibility,
   requestViewCommand,
   viewPersistenceResolved,
@@ -122,30 +118,23 @@ export function useViewportHandlers({
     setObjectContextMenu(null);
   }, []);
 
+  const hoverTooltipIdRef = useRef<string | null>(null);
+
   const hideHoverTooltip = useCallback(
     (id?: string | null) => {
       if (id !== undefined && hoverTooltipIdRef.current !== id) return;
       hoverTooltipIdRef.current = null;
-      const tooltip = hoverTooltipRef.current;
-      if (!tooltip) return;
-      tooltip.style.visibility = 'hidden';
-      tooltip.style.opacity = '0';
+      setHoverLabel(null);
     },
-    [hoverTooltipIdRef, hoverTooltipRef],
+    [setHoverLabel],
   );
 
   const showHoverTooltip = useCallback(
     (label: { id: string; name: string; x: number; y: number }) => {
       hoverTooltipIdRef.current = label.id;
-      const tooltip = hoverTooltipRef.current;
-      if (!tooltip) return;
-      if (tooltip.textContent !== label.name) tooltip.textContent = label.name;
-      tooltip.style.left = `${label.x}px`;
-      tooltip.style.top = `${label.y}px`;
-      tooltip.style.visibility = 'visible';
-      tooltip.style.opacity = '1';
+      setHoverLabel(label);
     },
-    [hoverTooltipIdRef, hoverTooltipRef],
+    [setHoverLabel],
   );
 
   const handleViewPersistenceResolved = useCallback(
@@ -463,8 +452,6 @@ export function useViewportHandlers({
     faceInfoLoading,
     sketchEntityInfo,
     setSketchEntityInfo,
-    hideHoverTooltip,
-    showHoverTooltip,
     updateHoverLabel,
     clearHoverLabel,
     handleObjectClick,

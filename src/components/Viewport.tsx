@@ -116,12 +116,11 @@ export function Viewport() {
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
   const [zoomMmPerPx, setZoomMmPerPx] = useState<number | null>(null);
+  const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const initialFitRequestedRef = useRef(false);
   const prevPreviewFileRef = useRef<string | null | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const hoverTooltipRef = useRef<HTMLDivElement | null>(null);
-  const hoverTooltipIdRef = useRef<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   const t = themes[themeName];
@@ -129,8 +128,6 @@ export function Viewport() {
 
   const handlers = useViewportHandlers({
     containerRef,
-    hoverTooltipRef,
-    hoverTooltipIdRef,
     contextMenuRef,
     measureMode,
     isViewportInteracting,
@@ -142,6 +139,7 @@ export function Viewport() {
     focusObject,
     clearFocusedObject,
     setHoveredObjectId,
+    setHoverLabel,
     setObjectVisibility,
     requestViewCommand,
     viewPersistenceResolved,
@@ -161,7 +159,6 @@ export function Viewport() {
     faceInfoLoading,
     sketchEntityInfo,
     setSketchEntityInfo,
-    hideHoverTooltip,
     updateHoverLabel,
     clearHoverLabel,
     handleObjectClick,
@@ -297,7 +294,7 @@ export function Viewport() {
                   if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
                   const rect = containerRef.current?.getBoundingClientRect();
                   if (!rect) return;
-                  handlers.showHoverTooltip({
+                  setHoverLabel({
                     id: `${obj.id}:${pointId}`,
                     name: pointId,
                     x: event.clientX - rect.left + 10,
@@ -478,13 +475,13 @@ export function Viewport() {
 
       {(isEvaluating || evaluationPhase === 'exporting') && <EvaluationIndicator phase={evaluationPhase} />}
 
-      {objectPickSyncEnabled && !measureMode && (
+      {objectPickSyncEnabled && !measureMode && hoverLabel && (
         <div
-          ref={hoverTooltipRef}
           style={{
             position: 'absolute',
-            left: 0,
-            top: 0,
+            left: hoverLabel.x,
+            top: hoverLabel.y,
+            zIndex: 15,
             background: '#111111d9',
             color: '#f2f2f2',
             padding: '3px 7px',
@@ -495,10 +492,10 @@ export function Viewport() {
             pointerEvents: 'none',
             whiteSpace: 'nowrap',
             transform: 'translate(0, -100%)',
-            visibility: 'hidden',
-            opacity: 0,
           }}
-        ></div>
+        >
+          {hoverLabel.name}
+        </div>
       )}
 
       {objectContextMenu && (
