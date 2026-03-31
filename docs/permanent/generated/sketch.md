@@ -479,7 +479,7 @@ Convert radians to degrees
 - `shape()` — Register a named shape (closed polygon) from an ordered list of line IDs. Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
 - `group()` — Create a rigid-body group with a local coordinate frame. Points/lines added to the group move together as a unit — the solver sees 3 DOF (x, y, θ) instead of 2N per point. ```ts const g = sk.group({ x: 50, y: 30 }); const p0 = g.point(0, 0);    // local origin → world (50, 30) const p1 = g.point(100, 0);  // local (100,0) → world (150, 30) const l = g.line(p0, p1); g.fixRotation(); // p0, p1 work in constraints like any other PointId: sk.coincident(p0, someExternalPoint); ```
 - `constrain()` — constrain(constraint: Omit<SketchConstraint, "id">): this
-- `solve()` — solve(options?: SolveOptions): ConstraintSketch
+- `solve()` — solve(options?: SolveOptions): ConstraintSketch | Sketch
 - `solveConstraintsOnly()` — Run the solver without building a full `ConstraintSketch`. Useful for lightweight constraint validation or progress monitoring. Returns the final maxError, the number of rejected constraints, and the solved `ConstraintDefinition` with updated point positions.
 - `rect()` — Add an axis-aligned rectangle concept. Returns a `ConstrainedRect` handle with named vertices, sides, and center.
 - `addPolygon()` — Add a general polygon concept (CCW winding enforced). Returns a `ConstrainedPolygon` handle.

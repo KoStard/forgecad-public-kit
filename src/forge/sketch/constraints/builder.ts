@@ -28,6 +28,7 @@ import type {
 } from './types';
 import { DEFAULT_TOLERANCE, getPendingBuilderMethods, solveConstraints } from './registry';
 import { ConstraintSketch, solveConstraintDefinition } from './sketch';
+import type { Sketch } from '../core';
 import { getSessionApi, type WasmSessionApi } from './solver-wasm';
 
 export interface ConstrainedSketchOptions {
@@ -471,7 +472,10 @@ export class ConstrainedSketchBuilder {
     }
   }
 
-  solve(options: SolveOptions = {}): ConstraintSketch {
+  solve(options: SolveOptions = {}): ConstraintSketch | Sketch {
+    // If route() computed an analytical result, return it directly
+    if ((this as any)._routeSketch) return (this as any)._routeSketch;
+
     // Release the session — the final solve uses the stateless path which
     // benefits from progressive + analysis + DOF metadata.
     this.destroySession();

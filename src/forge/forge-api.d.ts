@@ -1868,7 +1868,7 @@ declare class ConstrainedSketchBuilder {
 	 * Throws with the constraint name for clear debugging.
 	 */
 	private requireFinite;
-	solve(options?: SolveOptions): ConstraintSketch;
+	solve(options?: SolveOptions): ConstraintSketch | Sketch;
 	/**
 	 * Run the solver without building a full `ConstraintSketch`.
 	 * Useful for lightweight constraint validation or progress monitoring.

@@ -158,11 +158,16 @@ proto.arcTangentArc = function (this: any, arcA: any, arcB: any, aAtStart?: bool
     if (a.start === b.end) matches.push([true, false]);
     if (matches.length === 0) {
       // Fall back to closest pair by coordinate distance
+      const ptDist = (p1: any, p2: any) => {
+        const a1 = this.getPoint(p1), a2 = this.getPoint(p2);
+        if (!a1 || !a2) return Infinity;
+        return Math.hypot(a1.x - a2.x, a1.y - a2.y);
+      };
       const pts = [
-        { aS: true, bS: true, dist: this.pointDist(a.start, b.start) },
-        { aS: true, bS: false, dist: this.pointDist(a.start, b.end) },
-        { aS: false, bS: true, dist: this.pointDist(a.end, b.start) },
-        { aS: false, bS: false, dist: this.pointDist(a.end, b.end) },
+        { aS: true, bS: true, dist: ptDist(a.start, b.start) },
+        { aS: true, bS: false, dist: ptDist(a.start, b.end) },
+        { aS: false, bS: true, dist: ptDist(a.end, b.start) },
+        { aS: false, bS: false, dist: ptDist(a.end, b.end) },
       ];
       pts.sort((x: any, y: any) => x.dist - y.dist);
       aAtStart = pts[0].aS;

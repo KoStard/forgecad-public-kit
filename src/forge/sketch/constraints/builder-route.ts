@@ -7,6 +7,7 @@
  */
 import type { ArcId, CircleId, LineId, PointId } from './types';
 import { ConstrainedSketchBuilder } from './builder';
+import { routePerimeter, type PerimeterStep } from '../path';
 
 // ── Route step types ────────────────────────────────────────────────────────
 
@@ -136,33 +137,20 @@ declare module './builder' {
 const proto = ConstrainedSketchBuilder.prototype as any;
 
 /**
- * Estimate a reasonable initial position for a tangent point on a circle,
- * given the "from" direction (previous element's approximate position).
+ * Estimate a point on a circle in the direction of a target position.
+ * Used for initial tangent point placement before the solver refines.
  */
-function estimateTangentPoint(
-  cx: number,
-  cy: number,
-  r: number,
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
+function estimatePointOnCircle(
+  cx: number, cy: number, r: number,
+  towardX: number, towardY: number,
+  offsetRad = 0,
 ): [number, number] {
-  // Place the tangent point on the circle between the "from" and "to" directions
-  const midX = (fromX + toX) / 2;
-  const midY = (fromY + toY) / 2;
-  const dx = midX - cx;
-  const dy = midY - cy;
+  const dx = towardX - cx;
+  const dy = towardY - cy;
   const d = Math.hypot(dx, dy);
-  if (d < 1e-9) {
-    // Fall back: place on the side facing "from"
-    const fdx = fromX - cx;
-    const fdy = fromY - cy;
-    const fd = Math.hypot(fdx, fdy);
-    if (fd < 1e-9) return [cx + r, cy];
-    return [cx + (fdx / fd) * r, cy + (fdy / fd) * r];
-  }
-  return [cx + (dx / d) * r, cy + (dy / d) * r];
+  if (d < 1e-9) return [cx + r * Math.cos(offsetRad), cy + r * Math.sin(offsetRad)];
+  const angle = Math.atan2(dy, dx) + offsetRad;
+  return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
 }
 
 /**
@@ -194,7 +182,29 @@ function estimateFilletCenter(
 proto.route = function (this: any, steps: RouteStep[]): any {
   if (steps.length < 2) throw new Error('route(): need at least 2 steps');
 
-  // ─── Phase 1: Classify steps into "structural" and "connectors" ───────
+  // ─── Fast path: closed circle+fillet loops use analytical geometry ────
+  // Detect: even-length, alternating circles and fillets
+  const isClosedCircleFillet =
+    steps.length >= 4 &&
+    steps.length % 2 === 0 &&
+    steps.every((s, i) => (i % 2 === 0 ? isRouteCircle(s) : isRouteFillet(s)));
+
+  if (isClosedCircleFillet) {
+    // Convert to PerimeterStep format and use routePerimeter
+    const perimeterSteps: PerimeterStep[] = steps.map((s, i) => {
+      if (i % 2 === 0) {
+        const c = s as RouteCircle;
+        return { center: c.center, radius: c.radius };
+      }
+      const f = s as RouteFillet;
+      return { fillet: f.fillet };
+    });
+    // Store the analytical result — solve() will return it
+    this._routeSketch = routePerimeter(perimeterSteps);
+    return this;
+  }
+
+  // ─── General solver-based path for mixed step types ───────────────────
   // Structural: points, lines, line-until, circles/tangent circles
   // Connectors: fillets, tangent arcs (inserted between structural elements)
 
@@ -204,6 +214,16 @@ proto.route = function (this: any, steps: RouteStep[]): any {
   //    tangency constraints to neighboring elements
   // 3. Wire everything with coincident constraints at junctions
   // 4. Register the profile loop
+
+  // Pre-compute centroid of structural circle centers for exterior arc direction selection
+  let centroidX = 0, centroidY = 0, circleCount = 0;
+  for (const s of steps) {
+    const pos = isRouteCircle(s) ? s.center
+      : isRouteTangent(s) && typeof s.tangent === 'object' && 'center' in s.tangent ? s.tangent.center
+      : null;
+    if (pos) { centroidX += pos[0]; centroidY += pos[1]; circleCount++; }
+  }
+  if (circleCount > 0) { centroidX /= circleCount; centroidY /= circleCount; }
 
   const segments: Array<{
     kind: 'line' | 'arc';
@@ -219,6 +239,9 @@ proto.route = function (this: any, steps: RouteStep[]): any {
   let lastLineId: LineId | null = null;
   // Track the last arc created for arcTangentArc constraints
   let lastArcId: ArcId | null = null;
+  // Track first element for closing closed loops
+  let firstEntryPt: PointId | null = null;
+  let firstArcId: ArcId | null = null;
 
   const getCursorPos = (): [number, number] => {
     if (cursorPt) {
@@ -228,27 +251,43 @@ proto.route = function (this: any, steps: RouteStep[]): any {
     return [cursorX, cursorY];
   };
 
-  // Helper: look ahead to find the next structural element's approximate position
+  // Helper: find the approximate position of a structural element
+  const structuralPos = (s: RouteStep): [number, number] | null => {
+    if (isRoutePoint(s)) return s.point;
+    if (isRouteCircle(s)) return s.center;
+    if (isRouteTangent(s)) {
+      const t = s.tangent;
+      if (typeof t === 'object' && 'center' in t) return t.center;
+    }
+    if (isRouteUntil(s)) {
+      const ln = s.line;
+      if (typeof ln === 'object' && 'axis' in ln) {
+        return ln.axis === 'x' ? [ln.offset, s.until] : [s.until, ln.offset];
+      }
+    }
+    if (isRouteLine(s)) {
+      const [cx, cy] = getCursorPos();
+      return s.axis === 'x' ? [s.offset, cy] : [cx, s.offset];
+    }
+    return null;
+  };
+
+  // Look ahead to find the next structural element's approximate position (wraps for closed loops)
   const peekNextStructuralPos = (fromIndex: number): [number, number] | null => {
-    for (let j = fromIndex + 1; j < steps.length; j++) {
-      const s = steps[j];
-      if (isRoutePoint(s)) return s.point;
-      if (isRouteCircle(s)) return s.center;
-      if (isRouteTangent(s)) {
-        const t = s.tangent;
-        if (typeof t === 'object' && 'center' in t) return t.center;
-      }
-      if (isRouteUntil(s)) {
-        const ln = s.line;
-        if (typeof ln === 'object' && 'axis' in ln) {
-          return ln.axis === 'x' ? [ln.offset, s.until] : [s.until, ln.offset];
-        }
-      }
-      if (isRouteLine(s)) {
-        // Approximate: use the cursor Y/X for the missing coordinate
-        const [cx, cy] = getCursorPos();
-        return s.axis === 'x' ? [s.offset, cy] : [cx, s.offset];
-      }
+    for (let k = 1; k < steps.length; k++) {
+      const j = (fromIndex + k) % steps.length;
+      const pos = structuralPos(steps[j]);
+      if (pos) return pos;
+    }
+    return null;
+  };
+
+  // Look backward to find the previous structural element (wraps for closed loops)
+  const peekPrevStructuralPos = (fromIndex: number): [number, number] | null => {
+    for (let k = 1; k < steps.length; k++) {
+      const j = (fromIndex - k + steps.length) % steps.length;
+      const pos = structuralPos(steps[j]);
+      if (pos) return pos;
     }
     return null;
   };
@@ -372,7 +411,6 @@ proto.route = function (this: any, steps: RouteStep[]): any {
       cursorY = endY;
     } else if (isRouteTangent(step)) {
       // ─── Tangent to circle: create arc on circle with tangency ──────
-      if (!cursorPt) throw new Error('route(): tangent step requires a preceding element');
 
       let cx: number, cy: number, r: number;
       let circleId: CircleId;
@@ -395,14 +433,29 @@ proto.route = function (this: any, steps: RouteStep[]): any {
         circleId = this.circle(centerPt, r, true); // construction=true
       }
 
-      // Look ahead for exit direction
+      // Look ahead/behind for direction estimates (wrapping for closed loops)
       const nextPos = peekNextStructuralPos(i);
-      const [curX, curY] = getCursorPos();
-      const [toX, toY] = nextPos ?? [curX + 20, curY + 20];
+      const prevPos = cursorPt ? getCursorPos() : peekPrevStructuralPos(i);
+      const [prevX, prevY] = prevPos ?? [cx - 20, cy];
+      const [nextX, nextY] = nextPos ?? [cx + 20, cy + 20];
 
-      // Estimate entry and exit tangent points on the circle
-      const [entryX, entryY] = estimateTangentPoint(cx, cy, r, curX, curY, toX, toY);
-      const [exitX, exitY] = estimateTangentPoint(cx, cy, r, toX, toY, curX, curY);
+      // Check if prev and next are in the same direction (e.g., 2-circle case)
+      const prevAngle = Math.atan2(prevY - cy, prevX - cx);
+      const nextAngle = Math.atan2(nextY - cy, nextX - cx);
+      let adiff = nextAngle - prevAngle;
+      while (adiff > Math.PI) adiff -= 2 * Math.PI;
+      while (adiff < -Math.PI) adiff += 2 * Math.PI;
+
+      let entryX: number, entryY: number, exitX: number, exitY: number;
+      if (Math.abs(adiff) < 0.15) {
+        // Same direction — offset entry/exit by ±90° to spread them
+        [entryX, entryY] = estimatePointOnCircle(cx, cy, r, prevX, prevY, -Math.PI / 2);
+        [exitX, exitY] = estimatePointOnCircle(cx, cy, r, nextX, nextY, Math.PI / 2);
+      } else {
+        // Different directions — place toward prev/next
+        [entryX, entryY] = estimatePointOnCircle(cx, cy, r, prevX, prevY);
+        [exitX, exitY] = estimatePointOnCircle(cx, cy, r, nextX, nextY);
+      }
 
       // Create entry and exit points
       const entryPtId = this.point(entryX, entryY);
@@ -412,8 +465,11 @@ proto.route = function (this: any, steps: RouteStep[]): any {
       this.pointOnCircle(entryPtId, circleId);
       this.pointOnCircle(exitPtId, circleId);
 
-      // Connect cursor to entry point with a line (if not from a fillet/tangentArc)
-      if (lastArcId === null && cursorPt) {
+      // Connect cursor to entry point
+      if (!cursorPt) {
+        // First element in a closed loop — remember for closing
+        firstEntryPt = entryPtId;
+      } else if (lastArcId === null) {
         // Need a line from cursor to entry
         const connLineId = this.line(cursorPt, entryPtId);
         segments.push({ kind: 'line', id: connLineId, startPt: cursorPt, endPt: entryPtId });
@@ -422,19 +478,40 @@ proto.route = function (this: any, steps: RouteStep[]): any {
         this.tangent(connLineId, circleId);
 
         lastLineId = connLineId;
-      } else if (lastArcId !== null) {
+      } else {
         // Previous element was an arc — make entry coincident with cursor
         this.coincident(cursorPt, entryPtId);
       }
 
-      // Create the arc on the circle from entry to exit (CCW)
+      // Choose arc direction: for exterior perimeters, pick the arc whose midpoint
+      // is farther from the centroid (the "outside" arc).
+      const entryAngle = Math.atan2(entryY - cy, entryX - cx);
+      const exitAngle = Math.atan2(exitY - cy, exitX - cx);
+      let ccwSweep = exitAngle - entryAngle;
+      while (ccwSweep <= 0) ccwSweep += 2 * Math.PI;
+      while (ccwSweep > 2 * Math.PI) ccwSweep -= 2 * Math.PI;
+      const cwSweep = ccwSweep - 2 * Math.PI;
+      const ccwMid = entryAngle + ccwSweep / 2;
+      const cwMid = entryAngle + cwSweep / 2;
+      const ccwDist = Math.hypot(cx + r * Math.cos(ccwMid) - centroidX, cy + r * Math.sin(ccwMid) - centroidY);
+      const cwDist = Math.hypot(cx + r * Math.cos(cwMid) - centroidX, cy + r * Math.sin(cwMid) - centroidY);
+      const clockwise = cwDist > ccwDist;
+
+      // Create the arc on the circle from entry to exit
       const circ = this.circles.find((c: any) => c.id === circleId);
-      const arcId = this.arcByCenter(circ.center, entryPtId, exitPtId, false);
+      const arcId = this.arcByCenter(circ.center, entryPtId, exitPtId, clockwise);
       segments.push({ kind: 'arc', id: arcId, startPt: entryPtId, endPt: exitPtId });
 
-      // If previous element was a line, add tangency constraint
+      // Remember first arc for closing
+      if (firstArcId === null && firstEntryPt) {
+        firstArcId = arcId;
+      }
+
+      // Tangency with previous element
       if (lastLineId && lastArcId === null) {
         this.lineTangentArc(lastLineId, arcId, true); // tangent at arc start
+      } else if (lastArcId) {
+        this.arcTangentArc(lastArcId, arcId);
       }
 
       lastArcId = arcId;
@@ -465,8 +542,16 @@ proto.route = function (this: any, steps: RouteStep[]): any {
       const exitY = d2 > 1e-9 ? fcy + (dy2 / d2) * filletR : fcy;
       const filletEndPt = this.point(exitX, exitY);
 
+      // Choose direction: pick the shorter arc (fillets are small roundings)
+      const fStartAngle = Math.atan2(curY - fcy, curX - fcx);
+      const fExitAngle = Math.atan2(exitY - fcy, exitX - fcx);
+      let fCcwSweep = fExitAngle - fStartAngle;
+      while (fCcwSweep <= 0) fCcwSweep += 2 * Math.PI;
+      while (fCcwSweep > 2 * Math.PI) fCcwSweep -= 2 * Math.PI;
+      const filletCW = fCcwSweep > Math.PI; // CW if CCW sweep > 180° (shorter arc is CW)
+
       // Create the arc
-      const arcId = this.arcByCenter(filletCenterPt, filletStartPt, filletEndPt, true); // CW for inward fillet
+      const arcId = this.arcByCenter(filletCenterPt, filletStartPt, filletEndPt, filletCW);
 
       // Constrain fillet radius via distance from center to start point
       this.distance(filletCenterPt, filletStartPt, filletR);
@@ -505,8 +590,15 @@ proto.route = function (this: any, steps: RouteStep[]): any {
       const arcStartPt = cursorPt;
       const arcEndPt = this.point(exitX, exitY);
 
-      // Create arc (CCW for convex bump)
-      const arcId = this.arcByCenter(arcCenterPt, arcStartPt, arcEndPt, false);
+      // Choose direction: pick shorter arc
+      const taStartAngle = Math.atan2(curY - acy, curX - acx);
+      const taExitAngle = Math.atan2(exitY - acy, exitX - acx);
+      let taCcwSweep = taExitAngle - taStartAngle;
+      while (taCcwSweep <= 0) taCcwSweep += 2 * Math.PI;
+      while (taCcwSweep > 2 * Math.PI) taCcwSweep -= 2 * Math.PI;
+      const taCW = taCcwSweep > Math.PI;
+
+      const arcId = this.arcByCenter(arcCenterPt, arcStartPt, arcEndPt, taCW);
       this.distance(arcCenterPt, arcStartPt, arcR);
 
       // Tangency with previous element
@@ -533,21 +625,23 @@ proto.route = function (this: any, steps: RouteStep[]): any {
     }
   }
 
-  // ─── Phase 2: Close the path if first element matches last ────────────
-  // Check if the first step was a point and the route should close
+  // ─── Phase 2: Close the loop ──────────────────────────────────────────
   const firstStep = steps[0];
-  const lastStep = steps[steps.length - 1];
   if (isRoutePoint(firstStep) && segments.length > 0) {
+    // Point-started route: close with a line back to the first point
     const firstSeg = segments[0];
-    // If cursor is not already at the first point, close with a line
     if (cursorPt && cursorPt !== firstSeg.startPt) {
       const closingLine = this.line(cursorPt, firstSeg.startPt);
       segments.push({ kind: 'line', id: closingLine, startPt: cursorPt, endPt: firstSeg.startPt });
-
-      // If last element was an arc, add tangency
       if (lastArcId) {
-        this.lineTangentArc(closingLine, lastArcId, false); // tangent at arc end
+        this.lineTangentArc(closingLine, lastArcId, false);
       }
+    }
+  } else if (firstEntryPt && cursorPt && cursorPt !== firstEntryPt) {
+    // Closed circle+fillet loop: connect last element back to first entry
+    this.coincident(cursorPt, firstEntryPt);
+    if (lastArcId && firstArcId) {
+      this.arcTangentArc(lastArcId, firstArcId);
     }
   }
 

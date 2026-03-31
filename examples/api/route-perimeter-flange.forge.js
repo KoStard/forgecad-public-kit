@@ -1,4 +1,4 @@
-// Flange coupling — demonstrates routePerimeter with construction circles and fillet arcs
+// Flange coupling — demonstrates route() on constrainedSketch with construction circles and fillet arcs
 
 const R_CORE = 45
 const R_CORE_IN = 27.5
@@ -13,14 +13,17 @@ const lugBL = { center: polar(LUG_DIST, 240),  radius: R_LUG }
 const lugBR = { center: polar(LUG_DIST, 300),  radius: R_LUG }
 
 // Route the outer perimeter: circles connected by fillet arcs
-let body = routePerimeter([
-  lugTR,  { fillet: 17 },
-  lugTL,  { fillet: 5, approach: 'tangent' },
-  core,   { fillet: 5, approach: 'tangent' },
-  lugBL,  { fillet: 17 },
-  lugBR,  { fillet: 5, approach: 'tangent' },
-  core,   { fillet: 5, approach: 'tangent' },
-])
+// The solver computes all tangent points automatically
+let body = constrainedSketch()
+  .route([
+    lugTR,  { fillet: 17 },
+    lugTL,  { fillet: 5 },
+    core,   { fillet: 5 },
+    lugBL,  { fillet: 17 },
+    lugBR,  { fillet: 5 },
+    core,   { fillet: 5 },
+  ])
+  .solve()
 
 // Subtract center bore
 body = body.subtract(circle2d(R_CORE_IN))
