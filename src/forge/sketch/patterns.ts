@@ -27,19 +27,64 @@ export function linearPattern(shape: ShapeArg, count: number, dx: number, dy: nu
   return union(...copies);
 }
 
-/** Repeat a shape in a circular pattern around the Z axis and union the copies. */
-export function circularPattern(shape: ShapeArg, count: number, centerX = 0, centerY = 0): Shape {
+export interface CircularPatternOptions {
+  /** Center X of the rotation (default: 0). Used when axis is Z (legacy mode). */
+  centerX?: number;
+  /** Center Y of the rotation (default: 0). Used when axis is Z (legacy mode). */
+  centerY?: number;
+  /** Rotation axis direction (default: [0, 0, 1] = Z axis). */
+  axis?: [number, number, number];
+  /** Pivot point for the rotation (default: [0, 0, 0]). Overrides centerX/centerY when set. */
+  origin?: [number, number, number];
+}
+
+/**
+ * Repeat a shape in a circular pattern around an axis and union the copies.
+ *
+ * Simple usage (Z axis, matches legacy signature):
+ *   circularPattern(shape, 6)
+ *   circularPattern(shape, 6, 10, 20)           // centerX=10, centerY=20
+ *
+ * Advanced usage (arbitrary axis):
+ *   circularPattern(shape, 6, { axis: [1, 0, 0], origin: [0, 0, 50] })
+ */
+export function circularPattern(shape: ShapeArg, count: number, centerXOrOpts?: number | CircularPatternOptions, centerY?: number): Shape {
   const base = unwrap(shape);
   const step = 360 / count;
+
+  // Parse arguments: support both legacy (centerX, centerY) and options object
+  let axis: [number, number, number] | undefined;
+  let origin: [number, number, number] | undefined;
+  let cx = 0;
+  let cy = 0;
+
+  if (typeof centerXOrOpts === 'object' && centerXOrOpts !== null) {
+    axis = centerXOrOpts.axis;
+    origin = centerXOrOpts.origin;
+    cx = centerXOrOpts.centerX ?? 0;
+    cy = centerXOrOpts.centerY ?? 0;
+  } else {
+    cx = centerXOrOpts ?? 0;
+    cy = centerY ?? 0;
+  }
+
+  // If an explicit axis is given (not default Z), use rotateAround
+  const useArbitraryAxis = axis != null && !(axis[0] === 0 && axis[1] === 0 && axis[2] !== 0);
+  const pivot: [number, number, number] = origin ?? [cx, cy, 0];
+
   const copies: Shape[] = [];
   for (let i = 0; i < count; i++) {
-    const copy =
-      i === 0
-        ? base.clone()
-        : base
-            .translate(-centerX, -centerY, 0)
-            .rotate(0, 0, step * i)
-            .translate(centerX, centerY, 0);
+    let copy: Shape;
+    if (i === 0) {
+      copy = base.clone();
+    } else if (useArbitraryAxis) {
+      copy = base.rotateAround(axis!, step * i, pivot);
+    } else {
+      copy = base
+        .translate(-pivot[0], -pivot[1], -pivot[2])
+        .rotate(0, 0, step * i)
+        .translate(pivot[0], pivot[1], pivot[2]);
+    }
     copies.push(withPatternOwnership(copy, 'circular', i));
   }
   return union(...copies);

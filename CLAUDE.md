@@ -101,6 +101,37 @@ return newAlgorithm(input);
 
 This applies everywhere, not just meshing. Fallbacks create two code paths that both need maintenance, make failures invisible, and prevent root-cause analysis. If something can fail, validate inputs upstream or fix the algorithm.
 
+## Blueprint-First: No Trigonometry Tax
+
+**Code should read like a mechanical blueprint, not a math textbook.** See [docs/permanent/project/blueprint-first.md](docs/permanent/project/blueprint-first.md) for the full philosophy.
+
+Every new public API method must pass this design gate:
+
+> Can the user accomplish this without `Math.sin`, `Math.cos`, `Math.atan2`, manual degree-to-radian conversion, or computing intermediate Cartesian coordinates from polar/angular intent?
+
+If no, the API needs a higher-level alternative. Use `circularLayout()`, `polygonVertices()`, `translatePolar()`, polar coordinates, and patterns instead of forcing users into trig. The raw math path can exist for power users, but the common case must be trig-free.
+
+```ts
+// BAD — user pays the trig tax
+const x = radius * Math.cos(angle * Math.PI / 180);
+const y = radius * Math.sin(angle * Math.PI / 180);
+shape.translate(x, y, 0);
+
+// GOOD — intent-driven
+shape.translatePolar(radius, angle);
+
+// BAD — manual circular positioning loop
+for (let i = 0; i < 6; i++) {
+  const a = i * 60 * Math.PI / 180;
+  holes.push(hole.translate(r * Math.cos(a), r * Math.sin(a), 0));
+}
+
+// GOOD — declarative layout
+for (const {x, y} of circularLayout(6, r)) {
+  holes.push(hole.translate(x, y, 0));
+}
+```
+
 ## Approach
 If you hit a moment you don't know how to proceed, take the scientist hat of experiments, only reality can give us the data, so we should run experiments, analyse, capture, iterate. If unsure about the science, take the first principles book approach.
 
