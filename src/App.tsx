@@ -352,7 +352,7 @@ function FullApp() {
   // Sync project files via the active FileSystemProvider
   useEffect(() => {
     return fileSystem.subscribe((event) => {
-      if (event.type === 'init') applyServerSnapshot(event.files, event.folders);
+      if (event.type === 'init') applyServerSnapshot(event.files, event.folders, event.initialFile);
       else if (event.type === 'change') applyServerFileChange(event.filename, event.content);
       else if (event.type === 'delete') applyServerFileDelete(event.filename);
     });

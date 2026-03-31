@@ -1,5 +1,5 @@
 export type FileChangeEvent =
-  | { type: 'init'; files: Record<string, string>; folders?: string[] }
+  | { type: 'init'; files: Record<string, string>; folders?: string[]; initialFile?: string }
   | { type: 'change'; filename: string; content: string }
   | { type: 'delete'; filename: string };
 

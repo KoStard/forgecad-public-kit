@@ -18,7 +18,7 @@ export class LocalStudioProvider implements FileSystemProvider {
       const data = JSON.parse((e as MessageEvent).data);
       // Server may send { files, folders } or just a flat files record (legacy)
       if (data && typeof data === 'object' && 'files' in data) {
-        onChange({ type: 'init', files: data.files, folders: data.folders });
+        onChange({ type: 'init', files: data.files, folders: data.folders, initialFile: data.initialFile });
       } else {
         onChange({ type: 'init', files: data });
       }

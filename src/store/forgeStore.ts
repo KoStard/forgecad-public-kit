@@ -307,7 +307,7 @@ interface ForgeStore {
 
   updateSketchConstraint: (objectId: string, constraintId: string, value: number) => void;
 
-  applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[]) => void;
+  applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[], initialFile?: string) => void;
   applyServerFileChange: (filename: string, content: string) => void;
   applyServerFileDelete: (filename: string) => void;
 
@@ -1286,11 +1286,11 @@ export const useForgeStore = create<ForgeStore>((set, get) => ({
     set({ lastValidResult: { ...current, objects } });
   },
 
-  applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[]) => {
+  applyServerSnapshot: (serverFiles: Record<string, string>, serverFolders?: string[], initialFile?: string) => {
     const state = get();
     const prevFiles = state.files;
     const prevActiveFile = state.activeFile;
-    const nextState = computeServerSnapshot(state, serverFiles, serverFolders, sharedModel, sharedBundle);
+    const nextState = computeServerSnapshot(state, serverFiles, serverFolders, sharedModel, sharedBundle, initialFile);
     set(nextState as any);
     postApplyServerSnapshot(
       prevActiveFile,

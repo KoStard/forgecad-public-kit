@@ -44,6 +44,7 @@ export function computeServerSnapshot(
   serverFolders: string[] | undefined,
   sharedModel: SharedModel | null,
   sharedBundle: SharedBundle | null,
+  initialFile?: string,
 ): Partial<ServerSyncStoreSlice> & {
   meshPreviewFile: string | null;
   dirty: boolean;
@@ -107,9 +108,11 @@ export function computeServerSnapshot(
       ? sharedModel.filename
       : hashFile && !isMeshHash && nextFiles[hashFile] !== undefined
         ? hashFile
-        : activeFile && nextFiles[activeFile]
-          ? activeFile
-          : findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0];
+        : initialFile && nextFiles[initialFile] !== undefined
+          ? initialFile
+          : activeFile && nextFiles[activeFile]
+            ? activeFile
+            : findPreferredEntryFile(availableFiles) || availableFiles.find((n) => n.endsWith('.js')) || availableFiles[0];
 
   const nextDirty = Object.keys(nextFiles).some((p) => nextSaved[p] !== nextFiles[p]);
   const nextObjectSettingsByFile = Object.fromEntries(
