@@ -173,6 +173,41 @@ export function useViewportState() {
     [constructionGhost, objectMatrices],
   );
 
+  // Model bounds min Z — used to auto-position ground plane beneath the model
+  const modelBoundsMinZ = useMemo(() => {
+    const bounds = new THREE.Box3();
+    let hasBounds = false;
+    objects.forEach((obj) => {
+      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
+      if (obj.shape) {
+        try {
+          const bb = obj.shape.boundingBox();
+          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, matrix);
+          hasBounds = true;
+        } catch {
+          /* ignore partial execution failures */
+        }
+        return;
+      }
+      if (obj.sketch) {
+        try {
+          const bb = obj.sketch.bounds();
+          expandBoundsByTransformedAabb(bounds, [bb.min[0], bb.min[1], 0], [bb.max[0], bb.max[1], 0], matrix);
+          hasBounds = true;
+        } catch {
+          /* ignore partial execution failures */
+        }
+        return;
+      }
+      if (obj.toolpath) {
+        const tb = obj.toolpath.bounds;
+        expandBoundsByTransformedAabb(bounds, tb.min, tb.max, matrix);
+        hasBounds = true;
+      }
+    });
+    return hasBounds ? bounds.min.z : null;
+  }, [objects, objectMatrices]);
+
   // Joint animation RAF loop
   useJointAnimationLoop(activeJointAnimation);
 
@@ -422,6 +457,7 @@ export function useViewportState() {
     explodeConfig,
     jointsConfig,
     sceneConfig,
+    modelBoundsMinZ,
     focusedObjectIdSet,
     visibleSceneObjectCount,
     visibleModelTriangles,

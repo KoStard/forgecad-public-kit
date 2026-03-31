@@ -343,8 +343,8 @@ interface SceneGroundConfig {
   visible?: boolean;
   /** Ground color */
   color?: string;
-  /** Ground Y offset from origin */
-  height?: number;
+  /** Offset below the model's bounding box minimum Z. Default 0 (flush with model bottom). */
+  offset?: number;
   /** Receive shadows on the ground */
   receiveShadow?: boolean;
 }

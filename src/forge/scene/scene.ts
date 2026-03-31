@@ -95,8 +95,8 @@ export interface SceneGroundConfig {
   visible?: boolean;
   /** Ground color */
   color?: string;
-  /** Ground Z offset from origin */
-  height?: number;
+  /** Offset below the model's bounding box minimum Z. Default 0 (flush with model bottom). */
+  offset?: number;
   /** Receive shadows on the ground */
   receiveShadow?: boolean;
 }
@@ -283,7 +283,7 @@ function validateGround(ground: SceneGroundConfig, label: string): SceneGroundCo
     out.visible = ground.visible;
   }
   if (ground.color !== undefined) out.color = requireColor(ground.color, `${label}.color`);
-  if (ground.height !== undefined) out.height = requireFinite(ground.height, `${label}.height`);
+  if (ground.offset !== undefined) out.offset = requireFinite(ground.offset, `${label}.offset`);
   if (ground.receiveShadow !== undefined) {
     if (typeof ground.receiveShadow !== 'boolean') throw new Error(`${label}.receiveShadow must be a boolean`);
     out.receiveShadow = ground.receiveShadow;

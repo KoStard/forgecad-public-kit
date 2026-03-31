@@ -285,12 +285,15 @@ function SceneEnvironment({ config }: { config: SceneConfig }) {
 // Ground Plane
 // ---------------------------------------------------------------------------
 
-function SceneGround({ config }: { config: SceneConfig }) {
+function SceneGround({ config, modelBoundsMinZ }: { config: SceneConfig; modelBoundsMinZ: number | null }) {
   const ground = config.ground;
   if (!ground || ground.visible === false) return null;
 
+  const offset = ground.offset ?? 0;
+  const height = (modelBoundsMinZ ?? 0) - offset;
+
   return (
-    <mesh position={[0, 0, ground.height ?? 0]} receiveShadow={ground.receiveShadow ?? false}>
+    <mesh position={[0, 0, height]} receiveShadow={ground.receiveShadow ?? false}>
       <planeGeometry args={[10000, 10000]} />
       <meshStandardMaterial color={ground.color ?? '#1a1a1a'} roughness={1} metalness={0} />
     </mesh>
@@ -303,13 +306,15 @@ function SceneGround({ config }: { config: SceneConfig }) {
 
 interface SceneConfiguratorProps {
   config: SceneConfig;
+  /** Model bounding box min Z — used to auto-position ground beneath the model */
+  modelBoundsMinZ: number | null;
   /** When true, hide the default lights (because custom lights replace them) */
   onDefaultLightsOverridden: (overridden: boolean) => void;
   /** When true, hide the default environment */
   onDefaultEnvironmentOverridden: (overridden: boolean) => void;
 }
 
-export function SceneConfigurator({ config, onDefaultLightsOverridden, onDefaultEnvironmentOverridden }: SceneConfiguratorProps) {
+export function SceneConfigurator({ config, modelBoundsMinZ, onDefaultLightsOverridden, onDefaultEnvironmentOverridden }: SceneConfiguratorProps) {
   // Signal to parent whether defaults should be hidden
   useEffect(() => {
     onDefaultLightsOverridden(config.lights !== null);
@@ -326,7 +331,7 @@ export function SceneConfigurator({ config, onDefaultLightsOverridden, onDefault
       {config.lights && <SceneLights lights={config.lights} />}
       {config.fog && <SceneFog fog={config.fog} />}
       {config.environment && <SceneEnvironment config={config} />}
-      {config.ground && <SceneGround config={config} />}
+      {config.ground && <SceneGround config={config} modelBoundsMinZ={modelBoundsMinZ} />}
       <ScenePostProcessing config={config} />
     </>
   );

@@ -13,6 +13,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { MOUSE_BUTTONS_3D, TOUCH_GESTURES_3D } from '../capture/controlsConfig';
 import { SceneConfigurator } from '../components/SceneConfigurator';
+import { expandBoundsByTransformedAabb } from '../components/viewport/geometryUtils';
 import { LocalStudioEnvironment } from '../components/viewport/LocalStudioEnvironment';
 import { useForgeStore } from '../store/forgeStore';
 
@@ -79,6 +80,22 @@ export function MobileViewport({ jointMatrices }: MobileViewportProps) {
     return out;
   }, [objects, jointMatrices]);
 
+  const modelBoundsMinZ = useMemo(() => {
+    const bounds = new THREE.Box3();
+    let hasBounds = false;
+    objects.forEach((obj) => {
+      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
+      if (obj.shape) {
+        try {
+          const bb = obj.shape.boundingBox();
+          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, matrix);
+          hasBounds = true;
+        } catch { /* ignore */ }
+      }
+    });
+    return hasBounds ? bounds.min.z : null;
+  }, [objects, objectMatrices]);
+
   const themeBg = getComputedStyle(document.documentElement).getPropertyValue('--fc-viewportBg').trim() || '#1e1e1e';
 
   return (
@@ -106,6 +123,7 @@ export function MobileViewport({ jointMatrices }: MobileViewportProps) {
         {sceneConfig && (
           <SceneConfigurator
             config={sceneConfig}
+            modelBoundsMinZ={modelBoundsMinZ}
             onDefaultLightsOverridden={handleDefaultLightsOverridden}
             onDefaultEnvironmentOverridden={handleDefaultEnvironmentOverridden}
           />

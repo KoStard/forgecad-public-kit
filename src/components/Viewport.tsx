@@ -95,6 +95,7 @@ export function Viewport() {
     jointOverlayConfig,
     isSketchOnly,
     sceneConfig,
+    modelBoundsMinZ,
     focusedObjectIdSet,
     visibleSceneObjectCount,
     visibleModelTriangles,
@@ -209,6 +210,7 @@ export function Viewport() {
         {sceneConfig && (
           <SceneConfigurator
             config={sceneConfig}
+            modelBoundsMinZ={modelBoundsMinZ}
             onDefaultLightsOverridden={handleDefaultLightsOverridden}
             onDefaultEnvironmentOverridden={handleDefaultEnvironmentOverridden}
           />
