@@ -495,6 +495,17 @@ export class OCCTShapeBackend implements ShapeBackend {
     return this._shape.IsNull() || this._shape.NbChildren() === 0;
   }
 
+  numBodies(): number {
+    const oc = getOCCT();
+    let count = 0;
+    const expl = new oc.TopExp_Explorer_2(this._shape, oc.TopAbs_ShapeEnum.TopAbs_SOLID, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+    while (expl.More()) {
+      count++;
+      expl.Next();
+    }
+    return Math.max(1, count);
+  }
+
   numTri(): number {
     return this.getMesh().numTri;
   }

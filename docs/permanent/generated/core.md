@@ -414,6 +414,14 @@ interface PortDef {
 
 </details>
 
+#### `polar()`
+
+```ts
+polar(length: number, angleDeg: number, from?: [ number, number ]): [ number, number ]
+```
+
+Compute a point by moving a given distance at a given angle from a start point. Angle is in degrees, measured CCW from the +X axis (standard math convention). Returns `[x, y]`. ```js polar(10, 45)            // [7.07, 7.07] — from origin polar(10, 45, [5, 5])    // [12.07, 12.07] — from (5,5) ```
+
 #### `fillet()`
 
 ```ts
@@ -567,6 +575,14 @@ interface QuinticHermiteCurveEndpoint {
 
 </details>
 
+#### `routePerimeter()`
+
+```ts
+routePerimeter(steps: PerimeterStep[]): Sketch
+```
+
+Route a smooth closed perimeter around a sequence of construction circles, connected by tangent fillet arcs. Steps must alternate: circle, fillet, circle, fillet, ... The sequence wraps — the last fillet connects back to the first circle. ```js const outline = routePerimeter([ { center: [0, 0], radius: 45 }, { fillet: 5 }, { center: polar(60, 60), radius: 18 }, { fillet: 17 }, { center: polar(60, 120), radius: 18 }, { fillet: 5 }, ]) ```
+
 #### `linearPattern2d()`
 
 ```ts
@@ -582,6 +598,14 @@ circularPattern2d(sketch: Sketch, count: number, centerX?: number, centerY?: num
 ```
 
 Repeat a sketch in a circular pattern around a center point
+
+#### `arcSlot()`
+
+```ts
+arcSlot(pitchRadius: number, sweepDeg: number, thickness: number): Sketch
+```
+
+Create an arc-shaped slot (banana/annular sector) centered at the origin. The slot is symmetric about the +X axis. ```js arcSlot(135, 74, 40)  // pitch R135, 74° sweep, 40mm wide ```
 
 #### `surfacePatch()`
 
@@ -972,6 +996,7 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `volume()` — Volume in mm cubed.
 - `surfaceArea()` — Surface area in mm squared.
 - `isEmpty()` — True if the shape contains no geometry.
+- `numBodies()` — Number of disconnected solid bodies in this shape.
 - `numTri()` — Triangle count of the mesh representation.
 - `getMesh()` — Extract triangle mesh for Three.js rendering
 - `slice()` — Slice the runtime solid by a plane normal to local Z at the given offset.

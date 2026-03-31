@@ -9,11 +9,15 @@ function formatVec(values: number[]): string {
 function summarizeObject(object: SceneObject, unit: LengthUnit = 'mm'): string {
   if (object.shape) {
     const bbox = object.shape.boundingBox();
-    return `${object.name}: vol=${formatVolume(object.shape.volume(), unit, 1)} bbox=${formatVec(bbox.min)} -> ${formatVec(bbox.max)}`;
+    const bodies = object.shape.numBodies();
+    const bodiesSuffix = bodies > 1 ? ` bodies=${bodies}` : '';
+    return `${object.name}: vol=${formatVolume(object.shape.volume(), unit, 1)} bbox=${formatVec(bbox.min)} -> ${formatVec(bbox.max)}${bodiesSuffix}`;
   }
   if (object.sketch) {
     const bounds = object.sketch.bounds();
-    return `${object.name}: area=${formatArea(object.sketch.area(), unit, 1)} bounds=${formatVec(bounds.min)} -> ${formatVec(bounds.max)}`;
+    const regions = object.sketch.regions().length;
+    const regionsSuffix = regions > 1 ? ` regions=${regions}` : '';
+    return `${object.name}: area=${formatArea(object.sketch.area(), unit, 1)} bounds=${formatVec(bounds.min)} -> ${formatVec(bounds.max)}${regionsSuffix}`;
   }
   return object.name;
 }
@@ -23,7 +27,13 @@ function summarizeRunResult(result: RunResult): string[] {
     return ['(no renderable output)', `Time: ${result.timeMs.toFixed(0)}ms`];
   }
 
-  const lines = [`Objects: ${result.objects.length}`, ...result.objects.map((object) => `  ${summarizeObject(object)}`)];
+  let totalBodies = 0;
+  for (const obj of result.objects) {
+    if (obj.shape) totalBodies += obj.shape.numBodies();
+    else if (obj.sketch) totalBodies += obj.sketch.regions().length;
+  }
+  const bodiesTag = totalBodies !== result.objects.length ? ` (${totalBodies} ${totalBodies === 1 ? 'body' : 'bodies'})` : '';
+  const lines = [`Objects: ${result.objects.length}${bodiesTag}`, ...result.objects.map((object) => `  ${summarizeObject(object)}`)];
 
   if (result.params.length > 0) {
     lines.push(`Params: ${result.params.map((param) => param.name).join(', ')}`);

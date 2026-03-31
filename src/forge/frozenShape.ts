@@ -112,6 +112,10 @@ class FrozenShapeBackend implements ShapeBackend {
     return this._data.numTriangles;
   }
 
+  numBodies(): number {
+    return this.getReconstructedBackend().numBodies();
+  }
+
   // --- Delegated to lazy reconstructed backend ---
 
   clone(): ShapeBackend {

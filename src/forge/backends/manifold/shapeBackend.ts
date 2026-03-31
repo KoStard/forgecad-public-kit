@@ -93,6 +93,10 @@ export class ManifoldShapeBackend implements ManifoldCapableBackend {
     return this.manifold.isEmpty();
   }
 
+  numBodies(): number {
+    return this.manifold.decompose().length;
+  }
+
   numTri(): number {
     return this.manifold.numTri();
   }

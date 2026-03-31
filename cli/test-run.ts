@@ -203,7 +203,14 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
       process.exit(1);
     }
 
-    console.log(`✓ Objects: ${result.objects.length}`);
+    // Count total physical bodies across all scene objects
+    let totalBodies = 0;
+    for (const obj of result.objects) {
+      if (obj.shape) totalBodies += obj.shape.numBodies();
+      else if (obj.sketch) totalBodies += obj.sketch.regions().length;
+    }
+    const bodiesTag = totalBodies !== result.objects.length ? ` (${totalBodies} ${totalBodies === 1 ? 'body' : 'bodies'})` : '';
+    console.log(`✓ Objects: ${result.objects.length}${bodiesTag}`);
     for (const obj of result.objects) {
       const grpTag = obj.groupName ? ` [${obj.groupName}]` : '';
       const geomTag = obj.geometryInfo
@@ -211,12 +218,16 @@ export async function runScriptCli(argv: string[] = process.argv.slice(2)): Prom
         : '';
       if (obj.shape) {
         const bb = obj.shape.boundingBox();
+        const bodies = obj.shape.numBodies();
+        const bodiesSuffix = bodies > 1 ? `  bodies=${bodies}` : '';
         console.log(
-          `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${geomTag}`,
+          `  ${obj.name}${grpTag}: vol=${obj.shape.volume().toFixed(1)}mm³  bbox=[${bb.min.map((v: number) => v.toFixed(1))}] → [${bb.max.map((v: number) => v.toFixed(1))}]${bodiesSuffix}${geomTag}`,
         );
       }
       if (obj.sketch) {
-        console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²`);
+        const regions = obj.sketch.regions().length;
+        const regionsSuffix = regions > 1 ? `  regions=${regions}` : '';
+        console.log(`  ${obj.name}${grpTag}: area=${obj.sketch.area().toFixed(1)}mm²${regionsSuffix}`);
       }
       const meta = obj.sketchMeta;
       if (meta) {

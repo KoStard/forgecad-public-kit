@@ -1209,6 +1209,11 @@ export class Shape {
     return getShapeRuntimeBackendInternal(this).isEmpty();
   }
 
+  /** Number of disconnected solid bodies in this shape. */
+  numBodies(): number {
+    return getShapeRuntimeBackendInternal(this).numBodies();
+  }
+
   /** Triangle count of the mesh representation. */
   numTri(): number {
     return getShapeRuntimeBackendInternal(this).numTri();

@@ -1499,6 +1499,8 @@ interface ShapeBackend {
 	volume(): number;
 	surfaceArea(): number;
 	isEmpty(): boolean;
+	/** Number of disconnected solid bodies in this shape. */
+	numBodies(): number;
 	numTri(): number;
 	getMesh(): ShapeRuntimeMesh;
 	slice(offset: number): ShapeRuntimeCrossSection;
@@ -1715,6 +1717,55 @@ interface ConstrainedSketchBuilder {
 		points: Map<string, PointId>;
 		lines: Map<string, LineId>;
 	};
+}
+interface RouteLine {
+	/** 'x' for vertical line at x=offset, 'y' for horizontal line at y=offset */
+	axis: "x" | "y";
+	offset: number;
+}
+interface RouteCircle {
+	center: [
+		number,
+		number
+	];
+	radius: number;
+}
+interface RouteTangent {
+	tangent: RouteCircle | CircleId;
+}
+interface RouteFillet {
+	fillet: number;
+}
+interface RouteTangentArc {
+	tangentArc: number;
+}
+interface RoutePoint {
+	point: [
+		number,
+		number
+	];
+}
+interface RouteUntil {
+	line: RouteLine | LineId;
+	until: number;
+}
+type RouteStep = RouteLine | RouteCircle | RouteTangent | RouteFillet | RouteTangentArc | RoutePoint | RouteUntil;
+interface ConstrainedSketchBuilder {
+	/**
+	 * Route a profile through a sequence of geometric elements.
+	 * The solver computes all tangent points and intersections automatically.
+	 *
+	 * Steps can include:
+	 * - `{ point: [x, y] }` — route through a point
+	 * - `{ axis: 'x'|'y', offset: n }` — follow a construction line
+	 * - `{ line: {...}, until: n }` — follow a line clipped to a coordinate
+	 * - `{ tangent: { center, radius } }` — tangent arc onto a construction circle
+	 * - `{ fillet: radius }` — fillet between adjacent elements
+	 * - `{ tangentArc: radius }` — free tangent arc (solver finds center)
+	 *
+	 * Returns `this` for chaining. Call `.solve()` after to get the Sketch.
+	 */
+	route(steps: RouteStep[]): this;
 }
 interface ConstrainedSketchOptions {
 	/** When true, adding a constraint that cannot be satisfied throws instead of silently discarding it. */
@@ -2007,6 +2058,23 @@ declare function rectangle(x: number, y: number, width: number, height: number):
 declare function degrees(deg: number): number;
 /** Convert radians to degrees */
 declare function radians(rad: number): number;
+/**
+ * Compute a point by moving a given distance at a given angle from a start point.
+ * Angle is in degrees, measured CCW from the +X axis (standard math convention).
+ * Returns `[x, y]`.
+ *
+ * ```js
+ * polar(10, 45)            // [7.07, 7.07] — from origin
+ * polar(10, 45, [5, 5])    // [12.07, 12.07] — from (5,5)
+ * ```
+ */
+declare function polar(length: number, angleDeg: number, from?: [
+	number,
+	number
+]): [
+	number,
+	number
+];
 type LineArg = LineId | Line2D;
 type PointArg = PointId | Point2D;
 declare const Constraint: {
@@ -2812,6 +2880,8 @@ declare class Shape {
 	surfaceArea(): number;
 	/** True if the shape contains no geometry. */
 	isEmpty(): boolean;
+	/** Number of disconnected solid bodies in this shape. */
+	numBodies(): number;
 	/** Triangle count of the mesh representation. */
 	numTri(): number;
 	/** Extract triangle mesh for Three.js rendering */
@@ -5610,6 +5680,31 @@ declare class PathBuilder {
 	 */
 	tangentArcTo(x: number, y: number): this;
 	/**
+	 * Arc around a known center point, sweeping by the given angle.
+	 * Radius is derived from the distance between the current position and the center.
+	 * Positive sweep = CCW (math convention), negative = CW.
+	 *
+	 * ```js
+	 * // Arc 90° CCW around (50, 50)
+	 * path().moveTo(70, 50).arcAround(50, 50, 90)
+	 * // Arc 45° CW around the origin
+	 * path().moveTo(10, 0).arcAround(0, 0, -45)
+	 * ```
+	 */
+	arcAround(cx: number, cy: number, sweepDeg: number): this;
+	/**
+	 * Arc around a center point given as an offset from the current position.
+	 * `(dx, dy)` is the vector from the current point to the center.
+	 * Positive sweep = CCW (math convention), negative = CW.
+	 *
+	 * ```js
+	 * // Arc 90° CCW around a center 20 units to the right
+	 * path().moveTo(50, 50).arcAroundRelative(20, 0, 90)
+	 * // Equivalent to: path().moveTo(50, 50).arcAround(70, 50, 90)
+	 * ```
+	 */
+	arcAroundRelative(dx: number, dy: number, sweepDeg: number): this;
+	/**
 	 * Smooth three-arc end cap from the current position to (endX, endY).
 	 * Inserts: small corner arc → large cap arc → small corner arc, all G1-continuous.
 	 */
@@ -5705,6 +5800,36 @@ declare class PathBuilder {
 }
 /** Create a path builder for constructing 2D outlines. */
 declare function path(): PathBuilder;
+interface PerimeterCircle {
+	center: [
+		number,
+		number
+	];
+	radius: number;
+}
+interface PerimeterFillet {
+	fillet: number;
+}
+type PerimeterStep = PerimeterCircle | PerimeterFillet;
+/**
+ * Route a smooth closed perimeter around a sequence of construction circles,
+ * connected by tangent fillet arcs.
+ *
+ * Steps must alternate: circle, fillet, circle, fillet, ...
+ * The sequence wraps — the last fillet connects back to the first circle.
+ *
+ * ```js
+ * const outline = routePerimeter([
+ *   { center: [0, 0], radius: 45 },
+ *   { fillet: 5 },
+ *   { center: polar(60, 60), radius: 18 },
+ *   { fillet: 17 },
+ *   { center: polar(60, 120), radius: 18 },
+ *   { fillet: 5 },
+ * ])
+ * ```
+ */
+declare function routePerimeter(steps: PerimeterStep[]): Sketch;
 /** Create a stroked polyline sketch from an array of 2D points. */
 declare function stroke(points: [
 	number,
@@ -5742,6 +5867,19 @@ declare function ngon(sides: number, radius: number): Sketch;
 declare function ellipse(rx: number, ry: number, segments?: number): Sketch;
 /** Create a slot (stadium/discorectangle) — a rectangle with semicircular ends, centered at origin. */
 declare function slot(length: number, width: number): Sketch;
+/**
+ * Create an arc-shaped slot (banana/annular sector) centered at the origin.
+ * The slot is symmetric about the +X axis.
+ *
+ * @param pitchRadius — distance from center to the middle of the slot
+ * @param sweepDeg — angular extent in degrees
+ * @param thickness — width of the slot (radial direction)
+ *
+ * ```js
+ * arcSlot(135, 74, 40)  // pitch R135, 74° sweep, 40mm wide
+ * ```
+ */
+declare function arcSlot(pitchRadius: number, sweepDeg: number, thickness: number): Sketch;
 /** Create a star shape with alternating outer and inner radii. */
 declare function star(points: number, outerR: number, innerR: number): Sketch;
 type Vec3$5 = [

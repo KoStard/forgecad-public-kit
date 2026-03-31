@@ -60,6 +60,8 @@ export interface ShapeBackend {
   volume(): number;
   surfaceArea(): number;
   isEmpty(): boolean;
+  /** Number of disconnected solid bodies in this shape. */
+  numBodies(): number;
   numTri(): number;
   getMesh(): ShapeRuntimeMesh;
   slice(offset: number): ShapeRuntimeCrossSection;
