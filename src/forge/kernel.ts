@@ -848,6 +848,17 @@ export class Shape {
 
   // --- Transforms (all return new Shape, immutable) ---
 
+  /**
+   * Translate using polar coordinates (radius + angle in degrees).
+   * Eliminates manual `r * Math.cos(angle * PI/180)` calculations.
+   *
+   * Example: `shape.translatePolar(50, 30)` moves 50mm at 30 degrees from +X.
+   */
+  translatePolar(radius: number, angleDeg: number, z = 0): Shape {
+    const rad = angleDeg * (Math.PI / 180);
+    return this.translate(radius * Math.cos(rad), radius * Math.sin(rad), z);
+  }
+
   /** Move the shape relative to its current position. All transforms are immutable and return new shapes. */
   translate(x: number, y: number, z: number): Shape {
     const nextPlan = appendShapeCompileTransform(getShapeCompilePlanInternal(this), { kind: 'translate', x, y, z });

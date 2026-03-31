@@ -28,6 +28,7 @@ export * from './extrude';
 export * from './fillets';
 export { loadFont } from './fontText';
 export * from './hermiteCurve';
+export * from './layout';
 export * from './highlights';
 export * from './operations';
 export * from './path';

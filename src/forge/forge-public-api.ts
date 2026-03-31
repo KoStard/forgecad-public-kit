@@ -86,6 +86,10 @@ export type {
   SketchDxfOptions,
   SketchSvgOptions,
   SvgImportOptions,
+  CircularLayoutOptions,
+  CircularPatternOptions,
+  LayoutPoint,
+  PolygonVerticesOptions,
 } from './sketch';
 export {
   addPolygon,
@@ -99,6 +103,7 @@ export {
   chamferEdge,
   circle,
   circle2d,
+  circularLayout,
   circularPattern,
   circularPattern2d,
   connectEdges,
@@ -130,6 +135,7 @@ export {
   point,
   polar,
   polygon,
+  polygonVertices,
   QuinticHermiteCurve3D,
   Rectangle2D,
   radians,

@@ -2772,6 +2772,13 @@ declare class Shape {
 		number,
 		number
 	]): Shape;
+	/**
+	 * Translate using polar coordinates (radius + angle in degrees).
+	 * Eliminates manual `r * Math.cos(angle * PI/180)` calculations.
+	 *
+	 * Example: `shape.translatePolar(50, 30)` moves 50mm at 30 degrees from +X.
+	 */
+	translatePolar(radius: number, angleDeg: number, z?: number): Shape;
 	/** Move the shape relative to its current position. All transforms are immutable and return new shapes. */
 	translate(x: number, y: number, z: number): Shape;
 	/** Position the shape so its bounding box min corner is at the given global coordinate. */
@@ -5653,6 +5660,68 @@ declare class QuinticHermiteCurve3D {
  * @returns QuinticHermiteCurve3D instance
  */
 declare function hermiteTransitionG2(a: QuinticHermiteCurveEndpoint, b: QuinticHermiteCurveEndpoint): QuinticHermiteCurve3D;
+/**
+ * Layout helpers — eliminate manual trigonometry for common positioning patterns.
+ *
+ * These functions return arrays of {x, y} positions that can be used with
+ * translate(), circularPattern seed placement, or any other positioning API.
+ */
+interface LayoutPoint {
+	x: number;
+	y: number;
+}
+interface CircularLayoutOptions {
+	/** Angle of the first element in degrees (default: 0 = +X axis). */
+	startDeg?: number;
+	/** Center X coordinate (default: 0). */
+	centerX?: number;
+	/** Center Y coordinate (default: 0). */
+	centerY?: number;
+}
+/**
+ * Compute evenly-spaced positions around a circle.
+ *
+ * Eliminates the most common trig pattern in CAD scripts:
+ * ```js
+ * // Before — manual trig
+ * for (let i = 0; i < 12; i++) {
+ *   const angle = i * 30 * Math.PI / 180;
+ *   markers.push(marker.translate(r * Math.cos(angle), r * Math.sin(angle), 0));
+ * }
+ *
+ * // After — declarative
+ * for (const {x, y} of circularLayout(12, r)) {
+ *   markers.push(marker.translate(x, y, 0));
+ * }
+ * ```
+ */
+declare function circularLayout(count: number, radius: number, options?: CircularLayoutOptions): LayoutPoint[];
+interface PolygonVerticesOptions {
+	/** Angle of the first vertex in degrees (default: 90 = top). */
+	startDeg?: number;
+	/** Center X coordinate (default: 0). */
+	centerX?: number;
+	/** Center Y coordinate (default: 0). */
+	centerY?: number;
+}
+/**
+ * Compute the vertex positions of a regular polygon.
+ *
+ * Default orientation places the first vertex at the top (90 degrees),
+ * matching the convention used by `ngon()`.
+ *
+ * Eliminates manual Math.sqrt(3) for triangles, pentagon vertex math, etc:
+ * ```js
+ * // Before — manual equilateral triangle
+ * const v1 = [center.x - r/2, center.y + r * Math.sqrt(3)/2];
+ * const v2 = [center.x - r/2, center.y - r * Math.sqrt(3)/2];
+ * const v3 = [center.x + r, center.y];
+ *
+ * // After — declarative
+ * const [v1, v2, v3] = polygonVertices(3, r);
+ * ```
+ */
+declare function polygonVertices(sides: number, radius: number, options?: PolygonVerticesOptions): LayoutPoint[];
 declare class PathBuilder {
 	private segs;
 	private x;
@@ -5844,8 +5913,35 @@ declare function stroke(points: [
 type ShapeArg$3 = Shape | TrackedShape;
 /** Repeat a shape in a linear pattern along a direction vector and union the copies. */
 declare function linearPattern(shape: ShapeArg$3, count: number, dx: number, dy: number, dz?: number): Shape;
-/** Repeat a shape in a circular pattern around the Z axis and union the copies. */
-declare function circularPattern(shape: ShapeArg$3, count: number, centerX?: number, centerY?: number): Shape;
+interface CircularPatternOptions {
+	/** Center X of the rotation (default: 0). Used when axis is Z (legacy mode). */
+	centerX?: number;
+	/** Center Y of the rotation (default: 0). Used when axis is Z (legacy mode). */
+	centerY?: number;
+	/** Rotation axis direction (default: [0, 0, 1] = Z axis). */
+	axis?: [
+		number,
+		number,
+		number
+	];
+	/** Pivot point for the rotation (default: [0, 0, 0]). Overrides centerX/centerY when set. */
+	origin?: [
+		number,
+		number,
+		number
+	];
+}
+/**
+ * Repeat a shape in a circular pattern around an axis and union the copies.
+ *
+ * Simple usage (Z axis, matches legacy signature):
+ *   circularPattern(shape, 6)
+ *   circularPattern(shape, 6, 10, 20)           // centerX=10, centerY=20
+ *
+ * Advanced usage (arbitrary axis):
+ *   circularPattern(shape, 6, { axis: [1, 0, 0], origin: [0, 0, 50] })
+ */
+declare function circularPattern(shape: ShapeArg$3, count: number, centerXOrOpts?: number | CircularPatternOptions, centerY?: number): Shape;
 /** Repeat a sketch in a linear pattern */
 declare function linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch;
 /** Repeat a sketch in a circular pattern around a center point */

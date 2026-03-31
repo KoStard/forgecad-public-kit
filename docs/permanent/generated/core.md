@@ -250,10 +250,23 @@ Repeat a shape in a linear pattern along a direction vector and union the copies
 #### `circularPattern()`
 
 ```ts
-circularPattern(shape: ShapeArg$3, count: number, centerX?: number, centerY?: number): Shape
+circularPattern(shape: ShapeArg$3, count: number, centerXOrOpts?: number | CircularPatternOptions, centerY?: number): Shape
 ```
 
-Repeat a shape in a circular pattern around the Z axis and union the copies.
+Repeat a shape in a circular pattern around an axis and union the copies. Simple usage (Z axis, matches legacy signature): circularPattern(shape, 6) circularPattern(shape, 6, 10, 20)           // centerX=10, centerY=20 Advanced usage (arbitrary axis): circularPattern(shape, 6, { axis: [1, 0, 0], origin: [0, 0, 50] })
+
+<details><summary><code>CircularPatternOptions</code></summary>
+
+```ts
+interface CircularPatternOptions {
+  /** Center X of the rotation (default: 0). Used when axis is Z (legacy mode). */
+  centerX?: number;
+  /** Center Y of the rotation (default: 0). Used when axis is Z (legacy mode). */
+  centerY?: number;
+}
+```
+
+</details>
 
 #### `mirrorCopy()`
 
@@ -570,6 +583,63 @@ interface QuinticHermiteCurveEndpoint {
   curvature?: Vec3$4;
   /** Weight: scales tangent magnitude relative to chord length. Default 1.0. */
   weight?: number;
+}
+```
+
+</details>
+
+#### `circularLayout()`
+
+```ts
+circularLayout(count: number, radius: number, options?: CircularLayoutOptions): LayoutPoint[]
+```
+
+Compute evenly-spaced positions around a circle. Eliminates the most common trig pattern in CAD scripts: ```js // Before — manual trig for (let i = 0; i < 12; i++) { const angle = i * 30 * Math.PI / 180; markers.push(marker.translate(r * Math.cos(angle), r * Math.sin(angle), 0)); } // After — declarative for (const {x, y} of circularLayout(12, r)) { markers.push(marker.translate(x, y, 0)); } ```
+
+<details><summary><code>CircularLayoutOptions</code></summary>
+
+```ts
+interface CircularLayoutOptions {
+  /** Angle of the first element in degrees (default: 0 = +X axis). */
+  startDeg?: number;
+  /** Center X coordinate (default: 0). */
+  centerX?: number;
+  /** Center Y coordinate (default: 0). */
+  centerY?: number;
+}
+```
+
+</details>
+
+<details><summary><code>LayoutPoint</code></summary>
+
+```ts
+interface LayoutPoint {
+  x: number;
+  y: number;
+}
+```
+
+</details>
+
+#### `polygonVertices()`
+
+```ts
+polygonVertices(sides: number, radius: number, options?: PolygonVerticesOptions): LayoutPoint[]
+```
+
+Compute the vertex positions of a regular polygon. Default orientation places the first vertex at the top (90 degrees), matching the convention used by `ngon()`. Eliminates manual Math.sqrt(3) for triangles, pentagon vertex math, etc: ```js // Before — manual equilateral triangle const v1 = [center.x - r/2, center.y + r * Math.sqrt(3)/2]; const v2 = [center.x - r/2, center.y - r * Math.sqrt(3)/2]; const v3 = [center.x + r, center.y]; // After — declarative const [v1, v2, v3] = polygonVertices(3, r); ```
+
+<details><summary><code>PolygonVerticesOptions</code></summary>
+
+```ts
+interface PolygonVerticesOptions {
+  /** Angle of the first vertex in degrees (default: 90 = top). */
+  startDeg?: number;
+  /** Center X coordinate (default: 0). */
+  centerX?: number;
+  /** Center Y coordinate (default: 0). */
+  centerY?: number;
 }
 ```
 
@@ -975,6 +1045,7 @@ Core 3D solid shape. All operations are immutable and return new shapes. Support
 - `faceNames()` — List defended semantic face names currently available on this shape.
 - `faceHistory()` — Get the transformation history for a specific face.
 - `placeReference()` — Translate the shape so the given reference lands on the target coordinate.
+- `translatePolar()` — Translate using polar coordinates (radius + angle in degrees). Eliminates manual `r * Math.cos(angle * PI/180)` calculations. Example: `shape.translatePolar(50, 30)` moves 50mm at 30 degrees from +X.
 - `translate()` — Move the shape relative to its current position. All transforms are immutable and return new shapes.
 - `moveTo()` — Position the shape so its bounding box min corner is at the given global coordinate.
 - `moveToLocal()` — Position the shape relative to another shape's local coordinate system (bounding box min corner).
