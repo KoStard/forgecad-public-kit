@@ -131,6 +131,11 @@ function parseCli(argv) {
       i += 1;
       continue;
     }
+    if (arg === '--output') {
+      outputBase = readValue(argv, i, arg);
+      i += 1;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown option: ${arg}`);
     }

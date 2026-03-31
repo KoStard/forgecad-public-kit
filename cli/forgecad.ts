@@ -33,6 +33,7 @@ import { runMeshExportCli } from './forge-mesh';
 import { runNotebookCli } from './forge-notebook';
 import { runRenderCli } from './forge-render.mjs';
 import { runRenderHqCli } from './forge-render-hq';
+import { runRender2dCli } from './forge-render-2d';
 import { runCuttingLayoutCli } from './forge-cutting-layout';
 import { runReportCli } from './forge-report';
 import { runSdfCli } from './forge-sdf';
@@ -149,6 +150,7 @@ const RENDER_OPTIONS: CompletionOptionDefinition[] = [
     valueLabel: '<path>',
     valueKind: 'path',
   },
+  { name: '--output', description: 'Output file path', argument: 'required', valueLabel: '<path>', valueKind: 'png' },
 ];
 
 const CAPTURE_COMMON_OPTIONS: CompletionOptionDefinition[] = [
@@ -484,6 +486,28 @@ const commands: CommandDefinition[] = [
       ],
     },
     run: (args) => runRenderHqCli(args),
+  },
+  {
+    group: 'Modeling',
+    path: ['render', 'sketch'],
+    summary: 'Render a 2D sketch .forge.js to PNG.',
+    usage: ['forgecad render sketch <script.forge.js> [output.png] [--size <px>] [--background <color>] [--chrome-path <path>]'],
+    examples: [
+      'forgecad render sketch examples/01-fully-constrained-rect.forge.js',
+      'forgecad render sketch examples/constraints/circle.forge.js out/circle.png --size 800',
+    ],
+    completion: {
+      options: [
+        { name: '--size', description: 'Output image size in pixels (square)', argument: 'required', valueLabel: '<px>' },
+        { name: '--background', description: 'Background color (CSS color)', argument: 'required', valueLabel: '<color>' },
+        { name: '--chrome-path', description: 'Chrome executable path', argument: 'required', valueLabel: '<path>' },
+      ],
+      positionals: [
+        { description: 'Sketch script', valueKind: 'sketch-script' },
+        { description: 'output PNG path', valueKind: 'png' },
+      ],
+    },
+    run: runRender2dCli,
   },
   {
     group: 'Modeling',
