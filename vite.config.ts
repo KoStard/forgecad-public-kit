@@ -28,6 +28,12 @@ function resolveProjectDir(): string | null {
 }
 
 const projectDir = resolveProjectDir();
+const initialFile = process.env.FORGE_FILE ?? null;
+
+function scanProject(): { files: Record<string, string>; folders: string[] } {
+  if (initialFile && projectDir) return scanSingleFile(projectDir, initialFile);
+  return scanProjectFiles(projectDir);
+}
 const PROJECT_FILE_EXTS = ['.forge.js', '.js', '.svg', '.forge-notebook.json'];
 const isProjectFile = (name: string): boolean => PROJECT_FILE_EXTS.some((ext) => name.endsWith(ext));
 const MESH_FILE_EXTS = ['.stl', '.obj', '.3mf'];
@@ -40,6 +46,16 @@ function ensureNotebookKernel(): Promise<void> {
     notebookKernelReady = init();
   }
   return notebookKernelReady;
+}
+
+// When a single file was passed on the CLI, return just that one file without scanning the directory.
+function scanSingleFile(dir: string, filename: string): { files: Record<string, string>; folders: string[] } {
+  try {
+    const content = fs.readFileSync(path.join(dir, filename), 'utf-8');
+    return { files: { [filename]: content }, folders: [] };
+  } catch {
+    return { files: {}, folders: [] };
+  }
 }
 
 // Helper to scan project directory for forge/sketch files
@@ -174,7 +190,7 @@ async function executeNotebookRequest(body: any, createIfMissing = false) {
 
   const notebookText = serializeNotebook(notebook);
   const allFiles = {
-    ...scanProjectFiles(projectDir).files,
+    ...scanProject().files,
     [filename]: notebookText,
   };
   const quality = resolveForgeQualityPreset(typeof body.quality === 'string' ? body.quality : undefined);
@@ -274,7 +290,7 @@ function forgeProjectPlugin(enableInitialScan = true) {
       // Never bake project files into the production build — the production
       // server always delivers the real project via the SSE /api/watch init event.
       if (!enableInitialScan || !projectDir) return 'export default null;';
-      const { files: entries } = scanProjectFiles(projectDir);
+      const { files: entries } = scanProject();
       return `export default ${JSON.stringify(entries)};`;
     },
     handleHotUpdate({ file, server }: any) {
@@ -297,7 +313,8 @@ function forgeProjectPlugin(enableInitialScan = true) {
 
       if (projectDir) {
         const abs = path.resolve(projectDir);
-        const watcher = chokidar.watch(abs, {
+        const watchTarget = initialFile ? path.join(abs, initialFile) : abs;
+        const watcher = chokidar.watch(watchTarget, {
           ignoreInitial: true,
           ignored: /(^|[/\\])\../,
         });
@@ -343,8 +360,9 @@ function forgeProjectPlugin(enableInitialScan = true) {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
           res.flushHeaders();
-          const scan = scanProjectFiles(projectDir);
-          res.write(`event: init\ndata: ${JSON.stringify(scan)}\n\n`);
+          const scan = scanProject();
+          const initPayload = initialFile ? { ...scan, initialFile } : scan;
+          res.write(`event: init\ndata: ${JSON.stringify(initPayload)}\n\n`);
           if (projectDir) {
             sseClients.add(res);
             req.on('close', () => sseClients.delete(res));

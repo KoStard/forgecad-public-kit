@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { type ChildProcess } from 'child_process';
-import { resolve } from 'path';
+import { resolve, dirname, basename } from 'path';
+import { statSync } from 'fs';
 import { packageRootFrom, resolvePackagePath, spawnPackageVite } from './package-runtime';
 
 interface DevOptions {
@@ -11,6 +12,7 @@ interface DevOptions {
   port?: number;
   host?: string;
   projectPath?: string;
+  initialFile?: string;
 }
 
 function usage(): never {
@@ -81,7 +83,21 @@ function parseDevArgs(argv: string[]): DevOptions {
     }
     if (arg.startsWith('-')) throw new Error(`Unknown option: ${arg}`);
     if (options.projectPath) throw new Error('Only one project path can be provided.');
-    options.projectPath = resolve(arg);
+    const resolved = resolve(arg);
+    // If the path points to a file, use its directory as the project root and
+    // record the filename so the UI can open it immediately on startup.
+    let isFile = false;
+    try {
+      isFile = statSync(resolved).isFile();
+    } catch {
+      // path doesn't exist yet – treat as directory
+    }
+    if (isFile) {
+      options.projectPath = dirname(resolved);
+      options.initialFile = basename(resolved);
+    } else {
+      options.projectPath = resolved;
+    }
   }
 
   if (options.blank && options.projectPath) {
@@ -117,6 +133,7 @@ export async function runDevCli(argv: string[] = process.argv.slice(2)): Promise
     env: {
       ...process.env,
       ...(projectDir ? { FORGE_PROJECT: projectDir } : {}),
+      ...(options.initialFile ? { FORGE_FILE: options.initialFile } : {}),
     },
   });
 
