@@ -8,15 +8,23 @@
  * Arbitrary boolean results lose topology (mesh kernel limitation).
  */
 
+import type { FaceDescendantMetadata } from '../face-tracking/descendantResolution';
+import { explainNoFaceQueryMatch } from '../face-tracking/faceDiagnostics';
+import type { FaceQuery, FaceSelector } from '../face-tracking/faceQuery';
+import { normalizeFaceSelector } from '../face-tracking/faceQuery';
+import { queryMeshFace, queryMeshFaces } from '../face-tracking/meshFaceDetect';
 import {
-  Shape,
-  resolveAnchor3D,
-  setShapePlacementReferences,
-  type ShapeOperandInput,
   type GeometryInfo,
+  getShapePrimaryQueryOwner,
   type PlacementReferenceInput,
+  resolveAnchor3D,
+  Shape,
+  type ShapeOperandInput,
+  setShapePlacementReferences,
 } from '../kernel';
-import { Transform, normalizeAxis, type Mat4, type RotateAroundToOptions } from '../transform';
+import type { PortInput } from '../port';
+import { cloneEdgeQueryRef, cloneFaceQueryRef, cloneShapeQueryOwner, type EdgeQueryRef, type FaceQueryRef } from '../queryModel';
+import { type Mat4, normalizeAxis, type RotateAroundToOptions, Transform } from '../transform';
 import { Point2D, Rectangle2D, type RectSide } from './entities';
 
 export type FaceName = string;
@@ -28,12 +36,16 @@ export interface FaceRef {
   normal: [number, number, number];
   /** Center point of the face */
   center: [number, number, number];
+  /** Compiler-owned face query when available. */
+  query?: FaceQueryRef;
   /** True when the face can host a 2D sketch placement frame */
   planar?: boolean;
   /** Face-local horizontal axis for planar faces */
   uAxis?: [number, number, number];
   /** Face-local vertical axis for planar faces */
   vAxis?: [number, number, number];
+  /** Shared descendant-resolution metadata when this face is a semantic region/set. */
+  descendant?: FaceDescendantMetadata;
 }
 
 export interface EdgeRef {
@@ -42,11 +54,26 @@ export interface EdgeRef {
   start: [number, number, number];
   /** End point */
   end: [number, number, number];
+  /** Compiler-owned edge query when available. */
+  query?: EdgeQueryRef;
 }
 
 export interface Topology {
   faces: Map<FaceName, FaceRef>;
   edges: Map<EdgeName, EdgeRef>;
+}
+
+function createTrackedEdgeRef(name: EdgeName, start: [number, number, number], end: [number, number, number]): EdgeRef {
+  return {
+    name,
+    start,
+    end,
+    query: {
+      kind: 'tracked-edge',
+      edgeName: name,
+      selector: 'edge',
+    },
+  };
 }
 
 /**
@@ -63,14 +90,48 @@ export class TrackedShape {
     setShapePlacementReferences(this.shape, topologyToPlacementReferences(this.topology), { merge: true });
   }
 
-  /** Get a named face */
-  face(name: FaceName): FaceRef {
-    const f = this.topology.faces.get(name);
-    if (!f) {
-      const available = [...this.topology.faces.keys()].join(', ');
-      throw new Error(`Face "${name}" not found. Available: ${available}`);
+  /** Get a named face or a face matching a query */
+  face(selector: FaceSelector): FaceRef {
+    const { compilePlanName, query } = normalizeFaceSelector(selector);
+
+    // 1. Topology map lookup (string names only)
+    if (compilePlanName) {
+      const f = this.topology.faces.get(compilePlanName);
+      if (f) {
+        const owner = getShapePrimaryQueryOwner(this.shape);
+        return {
+          ...f,
+          normal: [f.normal[0], f.normal[1], f.normal[2]],
+          center: [f.center[0], f.center[1], f.center[2]],
+          query: cloneFaceQueryRef({
+            kind: 'tracked-face',
+            faceName: compilePlanName,
+            owner: cloneShapeQueryOwner(owner ?? f.query?.owner),
+          }),
+          uAxis: f.uAxis ? [f.uAxis[0], f.uAxis[1], f.uAxis[2]] : undefined,
+          vAxis: f.vAxis ? [f.vAxis[0], f.vAxis[1], f.vAxis[2]] : undefined,
+        };
+      }
     }
-    return f;
+
+    // 2. Fall through to mesh query (works for FaceQuery objects and canonical names not in topology)
+    if (query) {
+      const detected = queryMeshFace(this.toShape(), query);
+      if (detected) return detected;
+    }
+
+    // 3. Error
+    if (compilePlanName) {
+      const available = [...this.topology.faces.keys()].join(', ');
+      throw new Error(`Face "${compilePlanName}" not found. Available: ${available}`);
+    }
+    const allFaces = queryMeshFaces(this.toShape(), {});
+    throw new Error(explainNoFaceQueryMatch(query!, allFaces));
+  }
+
+  /** Return all faces matching a query, or all mesh-detected faces when no query is given. */
+  faces(query?: FaceQuery): FaceRef[] {
+    return queryMeshFaces(this.toShape(), query ?? {});
   }
 
   /** Get a named edge */
@@ -80,7 +141,18 @@ export class TrackedShape {
       const available = [...this.topology.edges.keys()].join(', ');
       throw new Error(`Edge "${name}" not found. Available: ${available}`);
     }
-    return e;
+    const owner = getShapePrimaryQueryOwner(this.shape);
+    return {
+      ...e,
+      start: [e.start[0], e.start[1], e.start[2]],
+      end: [e.end[0], e.end[1], e.end[2]],
+      query: cloneEdgeQueryRef({
+        kind: 'tracked-edge',
+        edgeName: name,
+        selector: 'edge',
+        owner: cloneShapeQueryOwner(owner ?? e.query?.owner),
+      }),
+    };
   }
 
   /** List all face names */
@@ -95,12 +167,7 @@ export class TrackedShape {
 
   /** Return a new TrackedShape wrapper with copied topology metadata. */
   clone(): TrackedShape {
-    return new TrackedShape(
-      this.shape.clone(),
-      cloneTopology(this.topology),
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.clone(), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
   }
 
   /** Alias for clone() */
@@ -120,12 +187,17 @@ export class TrackedShape {
 
   /** Attach named placement references that survive normal transforms and imports. */
   withReferences(refs: PlacementReferenceInput): TrackedShape {
-    return new TrackedShape(
-      this.shape.withReferences(refs),
-      cloneTopology(this.topology),
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.withReferences(refs), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
+  }
+
+  /** Attach named assembly ports (origin + axis + up) that survive transforms and imports. */
+  withPorts(ports: Record<string, PortInput>): TrackedShape {
+    return new TrackedShape(this.shape.withPorts(ports), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
+  }
+
+  /** List named port identifiers carried by this shape. */
+  portNames(): string[] {
+    return this.shape.portNames();
   }
 
   /** List named placement references carried by this tracked shape. */
@@ -139,17 +211,8 @@ export class TrackedShape {
   }
 
   /** Translate the tracked shape so the given reference lands on the target coordinate. */
-  placeReference(
-    ref: string,
-    target: [number, number, number],
-    offset?: [number, number, number],
-  ): TrackedShape {
-    return new TrackedShape(
-      this.shape.placeReference(ref, target, offset),
-      cloneTopology(this.topology),
-      this.baseHeight,
-      this.extrudeUp,
-    );
+  placeReference(ref: string, target: [number, number, number], offset?: [number, number, number]): TrackedShape {
+    return new TrackedShape(this.shape.placeReference(ref, target, offset), cloneTopology(this.topology), this.baseHeight, this.extrudeUp);
   }
 
   // Delegate Shape methods, preserving topology with offset transforms
@@ -184,15 +247,25 @@ export class TrackedShape {
     const dy = edge.end[1] - oy;
     const dz = edge.end[2] - oz;
     const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-    const ax = dx / len, ay = dy / len, az = dz / len;
+    const ax = dx / len,
+      ay = dy / len,
+      az = dz / len;
 
     // Rodrigues' rotation: build 4x3 affine matrix for rotation around arbitrary axis through origin
-    const rad = angleDeg * Math.PI / 180;
-    const c = Math.cos(rad), s = Math.sin(rad), t = 1 - c;
+    const rad = (angleDeg * Math.PI) / 180;
+    const c = Math.cos(rad),
+      s = Math.sin(rad),
+      t = 1 - c;
     // Rotation matrix R
-    const r00 = t * ax * ax + c,      r01 = t * ax * ay - s * az, r02 = t * ax * az + s * ay;
-    const r10 = t * ax * ay + s * az,  r11 = t * ay * ay + c,     r12 = t * ay * az - s * ax;
-    const r20 = t * ax * az - s * ay,  r21 = t * ay * az + s * ax, r22 = t * az * az + c;
+    const r00 = t * ax * ax + c,
+      r01 = t * ax * ay - s * az,
+      r02 = t * ax * az + s * ay;
+    const r10 = t * ax * ay + s * az,
+      r11 = t * ay * ay + c,
+      r12 = t * ay * az - s * ax;
+    const r20 = t * ax * az - s * ay,
+      r21 = t * ay * az + s * ax,
+      r22 = t * az * az + c;
 
     // Full transform: translate(-origin) → rotate → translate(+origin)
     // Combined into a single 4x3 matrix [R | R*(-o) + o]
@@ -201,12 +274,24 @@ export class TrackedShape {
     const tz = -r20 * ox - r21 * oy - r22 * oz + oz;
 
     // Manifold transform() takes 4x4 column-major
-    const m: [number,number,number,number,number,number,number,number,number,number,number,number,number,number,number,number] = [
-      r00, r10, r20, 0,
-      r01, r11, r21, 0,
-      r02, r12, r22, 0,
-      tx,  ty,  tz,  1,
-    ];
+    const m: [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ] = [r00, r10, r20, 0, r01, r11, r21, 0, r02, r12, r22, 0, tx, ty, tz, 1];
     const final = this.shape.transform(m);
 
     // Topology is invalidated after rotation
@@ -215,40 +300,21 @@ export class TrackedShape {
 
   /** Rotate using Euler angles (degrees), topology is cleared */
   rotate(x: number, y: number, z: number): TrackedShape {
-    return new TrackedShape(
-      this.shape.rotate(x, y, z),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.rotate(x, y, z), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Apply a 4x4 transform matrix or Transform object. Topology is cleared. */
   transform(m: Mat4 | Transform): TrackedShape {
-    return new TrackedShape(
-      this.shape.transform(m),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.transform(m), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Reorient so primary axis (Z) points along direction. Topology is cleared. */
   pointAlong(direction: [number, number, number]): TrackedShape {
-    return new TrackedShape(
-      this.shape.pointAlong(direction),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.pointAlong(direction), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Rotate around an arbitrary axis through a pivot point. Topology is cleared. */
-  rotateAround(
-    axis: [number, number, number],
-    angleDeg: number,
-    pivot: [number, number, number] = [0, 0, 0],
-  ): TrackedShape {
+  rotateAround(axis: [number, number, number], angleDeg: number, pivot: [number, number, number] = [0, 0, 0]): TrackedShape {
     return new TrackedShape(
       this.shape.rotateAround(axis, angleDeg, pivot),
       { faces: new Map(), edges: new Map() },
@@ -275,27 +341,22 @@ export class TrackedShape {
 
   /** Scale the shape. Topology is cleared for non-uniform scale. */
   scale(v: number | [number, number, number]): TrackedShape {
-    return new TrackedShape(
-      this.shape.scale(v),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.scale(v), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Mirror across a plane. Topology is cleared. */
   mirror(normal: [number, number, number]): TrackedShape {
-    return new TrackedShape(
-      this.shape.mirror(normal),
-      { faces: new Map(), edges: new Map() },
-      this.baseHeight,
-      this.extrudeUp,
-    );
+    return new TrackedShape(this.shape.mirror(normal), { faces: new Map(), edges: new Map() }, this.baseHeight, this.extrudeUp);
   }
 
   /** Set the display color. Returns a new TrackedShape. */
   color(value: string | undefined): TrackedShape {
     return new TrackedShape(this.shape.color(value), this.topology, this.baseHeight, this.extrudeUp);
+  }
+
+  /** Set material properties (metalness, roughness, emissive, etc.). Returns a new TrackedShape. */
+  material(props: import('../kernel').ShapeMaterialProps): TrackedShape {
+    return new TrackedShape(this.shape.material(props), this.topology, this.baseHeight, this.extrudeUp);
   }
 
   /** Access the underlying Shape for boolean ops etc */
@@ -318,12 +379,18 @@ export class TrackedShape {
       const bb = (target as any)._bbox();
       tp = resolveAnchor3D(bb.min, bb.max, targetAnchor as any);
     } else {
-      const targetShape = target instanceof TrackedShape ? target : target as Shape;
+      const targetShape = target instanceof TrackedShape ? target : (target as Shape);
       tp = targetShape.referencePoint(targetAnchor);
     }
     const sp = this.referencePoint(selfAnchor);
-    let dx = tp[0] - sp[0], dy = tp[1] - sp[1], dz = tp[2] - sp[2];
-    if (offset) { dx += offset[0]; dy += offset[1]; dz += offset[2]; }
+    let dx = tp[0] - sp[0],
+      dy = tp[1] - sp[1],
+      dz = tp[2] - sp[2];
+    if (offset) {
+      dx += offset[0];
+      dy += offset[1];
+      dz += offset[2];
+    }
     return this.translate(dx, dy, dz);
   }
 
@@ -336,13 +403,18 @@ export class TrackedShape {
     face: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom',
     opts: { u?: number; v?: number; protrude?: number } = {},
   ): TrackedShape {
-    const u = opts.u ?? 0, v = opts.v ?? 0, p = opts.protrude ?? 0;
+    const u = opts.u ?? 0,
+      v = opts.v ?? 0,
+      p = opts.protrude ?? 0;
     type F = typeof face;
     const opp: Record<F, F> = { front: 'back', back: 'front', left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
     const uvMap: Record<F, (u: number, v: number, p: number) => [number, number, number]> = {
-      front: (u, v, p) => [u, -p, v], back: (u, v, p) => [u, p, v],
-      left: (u, v, p) => [-p, u, v], right: (u, v, p) => [p, u, v],
-      top: (u, v, p) => [u, v, p], bottom: (u, v, p) => [u, v, -p],
+      front: (u, v, p) => [u, -p, v],
+      back: (u, v, p) => [u, p, v],
+      left: (u, v, p) => [-p, u, v],
+      right: (u, v, p) => [p, u, v],
+      top: (u, v, p) => [u, v, p],
+      bottom: (u, v, p) => [u, v, -p],
     };
     return this.attachTo(parent, face, opp[face], uvMap[face](u, v, p));
   }
@@ -362,6 +434,21 @@ export class TrackedShape {
     return this.shape.intersect(...others);
   }
 
+  /** Split by infinite plane. Returns [positive-side, negative-side] as plain Shapes. */
+  splitByPlane(normal: [number, number, number], originOffset = 0): [Shape, Shape] {
+    return this.shape.splitByPlane(normal, originOffset);
+  }
+
+  /** Keep the positive side of the plane and discard the opposite side. Returns plain Shape. */
+  trimByPlane(normal: [number, number, number], originOffset = 0): Shape {
+    return this.shape.trimByPlane(normal, originOffset);
+  }
+
+  /** Shelling returns a plain Shape because tracked topology is not preserved. */
+  shell(thickness: number, opts: { openFaces?: Array<'top' | 'bottom'> } = {}): Shape {
+    return this.shape.shell(thickness, opts);
+  }
+
   boundingBox() {
     return this.shape.boundingBox();
   }
@@ -377,6 +464,7 @@ function offsetTopology(topo: Topology, dx: number, dy: number, dz: number): Top
     faces.set(name, {
       ...face,
       center: [face.center[0] + dx, face.center[1] + dy, face.center[2] + dz],
+      query: cloneFaceQueryRef(face.query),
       uAxis: face.uAxis ? [face.uAxis[0], face.uAxis[1], face.uAxis[2]] : undefined,
       vAxis: face.vAxis ? [face.vAxis[0], face.vAxis[1], face.vAxis[2]] : undefined,
     });
@@ -387,6 +475,7 @@ function offsetTopology(topo: Topology, dx: number, dy: number, dz: number): Top
       ...edge,
       start: [edge.start[0] + dx, edge.start[1] + dy, edge.start[2] + dz],
       end: [edge.end[0] + dx, edge.end[1] + dy, edge.end[2] + dz],
+      query: cloneEdgeQueryRef(edge.query),
     });
   }
   return { faces, edges };
@@ -399,6 +488,7 @@ function cloneTopology(topo: Topology): Topology {
       ...face,
       normal: [face.normal[0], face.normal[1], face.normal[2]],
       center: [face.center[0], face.center[1], face.center[2]],
+      query: cloneFaceQueryRef(face.query),
       uAxis: face.uAxis ? [face.uAxis[0], face.uAxis[1], face.uAxis[2]] : undefined,
       vAxis: face.vAxis ? [face.vAxis[0], face.vAxis[1], face.vAxis[2]] : undefined,
     });
@@ -409,6 +499,7 @@ function cloneTopology(topo: Topology): Topology {
       ...edge,
       start: [edge.start[0], edge.start[1], edge.start[2]],
       end: [edge.end[0], edge.end[1], edge.end[2]],
+      query: cloneEdgeQueryRef(edge.query),
     });
   }
   return { faces, edges };
@@ -422,6 +513,7 @@ export function transformTopology(topo: Topology, m: Mat4 | Transform): Topology
       ...face,
       normal: normalizeAxis(tx.vector(face.normal)),
       center: tx.point(face.center),
+      query: cloneFaceQueryRef(face.query),
       uAxis: face.uAxis ? normalizeAxis(tx.vector(face.uAxis)) : undefined,
       vAxis: face.vAxis ? normalizeAxis(tx.vector(face.vAxis)) : undefined,
     });
@@ -433,6 +525,7 @@ export function transformTopology(topo: Topology, m: Mat4 | Transform): Topology
       ...edge,
       start: tx.point(edge.start),
       end: tx.point(edge.end),
+      query: cloneEdgeQueryRef(edge.query),
     });
   }
 
@@ -465,12 +558,7 @@ function topologyToPlacementReferences(topo: Topology): PlacementReferenceInput 
  * Edges: bottom-front, bottom-back, bottom-left, bottom-right, top-front, top-back, top-left, top-right,
  *        vertical-front-left, vertical-front-right, vertical-back-left, vertical-back-right
  */
-export function buildRectExtrusionTopology(
-  rect: Rectangle2D,
-  height: number,
-  up = true,
-  zBase = 0,
-): Topology {
+export function buildRectExtrusionTopology(rect: Rectangle2D, height: number, up = true, zBase = 0): Topology {
   const faces = new Map<FaceName, FaceRef>();
   const edges = new Map<EdgeName, EdgeRef>();
 
@@ -530,22 +618,22 @@ export function buildRectExtrusionTopology(
   }
 
   // Bottom edges (at z=zBot)
-  edges.set('bottom-bottom', { name: 'bottom-bottom', start: [bl.x, bl.y, zBot], end: [br.x, br.y, zBot] });
-  edges.set('bottom-right', { name: 'bottom-right', start: [br.x, br.y, zBot], end: [tr.x, tr.y, zBot] });
-  edges.set('bottom-top', { name: 'bottom-top', start: [tr.x, tr.y, zBot], end: [tl.x, tl.y, zBot] });
-  edges.set('bottom-left', { name: 'bottom-left', start: [tl.x, tl.y, zBot], end: [bl.x, bl.y, zBot] });
+  edges.set('bottom-bottom', createTrackedEdgeRef('bottom-bottom', [bl.x, bl.y, zBot], [br.x, br.y, zBot]));
+  edges.set('bottom-right', createTrackedEdgeRef('bottom-right', [br.x, br.y, zBot], [tr.x, tr.y, zBot]));
+  edges.set('bottom-top', createTrackedEdgeRef('bottom-top', [tr.x, tr.y, zBot], [tl.x, tl.y, zBot]));
+  edges.set('bottom-left', createTrackedEdgeRef('bottom-left', [tl.x, tl.y, zBot], [bl.x, bl.y, zBot]));
 
   // Top edges (at z=zTop)
-  edges.set('top-bottom', { name: 'top-bottom', start: [bl.x, bl.y, zTop], end: [br.x, br.y, zTop] });
-  edges.set('top-right', { name: 'top-right', start: [br.x, br.y, zTop], end: [tr.x, tr.y, zTop] });
-  edges.set('top-top', { name: 'top-top', start: [tr.x, tr.y, zTop], end: [tl.x, tl.y, zTop] });
-  edges.set('top-left', { name: 'top-left', start: [tl.x, tl.y, zTop], end: [bl.x, bl.y, zTop] });
+  edges.set('top-bottom', createTrackedEdgeRef('top-bottom', [bl.x, bl.y, zTop], [br.x, br.y, zTop]));
+  edges.set('top-right', createTrackedEdgeRef('top-right', [br.x, br.y, zTop], [tr.x, tr.y, zTop]));
+  edges.set('top-top', createTrackedEdgeRef('top-top', [tr.x, tr.y, zTop], [tl.x, tl.y, zTop]));
+  edges.set('top-left', createTrackedEdgeRef('top-left', [tl.x, tl.y, zTop], [bl.x, bl.y, zTop]));
 
   // Vertical edges
-  edges.set('vert-bl', { name: 'vert-bl', start: [bl.x, bl.y, zBot], end: [bl.x, bl.y, zTop] });
-  edges.set('vert-br', { name: 'vert-br', start: [br.x, br.y, zBot], end: [br.x, br.y, zTop] });
-  edges.set('vert-tr', { name: 'vert-tr', start: [tr.x, tr.y, zBot], end: [tr.x, tr.y, zTop] });
-  edges.set('vert-tl', { name: 'vert-tl', start: [tl.x, tl.y, zBot], end: [tl.x, tl.y, zTop] });
+  edges.set('vert-bl', createTrackedEdgeRef('vert-bl', [bl.x, bl.y, zBot], [bl.x, bl.y, zTop]));
+  edges.set('vert-br', createTrackedEdgeRef('vert-br', [br.x, br.y, zBot], [br.x, br.y, zTop]));
+  edges.set('vert-tr', createTrackedEdgeRef('vert-tr', [tr.x, tr.y, zBot], [tr.x, tr.y, zTop]));
+  edges.set('vert-tl', createTrackedEdgeRef('vert-tl', [tl.x, tl.y, zBot], [tl.x, tl.y, zTop]));
 
   return { faces, edges };
 }
@@ -558,7 +646,8 @@ export function buildCircleExtrusionTopology(
 ): Topology {
   const faces = new Map<FaceName, FaceRef>();
   const edges = new Map<EdgeName, EdgeRef>();
-  const cx = circ.center.x, cy = circ.center.y;
+  const cx = circ.center.x,
+    cy = circ.center.y;
   const z0 = center ? -height / 2 : 0;
   const z1 = center ? height / 2 : height;
   const zBot = Math.min(z0, z1);
@@ -590,8 +679,8 @@ export function buildCircleExtrusionTopology(
   });
 
   // Top and bottom rim edges (represented as a single named reference at 0°)
-  edges.set('top-rim', { name: 'top-rim', start: [cx + topRadius, cy, zTop], end: [cx, cy + topRadius, zTop] });
-  edges.set('bottom-rim', { name: 'bottom-rim', start: [cx + circ.radius, cy, zBot], end: [cx, cy + circ.radius, zBot] });
+  edges.set('top-rim', createTrackedEdgeRef('top-rim', [cx + topRadius, cy, zTop], [cx, cy + topRadius, zTop]));
+  edges.set('bottom-rim', createTrackedEdgeRef('bottom-rim', [cx + circ.radius, cy, zBot], [cx, cy + circ.radius, zBot]));
 
   return { faces, edges };
 }

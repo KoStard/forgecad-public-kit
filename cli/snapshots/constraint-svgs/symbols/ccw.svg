@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5 -4 10 8" width="300" height="240">
+  <rect x="-5" y="-4" width="10" height="8" fill="#1a1a2e"/>
+  <text x="0" y="-2.5" fill="#888" font-size="1.2" font-family="sans-serif" text-anchor="middle">CCW ↺</text>
+  <path d="M0.720,0.000 A0.720,0.720 0 1,0 0.000,-0.720" fill="none" stroke="#4ade80" stroke-width="0.3"/>
+  <polygon points="0.000,-1.080 0.300,-0.600 -0.300,-0.600" fill="#4ade80"/>
+</svg>

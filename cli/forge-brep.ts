@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
-import { extname, join, resolve } from 'path';
-import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { extname, join, resolve } from 'path';
+import { buildBrepExportManifest } from '../src/forge/export/brepExport';
 import { init, runScript } from '../src/forge/headless';
-import { buildBrepExportManifest } from '../src/forge/brepExport';
 import { collectProjectFiles } from './collect-files';
+import { resolvePackagePath } from './package-runtime';
 
 type BrepFormat = 'step' | 'brep';
 
@@ -58,7 +59,9 @@ function parseArgs(argv: string[]) {
   }
 
   if (!scriptPath) {
-    throw new Error('Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] [--allow-faceted] <script.forge.js>');
+    throw new Error(
+      'Usage: npx tsx cli/forge-brep.ts [--format step|brep] [--output path] [--python path] [--uv path] [--allow-faceted] <script.forge.js>',
+    );
   }
 
   return { format, outputPath, pythonPath, uvPath, scriptPath, allowFaceted };
@@ -78,8 +81,8 @@ function resolveUvExecutable(requested?: string): string {
   return 'uv';
 }
 
-async function main() {
-  const { format, outputPath, pythonPath, uvPath, scriptPath, allowFaceted } = parseArgs(process.argv.slice(2));
+export async function runBrepCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const { format, outputPath, pythonPath, uvPath, scriptPath, allowFaceted } = parseArgs(argv);
   const code = readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -128,17 +131,13 @@ async function main() {
     console.error(`Using faceted fallback for: ${manifest.fallbacks.map((obj) => obj.name).join(', ')}`);
   }
 
-  const exporterScript = resolve('cli/forge-brep-export.py');
+  const exporterScript = resolvePackagePath(import.meta.url, 'cli', 'forge-brep-export.py');
   const uvArgs = ['run'];
   if (pythonPath) {
     uvArgs.push('--python', pythonPath);
   }
   uvArgs.push(exporterScript, '--input', manifestPath, '--output', finalOutput, '--format', format);
-  const proc = spawnSync(
-    uv,
-    uvArgs,
-    { stdio: 'inherit' },
-  );
+  const proc = spawnSync(uv, uvArgs, { stdio: 'inherit' });
 
   rmSync(tempDir, { recursive: true, force: true });
 
@@ -152,8 +151,3 @@ async function main() {
 
   console.log(`✓ Exported ${manifest.objects.length} object(s) to ${finalOutput}`);
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

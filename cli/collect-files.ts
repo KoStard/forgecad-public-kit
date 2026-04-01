@@ -2,14 +2,14 @@
  * Shared CLI utilities for ForgeCAD CLI tools.
  *
  * Handles project file collection with correct path resolution
- * so that importSketch/importPart paths match between frontend and CLI.
+ * so that require() paths match between frontend and CLI.
  */
 
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { resolve, relative, join, dirname } from 'path';
+import { readdirSync, readFileSync, statSync } from 'fs';
+import { dirname, join, relative, resolve } from 'path';
 
-const FORGE_EXTS = ['.forge.js', '.sketch.js', '.js', '.svg', '.forge-notebook.json'];
-const isForgeFile = (f: string) => FORGE_EXTS.some(ext => f.endsWith(ext));
+const FORGE_EXTS = ['.forge.js', '.js', '.svg', '.forge-notebook.json'];
+const isForgeFile = (f: string) => FORGE_EXTS.some((ext) => f.endsWith(ext));
 
 /**
  * Recursively collect all forge/sketch files under a directory.
@@ -19,7 +19,12 @@ function collectFilesRecursive(dir: string, root: string): Record<string, string
   const result: Record<string, string> = {};
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
-    const stat = statSync(full);
+    let stat;
+    try {
+      stat = statSync(full);
+    } catch {
+      continue;
+    }
     if (stat.isDirectory() && !entry.startsWith('.') && entry !== 'node_modules') {
       Object.assign(result, collectFilesRecursive(full, root));
     } else if (stat.isFile() && isForgeFile(entry)) {
@@ -51,10 +56,12 @@ export function findProjectRoot(scriptPath: string): string {
     try {
       // Check if candidate directly contains forge files (not in deep subdirs)
       const entries = readdirSync(candidate);
-      const hasDirectForgeFiles = entries.some(e => {
+      const hasDirectForgeFiles = entries.some((e) => {
         try {
           return statSync(join(candidate, e)).isFile() && isForgeFile(e);
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       });
       if (hasDirectForgeFiles) {
         root = candidate;
@@ -77,10 +84,17 @@ export function findProjectRoot(scriptPath: string): string {
 export function collectProjectFiles(scriptPath: string): {
   allFiles: Record<string, string>;
   fileName: string;
+  /** Read a binary file by path (relative to project root). For importMesh(). */
+  readBinaryFile: (relativePath: string) => ArrayBuffer;
 } {
   const absScript = resolve(scriptPath);
   const root = findProjectRoot(scriptPath);
   const allFiles = collectFilesRecursive(root, root);
   const fileName = relative(root, absScript);
-  return { allFiles, fileName };
+  const readBinaryFile = (relativePath: string): ArrayBuffer => {
+    const absPath = resolve(root, relativePath);
+    const buf = readFileSync(absPath);
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  };
+  return { allFiles, fileName, readBinaryFile };
 }

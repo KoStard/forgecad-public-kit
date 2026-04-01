@@ -1,0 +1,43 @@
+/**
+ * Thin TS constraint descriptor for `vDistance`.
+ *
+ * Rust owns solving; this file only declares the public payload shape, equation count,
+ * and UI/display metadata used by the builder and viewer.
+ */
+import type { PointId, ConstraintTypeMap, AnnotationElement } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the signed vertical distance from point `a` to point `b` to `value`.
+     *
+     * The constraint is directional: `b.y − a.y = value`. A positive value places
+     * `b` above `a`; negative places it below.
+     * Contributes **1 equation**.
+     */
+    vDistance: { a: PointId; b: PointId; value: number };
+  }
+}
+
+registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
+  type: 'vDistance',
+  label: 'VD',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (a && b) return midpoint(a, b);
+    return [0, 0];
+  },
+
+  displayAnnotations(c, { points }): AnnotationElement[] {
+    const a = points.get(c.a),
+      b = points.get(c.b);
+    if (!a || !b) return [];
+    return [{ kind: 'dimension', from: [a.x, a.y], to: [a.x, b.y], offset: 3, value: String(c.value) }];
+  },
+});

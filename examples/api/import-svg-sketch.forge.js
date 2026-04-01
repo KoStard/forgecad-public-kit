@@ -1,14 +1,13 @@
 // SVG import demo:
 // - Filled regions (all vs largest only)
 // - Stroke-only import
-// - importSketch(...) overload for .svg
 
 const allFill = importSvgSketch("api/import-svg-sketch-shape.svg", {
   include: "fill",
   regionSelection: "all",
 });
 
-const largestFill = importSketch("api/import-svg-sketch-shape.svg", {
+const largestFill = importSvgSketch("api/import-svg-sketch-shape.svg", {
   include: "fill",
   regionSelection: "largest",
   maxWidth: 35,

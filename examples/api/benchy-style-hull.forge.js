@@ -43,7 +43,6 @@ let hull = loft(
   [z0, z1, z2, z3, z4],
   { edgeLength: 0.95 },
 );
-hull = hull.smoothOut(72, 0.28).refine(2);
 
 // Orient hull so length goes along X, beam along Y, height along Z.
 hull = hull
@@ -70,11 +69,11 @@ const stackPath = spline3d(
   ],
   { tension: 0.5 },
 );
-const stack = sweep(circle2d(3.8, 26), stackPath, {
+const stack = sweep(circle2d(3.8), stackPath, {
   samples: 28,
   edgeLength: 0.55,
 });
-const stackInner = sweep(circle2d(2.2, 22), stackPath, {
+const stackInner = sweep(circle2d(2.2), stackPath, {
   samples: 28,
   edgeLength: 0.55,
 });

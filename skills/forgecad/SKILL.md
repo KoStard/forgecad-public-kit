@@ -1,6 +1,6 @@
 ---
 name: forgecad
-description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .sketch.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when Codex needs to build or modify ForgeCAD geometry, structure multi-file projects, run notebook cells, validate scripts, or use ForgeCAD export/render tooling.
+description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, .forge-notebook.json, SVG-import, assembly, and CLI workflows. Use when building or modifying ForgeCAD geometry, structuring multi-file projects, running notebook cells, validating scripts, or using ForgeCAD export/render tooling.
 ---
 
 # ForgeCAD
@@ -9,7 +9,7 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ## Workflow
 
-1. Identify the artifact: `.forge.js`, `.sketch.js`, `.forge-notebook.json`, SVG asset, or CLI/export task.
+1. Identify the artifact: `.forge.js`, `.forge-notebook.json`, SVG asset, or CLI/export task.
 2. Load only the docs the task needs (see Source Map below). Start from the top group, add others as needed.
 3. Reuse patterns from `examples/api/` before inventing from scratch.
 4. Default to a concrete first pass — easy iteration beats speculative design review.
@@ -19,7 +19,8 @@ Author or modify ForgeCAD models, sketches, assemblies, notebooks, and CLI workf
 
 ### Import and Composition
 
-- `importPart()` for parts, `importSketch()` for sketches/SVGs, with explicit `paramOverrides`.
+- `require("./file.forge.js", { Param: value })` for any model file, with optional param overrides.
+- `importSvgSketch()` for SVG files (file format loader, not a module import).
 - `.withReferences()` + `.placeReference()` for reusable placement.
 - Plain `.js` modules for shared helpers/constants (not model imports).
 
@@ -33,59 +34,101 @@ Load groups top-to-bottom, stopping when you have what the task needs.
 
 ### 1. Core API (always read first)
 
-Primitives, transforms, booleans, imports, topology, return formats, curves/surfacing.
+Execution model, colors, coordinate system, primitives, booleans, patterns, imports, parameters, topology, edge queries.
 
-- `docs/permanent/API/model-building/reference.md`
+- `docs/permanent/API/core/concepts.md`
+- `docs/permanent/API/core/parameters.md`
+- `docs/permanent/API/core/topology.md`
+- `docs/permanent/API/core/edge-queries.md`
+- `docs/permanent/generated/core.md`
+
+### 1b. SDF Modeling (when using smooth booleans, TPMS, deformations, or fromFunction)
+
+Primitives, smooth booleans, TPMS lattices, twist/bend/displace, morph, custom functions, gotchas.
+
+- `docs/permanent/API/core/sdf.md`
 
 ### 2. Geometry and Positioning (when placement/orientation matters)
 
 Axis conventions, winding rules, and placement strategy.
 
-- `docs/permanent/API/model-building/coordinate-system.md`
-- `docs/permanent/API/model-building/geometry-conventions.md`
-- `docs/permanent/API/model-building/positioning.md`
+- `docs/permanent/guides/coordinate-system.md`
+- `docs/permanent/guides/geometry-conventions.md`
+- `docs/permanent/guides/positioning.md`
 
 ### 3. Sketch APIs (when the task is sketch-heavy)
 
-2D construction, transforms, booleans, paths, on-face sketching, extrusion, anchors.
+2D construction, transforms, booleans, paths, on-face sketching, extrusion, anchors, text, regions.
 
-- `docs/permanent/API/model-building/sketch-core.md`
-- `docs/permanent/API/model-building/sketch-primitives.md`
-- `docs/permanent/API/model-building/sketch-path.md`
-- `docs/permanent/API/model-building/sketch-transforms.md`
-- `docs/permanent/API/model-building/sketch-booleans.md`
-- `docs/permanent/API/model-building/sketch-operations.md`
-- `docs/permanent/API/model-building/sketch-on-face.md`
-- `docs/permanent/API/model-building/sketch-extrude.md`
-- `docs/permanent/API/model-building/sketch-anchor.md`
+- `docs/permanent/API/sketch/core.md`
+- `docs/permanent/API/sketch/primitives.md`
+- `docs/permanent/API/sketch/path.md`
+- `docs/permanent/API/sketch/transforms.md`
+- `docs/permanent/API/sketch/booleans.md`
+- `docs/permanent/API/sketch/operations.md`
+- `docs/permanent/API/sketch/on-face.md`
+- `docs/permanent/API/sketch/extrude.md`
+- `docs/permanent/API/sketch/anchor.md`
+- `docs/permanent/API/sketch/text.md`
+- `docs/permanent/API/sketch/regions.md`
+- `docs/permanent/generated/sketch.md`
 
-### 4. Entities and Topology (for tracked references, constraints, patterns)
+### 4. Curves and Surfacing (for lofts, sweeps, splines)
 
-Named entities, tracked 3D topology, constraints, patterns, fillet/chamfer helpers.
+Smooth curves, Hermite splines, lofted and swept solids.
 
-- `docs/permanent/API/model-building/entities.md`
+- `docs/permanent/generated/curves.md`
 
 ### 5. Assemblies and Mechanisms (for joints or kinematics)
 
 Assembly graph, joint types, couplings, validation, robot export.
 
-- `docs/permanent/API/model-building/assembly.md`
+- `docs/permanent/API/assembly/assembly.md`
+- `docs/permanent/generated/assembly.md`
 
-### 6. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)
+### 6. Sheet Metal (for bent parts, K-factor, flat patterns)
+
+Bend operations, flat pattern unfolding, K-factor configuration.
+
+- `docs/permanent/API/sheet-metal/sheet-metal.md`
+- `docs/permanent/generated/sheet-metal.md`
+
+### 7. Output and Export (for STL/3MF/STEP, BOM, dimensions)
+
+Mesh export, exact geometry export, bill of materials, dimension annotations.
+
+- `docs/permanent/API/output/export.md`
+- `docs/permanent/API/output/brep-export.md`
+- `docs/permanent/API/output/bom.md`
+- `docs/permanent/API/output/dimensions.md`
+- `docs/permanent/generated/output.md`
+
+### 8. Toolbox (fasteners and standard parts)
+
+Parametric bolts, nuts, washers, standard hardware, gears, pipes, and structural profiles.
+
+- `docs/permanent/API/toolbox/fasteners.md`
+- `docs/permanent/generated/lib.md`
+
+### 9. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)
 
 Viewer-only APIs such as cutPlane, explodeView, jointsView, and animation behavior.
 
 - `docs/permanent/API/runtime/viewport.md`
+- `docs/permanent/generated/viewport.md`
 
-### 7. Recipes and Debugging (for patterns and troubleshooting)
+### 10. Recipes and Debugging (for patterns and troubleshooting)
 
 Modeling patterns, debugging tactics, copyable snippets.
 
-- `docs/permanent/API/guides/modeling-recipes.md`
+- `docs/permanent/guides/modeling-recipes.md`
 
-### 8. CLI and Exports (for validation/render/export tasks)
+### 11. CLI (for validation/render/export tasks)
 
 Test-run, notebook execution, export pipelines, debug flags.
 
 - `docs/permanent/CLI.md`
 
+### 12. Check API examples for more context
+
+- `examples/api/*`

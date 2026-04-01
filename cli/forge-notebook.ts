@@ -1,28 +1,30 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'fs';
-import { spawn, type ChildProcess } from 'child_process';
-import { createServer } from 'net';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
 import { stdin as input } from 'node:process';
-import { findProjectRoot } from './collect-files';
+import { type ChildProcess } from 'child_process';
+import { readFileSync, writeFileSync } from 'fs';
+import { createServer } from 'net';
+import { resolve } from 'path';
 import { exportNotebookToForgeScript, notebookDefaultScriptPath } from '../src/notebook/export';
+import { parseNotebook } from '../src/notebook/model';
+import { renderNotebookForTerminal } from '../src/notebook/terminal';
+import { findProjectRoot } from './collect-files';
+import { packageRootFrom, spawnPackageVite } from './package-runtime';
 
 type NotebookOutput =
   | {
-    output_type: 'stream';
-    name: 'stdout' | 'stderr';
-    text: string[];
-  }
+      output_type: 'stream';
+      name: 'stdout' | 'stderr';
+      text: string[];
+    }
   | {
-    output_type: 'display_data';
-    data: { 'text/plain': string[] };
-  }
+      output_type: 'display_data';
+      data: { 'text/plain': string[] };
+    }
   | {
-    output_type: 'error';
-    evalue: string;
-    traceback: string[];
-  };
+      output_type: 'error';
+      evalue: string;
+      traceback: string[];
+    };
 
 interface NotebookResponse {
   cellId: string | null;
@@ -38,10 +40,11 @@ interface NotebookResponse {
 }
 
 interface ParsedCli {
-  command: 'append' | 'run' | 'export';
+  command: 'append' | 'run' | 'export' | 'view';
   target: string;
   afterCellId?: string;
   cellId?: string;
+  cellSpecifier?: string;
   code?: string;
   filePath?: string;
   outputPath?: string;
@@ -55,25 +58,28 @@ interface ServerHandle {
   requestTarget: string;
 }
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = packageRootFrom(import.meta.url);
 const DEFAULT_PORT = parseInt(process.env.FORGE_PORT || '5173', 10);
 
 function usage(exitCode = 0): never {
   console.error(`Usage:
-  npm run notebook -- <notebook.forge-notebook.json> --code "show(box(40, 20, 10));"
-  npm run notebook -- <notebook.forge-notebook.json> --file /tmp/cell.js
-  cat /tmp/cell.js | npm run notebook -- <notebook.forge-notebook.json>
-  npm run notebook -- <notebook.forge-notebook.json>
-  npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
+  forgecad notebook <notebook.forge-notebook.json> --code "show(box(40, 20, 10));"
+  forgecad notebook <notebook.forge-notebook.json> --file /tmp/cell.js
+  cat /tmp/cell.js | forgecad notebook <notebook.forge-notebook.json>
+  forgecad notebook <notebook.forge-notebook.json>
+  forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
+  forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]
 
 Explicit subcommands are still available:
-  npm run notebook -- append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id]
-  npm run notebook -- run <notebook.forge-notebook.json> [cell-id]
-  npm run notebook -- export <notebook.forge-notebook.json> [output.forge.js]
+  forgecad notebook append <notebook.forge-notebook.json> [--code "..."] [--file path] [--after cell-id]
+  forgecad notebook run <notebook.forge-notebook.json> [cell-id]
+  forgecad notebook view <notebook.forge-notebook.json> [cell-number|cell-id|preview]
+  forgecad notebook export <notebook.forge-notebook.json> [output.forge.js]
 
 Notes:
   append auto-creates the notebook file if it does not exist yet
-  run/export require an existing notebook file
+  run/export/view require an existing notebook file
+  view is local and renders the notebook in the terminal without starting the server
 
 Options:
   --server <url>   Reuse an existing Forge server instead of auto-starting one
@@ -105,7 +111,7 @@ function parsePort(value: string | undefined): number {
 function parseCli(argv: string[]): ParsedCli {
   if (argv.length === 0 || hasFlag(argv, '-h') || hasFlag(argv, '--help')) usage();
 
-  const explicitCommand = argv[0] === 'append' || argv[0] === 'run' || argv[0] === 'export' ? argv[0] : null;
+  const explicitCommand = argv[0] === 'append' || argv[0] === 'run' || argv[0] === 'export' || argv[0] === 'view' ? argv[0] : null;
   const targetIndex = explicitCommand ? 1 : 0;
   const target = argv[targetIndex];
   if (!target || target.startsWith('--')) usage(1);
@@ -116,7 +122,7 @@ function parseCli(argv: string[]): ParsedCli {
   const filePath = getOption(argv, '--file');
   const afterCellId = getOption(argv, '--after');
 
-  let command: 'append' | 'run' | 'export';
+  let command: 'append' | 'run' | 'export' | 'view';
   if (explicitCommand) {
     command = explicitCommand;
   } else if (code || filePath || !process.stdin.isTTY) {
@@ -125,19 +131,16 @@ function parseCli(argv: string[]): ParsedCli {
     command = 'run';
   }
 
-  const positionalAfterTarget = argv[targetIndex + 1] && !argv[targetIndex + 1].startsWith('--')
-    ? argv[targetIndex + 1]
-    : undefined;
+  const positionalAfterTarget = argv[targetIndex + 1] && !argv[targetIndex + 1].startsWith('--') ? argv[targetIndex + 1] : undefined;
 
-  const cellId = command === 'run'
-    ? positionalAfterTarget
-    : undefined;
+  const cellId = command === 'run' ? positionalAfterTarget : undefined;
 
   return {
     command,
     target,
     afterCellId: command === 'append' ? afterCellId : undefined,
     cellId,
+    cellSpecifier: command === 'view' ? positionalAfterTarget : undefined,
     code,
     filePath,
     outputPath: command === 'export' ? positionalAfterTarget : undefined,
@@ -225,13 +228,12 @@ function parseLocalUrl(chunk: string): string | null {
 
 async function startServer(projectDir: string, preferredPort: number): Promise<Pick<ServerHandle, 'baseUrl' | 'process'>> {
   const localPortFree = await startPortProbe(preferredPort);
-  const args = ['vite', '--port', String(preferredPort), '--', projectDir];
-  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const child = spawn(command, args, {
+  const child = spawnPackageVite(import.meta.url, ['--port', String(preferredPort)], {
     cwd: repoRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
+      FORGE_PROJECT: projectDir,
       FORCE_COLOR: '0',
     },
   });
@@ -334,10 +336,26 @@ function exportNotebook(cli: ParsedCli): void {
   console.log(`Script: ${outputPath}`);
 }
 
-async function main() {
-  const cli = parseCli(process.argv.slice(2));
+function viewNotebook(cli: ParsedCli): void {
+  const notebookPath = resolve(cli.target);
+  const notebookText = readFileSync(notebookPath, 'utf-8');
+  const notebook = parseNotebook(notebookText);
+  process.stdout.write(
+    renderNotebookForTerminal(notebook, {
+      filename: notebookPath,
+      cellSpecifier: cli.cellSpecifier,
+    }),
+  );
+}
+
+export async function runNotebookCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const cli = parseCli(argv);
   if (cli.command === 'export') {
     exportNotebook(cli);
+    return;
+  }
+  if (cli.command === 'view') {
+    viewNotebook(cli);
     return;
   }
   const server = await ensureServer(cli);
@@ -363,8 +381,3 @@ async function main() {
     stopServer(server);
   }
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

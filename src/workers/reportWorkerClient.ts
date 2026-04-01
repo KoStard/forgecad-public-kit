@@ -1,4 +1,5 @@
 import type { ForgeQualityPreset, ReportGenerationResult, ReportObjectVisual } from '@forge/index';
+import type { LengthUnit } from '@forge/units';
 import type { ReportWorkerRequest, ReportWorkerResponse } from './reportWorkerProtocol';
 
 interface GenerateReportInWorkerOptions {
@@ -9,6 +10,7 @@ interface GenerateReportInWorkerOptions {
   title: string;
   objectVisuals: Record<string, ReportObjectVisual>;
   includeDisassembled: boolean;
+  lengthUnit?: LengthUnit;
 }
 
 export function generateReportInWorker(options: GenerateReportInWorkerOptions): Promise<ReportGenerationResult> {

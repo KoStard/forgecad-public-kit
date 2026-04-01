@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, extname, resolve } from 'path';
-import { init, runScript, getCollectedRobotExport } from '../src/forge/headless';
-import { buildSdfRobotPackage } from '../src/forge/sdfExport';
+import { getCollectedRobotExport, init, runScript } from '../src/forge/headless';
+import { buildSdfRobotPackage } from '../src/forge/export/sdfExport';
 import { collectProjectFiles } from './collect-files';
 
 function parseArgs(argv: string[]): { scriptPath: string; outputPath?: string } {
@@ -36,8 +36,8 @@ function defaultOutputPath(scriptPath: string): string {
   return abs.slice(0, abs.length - extname(abs).length) + '.sdfpkg';
 }
 
-async function main() {
-  const { scriptPath, outputPath } = parseArgs(process.argv.slice(2));
+export async function runSdfCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const { scriptPath, outputPath } = parseArgs(argv);
   const code = readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -83,8 +83,3 @@ async function main() {
     packageOut.manifest.warnings.forEach((warning) => console.log(`    - ${warning}`));
   }
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

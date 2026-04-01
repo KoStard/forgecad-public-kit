@@ -29,7 +29,7 @@ function expectVec(actual: number[], expected: [number, number, number], label: 
   expect(ok, `${label} expected [${expected.join(', ')}], got [${actual.join(', ')}]`);
 }
 
-async function main() {
+export async function runCheckJsModulesCli(): Promise<void> {
   await init();
 
   const scriptPath = resolve('examples/api/js-module-imports.forge.js');
@@ -73,38 +73,27 @@ return [
 ];
 `,
   };
-  const returnArrayResult = runScript(
-    returnArrayModuleFiles['main.forge.js'],
-    'main.forge.js',
-    returnArrayModuleFiles,
-  );
+  const returnArrayResult = runScript(returnArrayModuleFiles['main.forge.js'], 'main.forge.js', returnArrayModuleFiles);
   expect(!returnArrayResult.error, `array-return module import failed: ${returnArrayResult.error}`);
   expect(returnArrayResult.objects.length === 2, `expected 2 imported objects, got ${returnArrayResult.objects.length}`);
 
+  // Mixing top-level return with exports is now allowed — the module resolves
+  // to a merged object where `default` holds the return value and named exports
+  // are top-level properties.
   const mixedModuleFiles: Record<string, string> = {
     'main.forge.js': `
-import value from "./mixed-module.js";
-return box(4, 4, 4, true).translate(value, 0, 0);
+import mod from "./mixed-module.js";
+// mod should be the return value (42), since it's the default export
+return box(4, 4, 4, true).translate(mod, 0, 0);
 `,
     'mixed-module.js': `
 export const answer = 42;
 return answer;
 `,
   };
-  const mixedModuleResult = runScript(
-    mixedModuleFiles['main.forge.js'],
-    'main.forge.js',
-    mixedModuleFiles,
-  );
-  expect(
-    Boolean(mixedModuleResult.error) && mixedModuleResult.error!.includes('mixed top-level return with exports'),
-    `expected mixed return/export failure, got: ${mixedModuleResult.error ?? 'success'}`,
-  );
+  const mixedModuleResult = runScript(mixedModuleFiles['main.forge.js'], 'main.forge.js', mixedModuleFiles);
+  expect(!mixedModuleResult.error, `mixed return/export module should succeed, got: ${mixedModuleResult.error}`);
+  expect(mixedModuleResult.shape != null, 'mixed return/export: expected a shape result');
 
   console.log('✓ JS module import invariants passed');
 }
-
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});

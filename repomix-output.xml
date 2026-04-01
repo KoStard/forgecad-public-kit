@@ -1,0 +1,5489 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+defs/
+  absoluteAngle.ts
+  angle.ts
+  angleBetween.ts
+  arcLength.ts
+  ccw.ts
+  coincident.ts
+  collinear.ts
+  concentric.ts
+  diameter.ts
+  distance.ts
+  equal.ts
+  equalRadius.ts
+  fixed.ts
+  hDistance.ts
+  horizontal.ts
+  index.ts
+  length.ts
+  lineDistance.ts
+  lineTangentArc.ts
+  midpoint.ts
+  parallel.ts
+  perpendicular.ts
+  pointLineDistance.ts
+  pointOnCircle.ts
+  pointOnLine.ts
+  radius.ts
+  shapeArea.ts
+  shapeCentroidX.ts
+  shapeCentroidY.ts
+  shapeEqualCentroid.ts
+  shapeHeight.ts
+  shapeWidth.ts
+  symmetric.ts
+  tangent.ts
+  vDistance.ts
+  vertical.ts
+builder.ts
+decompose.ts
+helpers.ts
+index.ts
+registry.ts
+sketch.ts
+types.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="defs/absoluteAngle.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { angleOfLine, distance, midpointPerp, normalizeAngle } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the angle of a line from the positive X axis to exactly `value` degrees.
+     * The direction is enforced as-is (a→b). Contributes **1 equation**:
+     * `normalizeAngle(angle − target) = 0`.
+     */
+    absoluteAngle: { line: LineId; value: number };
+  }
+}
+
+/** Count how many lines reference a given point ID. */
+const pointLineRefs = (
+  ptId: string,
+  lines: ReadonlyMap<string, { a: string; b: string }>,
+): number => {
+  let n = 0;
+  for (const l of lines.values()) {
+    if (l.a === ptId || l.b === ptId) n++;
+  }
+  return n;
+};
+
+registerConstraint<'absoluteAngle', ConstraintTypeMap['absoluteAngle']>({
+  type: 'absoluteAngle',
+  label: '∠',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0, 0];
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return [0, 0];
+    return midpointPerp(a, b, 3);
+  },
+
+  /**
+   * Unconditionally snap the less-constrained endpoint so the line starts
+   * at the target angle. Handles zero-length lines (fresh points at the
+   * same position) and lines that point in the opposite direction.
+   *
+   * Which endpoint to move: the point referenced by more lines is likely
+   * more constrained — anchor it, move the other.
+   */
+  presolve(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return;
+    if (a.fixed && b.fixed) return;
+
+    const targetRad = (c.value * Math.PI) / 180;
+    const len = distance(a, b) || 1;
+    const cos = Math.cos(targetRad);
+    const sin = Math.sin(targetRad);
+
+    const aRefs = pointLineRefs(line.a, lines);
+    const bRefs = pointLineRefs(line.b, lines);
+
+    if (b.fixed || (!a.fixed && bRefs > aRefs)) {
+      a.x = b.x - cos * len;
+      a.y = b.y - sin * len;
+    } else {
+      b.x = a.x + cos * len;
+      b.y = a.y + sin * len;
+    }
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const line = lines.get(c.line);
+    if (!line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+
+    const targetRad = (c.value * Math.PI) / 180;
+    const current = angleOfLine(a, b);
+    const err = Math.abs(normalizeAngle(current - targetRad));
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+
+    const len = distance(a, b) || 1;
+    const cos = Math.cos(targetRad);
+    const sin = Math.sin(targetRad);
+
+    // Move the less-constrained endpoint. The point referenced by more lines
+    // is anchored so GS warm-up doesn't corrupt shared points (e.g. the last
+    // line in a chain closing back to a triangle vertex).
+    const aRefs = pointLineRefs(line.a, lines);
+    const bRefs = pointLineRefs(line.b, lines);
+
+    if (b.fixed || (!a.fixed && bRefs > aRefs)) {
+      a.x = b.x - cos * len;
+      a.y = b.y - sin * len;
+    } else {
+      b.x = a.x + cos * len;
+      b.y = a.y + sin * len;
+    }
+    return err;
+  },
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    const targetRad = c.value * Math.PI / 180;
+    return [normalizeAngle(angleOfLine(a, b) - targetRad)];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const line = lines.find((l) => l.id === c.line);
+    if (!line) return;
+    for (const ptId of [line.a, line.b]) {
+      refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/angle.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpointPerp, angleOfLine, normalizeAngle, distance, toRad } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the angle from line `a` to line `b` to `value` degrees (CCW).
+     * Line `a` is the reference; only `b` is rotated. Contributes **1 equation**.
+     */
+    angle: { a: LineId; b: LineId; value: number };
+  }
+}
+
+/** Count how many lines reference a given point ID. */
+const pointLineRefs = (
+  ptId: string,
+  lines: ReadonlyMap<string, { a: string; b: string }>,
+): number => {
+  let n = 0;
+  for (const l of lines.values()) {
+    if (l.a === ptId || l.b === ptId) n++;
+  }
+  return n;
+};
+
+registerConstraint<'angle', ConstraintTypeMap['angle']>({
+  type: 'angle',
+  label: 'ANG',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    if (lineA) {
+      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
+    }
+    return [0, 0];
+  },
+
+  presolve(c, { lines, points }) {
+    const la = lines.get(c.a);
+    const lb = lines.get(c.b);
+    if (!la || !lb) return;
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return;
+    if (b1.fixed && b2.fixed) return;
+
+    const targetRad = angleOfLine(a1, a2) + toRad(c.value);
+    const len = distance(b1, b2) || 1;
+    const cos = Math.cos(targetRad);
+    const sin = Math.sin(targetRad);
+
+    const b1Refs = pointLineRefs(lb.a, lines);
+    const b2Refs = pointLineRefs(lb.b, lines);
+
+    if (b2.fixed || (!b1.fixed && b2Refs > b1Refs)) {
+      b1.x = b2.x - cos * len;
+      b1.y = b2.y - sin * len;
+    } else {
+      b2.x = b1.x + cos * len;
+      b2.y = b1.y + sin * len;
+    }
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return 0;
+    const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return 0;
+
+    const baseAngle = angleOfLine(a1, a2);
+    const targetRad = baseAngle + toRad(c.value);
+    const current = angleOfLine(b1, b2);
+    const err = Math.abs(normalizeAngle(current - targetRad));
+    if (err <= tolerance) return err;
+    if (b1.fixed && b2.fixed) return err;
+
+    const len = distance(b1, b2) || 1;
+    const cos = Math.cos(targetRad);
+    const sin = Math.sin(targetRad);
+
+    const b1Refs = pointLineRefs(lineB.a, lines);
+    const b2Refs = pointLineRefs(lineB.b, lines);
+
+    if (b2.fixed || (!b1.fixed && b2Refs > b1Refs)) {
+      b1.x = b2.x - cos * len;
+      b1.y = b2.y - sin * len;
+    } else {
+      b2.x = b1.x + cos * len;
+      b2.y = b1.y + sin * len;
+    }
+    return err;
+  },
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0];
+    const angleA = angleOfLine(a1, a2);
+    const angleB = angleOfLine(b1, b2);
+    return [normalizeAngle(angleB - angleA - toRad(c.value))];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const lineA = lines.find((l) => l.id === c.a);
+    const lineB = lines.find((l) => l.id === c.b);
+    if (lineA) {
+      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
+      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
+    }
+    if (lineB) {
+      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
+      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/angleBetween.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpointPerp, angleOfLine, normalizeAngle, distance, toRad } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the unsigned angle between lines `a` and `b` to `value` degrees.
+     *
+     * Unlike `angle` (which is directional — 90 ≠ −90), this constraint
+     * accepts both orientations of `b`: whichever of `+value` or `+value+180°`
+     * is closer to the current direction is chosen. Use this when you care
+     * about the magnitude of the angle but not the sign (e.g. "these two lines
+     * are 60° apart" without specifying which side).
+     *
+     * Contributes **1 equation**: `sin(angleB − angleA − target) = 0`.
+     */
+    angleBetween: { a: LineId; b: LineId; value: number };
+  }
+}
+
+/** Count how many lines reference a given point ID. */
+const pointLineRefs = (
+  ptId: string,
+  lines: ReadonlyMap<string, { a: string; b: string }>,
+): number => {
+  let n = 0;
+  for (const l of lines.values()) {
+    if (l.a === ptId || l.b === ptId) n++;
+  }
+  return n;
+};
+
+registerConstraint<'angleBetween', ConstraintTypeMap['angleBetween']>({
+  type: 'angleBetween',
+  label: 'ANG',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    if (lineA) {
+      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
+    }
+    return [0, 0];
+  },
+
+  presolve(c, { lines, points }) {
+    const la = lines.get(c.a);
+    const lb = lines.get(c.b);
+    if (!la || !lb) return;
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return;
+    if (b1.fixed && b2.fixed) return;
+
+    const baseAngle = angleOfLine(a1, a2);
+    const fwd = baseAngle + toRad(c.value);
+    const rev = fwd + Math.PI;
+    const current = angleOfLine(b1, b2);
+    const target = Math.abs(normalizeAngle(current - fwd)) <= Math.abs(normalizeAngle(current - rev)) ? fwd : rev;
+
+    const len = distance(b1, b2) || 1;
+    const cos = Math.cos(target);
+    const sin = Math.sin(target);
+
+    const b1Refs = pointLineRefs(lb.a, lines);
+    const b2Refs = pointLineRefs(lb.b, lines);
+
+    if (b2.fixed || (!b1.fixed && b2Refs > b1Refs)) {
+      b1.x = b2.x - cos * len;
+      b1.y = b2.y - sin * len;
+    } else {
+      b2.x = b1.x + cos * len;
+      b2.y = b1.y + sin * len;
+    }
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return 0;
+    const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return 0;
+
+    const baseAngle = angleOfLine(a1, a2);
+    const fwd = baseAngle + toRad(c.value);
+    const rev = fwd + Math.PI;
+    const current = angleOfLine(b1, b2);
+    const target = Math.abs(normalizeAngle(current - fwd)) <= Math.abs(normalizeAngle(current - rev)) ? fwd : rev;
+    const err = Math.abs(normalizeAngle(current - target));
+    if (err <= tolerance) return err;
+    if (b1.fixed && b2.fixed) return err;
+
+    const len = distance(b1, b2) || 1;
+    const cos = Math.cos(target);
+    const sin = Math.sin(target);
+
+    const b1Refs = pointLineRefs(lineB.a, lines);
+    const b2Refs = pointLineRefs(lineB.b, lines);
+
+    if (b2.fixed || (!b1.fixed && b2Refs > b1Refs)) {
+      b1.x = b2.x - cos * len;
+      b1.y = b2.y - sin * len;
+    } else {
+      b2.x = b1.x + cos * len;
+      b2.y = b1.y + sin * len;
+    }
+    return err;
+  },
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0];
+    const dax = a2.x - a1.x; const day = a2.y - a1.y;
+    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1;
+    const lenB = Math.hypot(dbx, dby) || 1;
+    const targetRad = toRad(c.value);
+    // sin(angleB - angleA - target) = 0 — satisfied by both target and target+π
+    const crossUnit = (dax / lenA) * (dby / lenB) - (day / lenA) * (dbx / lenB);
+    const dotUnit = (dax / lenA) * (dbx / lenB) + (day / lenA) * (dby / lenB);
+    return [crossUnit * Math.cos(targetRad) - dotUnit * Math.sin(targetRad)];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const lineA = lines.find((l) => l.id === c.a);
+    const lineB = lines.find((l) => l.id === c.b);
+    if (lineA) {
+      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
+      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
+    }
+    if (lineB) {
+      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
+      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/arcLength.ts">
+import type { ArcId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { arcSweep } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the arc length of an arc to `value`.
+     *
+     * Arc length is defined as `radius × sweep`, where `sweep` is the angle
+     * (in radians) from the start point to the end point in the arc's direction.
+     * A zero-length sweep is treated as a full circle (2π).
+     *
+     * The solver achieves the target by relocating the arc's end point along
+     * the circle; the radius and start point are left unchanged.
+     * Contributes **1 equation**: `radius × sweep − value = 0`.
+     */
+    arcLength: { arc: ArcId; value: number };
+  }
+}
+
+registerConstraint<'arcLength', ConstraintTypeMap['arcLength']>({
+  type: 'arcLength',
+  label: 'ARCL',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { arcs, points }) {
+    const arc = arcs.get(c.arc);
+    if (!arc) return [0, 0];
+    const center = points.get(arc.center);
+    const start = points.get(arc.start);
+    if (!center || !start) return [0, 0];
+    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    const midAngle = startAngle + (arc.clockwise ? -1 : 1) * Math.PI / 4;
+    return [
+      center.x + (arc.radius + 8) * Math.cos(midAngle),
+      center.y + (arc.radius + 8) * Math.sin(midAngle),
+    ];
+  },
+
+  solve(c, { arcs, points, tolerance }) {
+    const arc = arcs.get(c.arc);
+    if (!arc) return 0;
+    const center = points.get(arc.center);
+    const start = points.get(arc.start);
+    const end = points.get(arc.end);
+    if (!center || !start || !end) return 0;
+
+    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+    const sweep = arcSweep(startAngle, endAngle, arc.clockwise);
+    const current = arc.radius * sweep;
+    const err = Math.abs(current - c.value);
+    if (err <= tolerance) return err;
+
+    // Move the end point to achieve the target arc length given current radius.
+    if (!end.fixed && arc.radius > 1e-9) {
+      const targetSweep = c.value / arc.radius;
+      const dir = arc.clockwise ? -1 : 1;
+      const newEndAngle = startAngle + dir * targetSweep;
+      end.x = center.x + arc.radius * Math.cos(newEndAngle);
+      end.y = center.y + arc.radius * Math.sin(newEndAngle);
+    }
+    return err;
+  },
+
+  residual(c, { arcs, points }) {
+    const arc = arcs.get(c.arc);
+    if (!arc) return [0];
+    const center = points.get(arc.center);
+    const start = points.get(arc.start);
+    const end = points.get(arc.end);
+    if (!center || !start || !end) return [0];
+    const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+    const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+    return [arc.radius * arcSweep(startAngle, endAngle, arc.clockwise) - c.value];
+  },
+
+  computeDof(_c, _ctx) {
+    // Constrains arc end-point angle — DOF accounted for by equations count.
+  },
+});
+</file>
+
+<file path="defs/ccw.ts">
+import type { PointId, SketchPoint, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { polygonSignedArea, reflectPointAcrossLine } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Enforces counter-clockwise winding order on a polygon defined by `points`.
+     *
+     * This resolves the discrete orientation ambiguity that arises when a polygon's
+     * shape is fully determined but its mirror image also satisfies all constraints
+     * (e.g. an equilateral triangle with a fixed vertex and side angle).
+     *
+     * Applied during **presolve** and **solve**: if the signed area is negative
+     * (clockwise), the last non-fixed vertex is reflected across the line formed
+     * by the first two vertices. Contributes **0 equations** — it is a discrete
+     * constraint, not a continuous one, so it does not change the DOF count.
+     */
+    ccw: { points: PointId[] };
+  }
+}
+
+registerConstraint<'ccw', ConstraintTypeMap['ccw']>({
+  type: 'ccw',
+  label: 'CCW',
+  isDimension: false,
+  equations: 0,
+
+  displayPosition(c, { points }) {
+    const pts = c.points.map((id: PointId) => points.get(id)).filter(Boolean) as SketchPoint[];
+    if (pts.length < 3) return [0, 0];
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    return [cx, cy] as [number, number];
+  },
+
+  presolve(c, { points }) {
+    enforceWinding(c.points, points);
+  },
+
+  solve(c, { points }) {
+    enforceWinding(c.points, points);
+    return 0;
+  },
+
+  residual() {
+    // Discrete constraint — no continuous residual equations.
+    return [];
+  },
+
+  computeDof() {
+    // No continuous DOF consumed.
+  },
+});
+
+/**
+ * If the polygon wound by `ptIds` has negative signed area (clockwise),
+ * reflect the last non-fixed vertex across the line formed by the first two
+ * vertices to flip it to counter-clockwise.
+ */
+function enforceWinding(
+  ptIds: PointId[],
+  points: ReadonlyMap<PointId, SketchPoint>,
+): void {
+  const pts = ptIds.map((id) => points.get(id)).filter(Boolean) as SketchPoint[];
+  if (pts.length < 3) return;
+  const area = polygonSignedArea(pts);
+  if (area >= 0) return; // already CCW (or degenerate)
+
+  // Find the last non-fixed point and reflect it across the line p0→p1.
+  // For the typical triangle case: p0 is fixed, p1's direction is constrained,
+  // so p2 (the free vertex) gets reflected.
+  const p0 = pts[0];
+  const p1 = pts[1];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (!pts[i].fixed) {
+      const [rx, ry] = reflectPointAcrossLine(pts[i], p0, p1);
+      pts[i].x = rx;
+      pts[i].y = ry;
+      return;
+    }
+  }
+}
+</file>
+
+<file path="defs/coincident.ts">
+import type { PointId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces two points to occupy the same position.
+     *
+     * This is the most fundamental connectivity constraint — use it to join
+     * line endpoints, close a polygon, or snap a point to another point.
+     * Contributes **2 equations** (one per axis).
+     */
+    coincident: { a: PointId; b: PointId };
+  }
+}
+
+registerConstraint<'coincident', ConstraintTypeMap['coincident']>({
+  type: 'coincident',
+  label: 'COINC',
+  isDimension: false,
+  equations: 2,
+
+  displayPosition(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (a && b) return midpoint(a, b);
+    return [0, 0];
+  },
+
+  solve(c, { points, tolerance }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return 0;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const err = Math.sqrt(dx * dx + dy * dy);
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+    if (a.fixed) { b.x = a.x; b.y = a.y; return err; }
+    if (b.fixed) { a.x = b.x; a.y = b.y; return err; }
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    a.x = mx; a.y = my;
+    b.x = mx; b.y = my;
+    return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return [0, 0];
+    return [b.x - a.x, b.y - a.y];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
+    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/collinear.ts">
+import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { projectPointToLine } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces a point to lie on the infinite line passing through a line segment.
+     *
+     * The point is projected onto the line's infinite extension (not clamped to
+     * the segment). Contributes **1 equation**: signed distance from the point
+     * to the line = 0.
+     */
+    collinear: { point: PointId; line: LineId };
+  }
+}
+
+registerConstraint<'collinear', ConstraintTypeMap['collinear']>({
+  type: 'collinear',
+  label: 'COLL',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const pt = points.get(c.point);
+    if (pt) return [pt.x + 2.5, pt.y + 2.5];
+    return [0, 0];
+  },
+
+  solve(c, { points, lines, movePoint, tolerance }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+    const proj = projectPointToLine(pt, a, b);
+    const err = Math.sqrt((pt.x - proj[0]) ** 2 + (pt.y - proj[1]) ** 2);
+    if (err <= tolerance) return err;
+    if (!pt.fixed) {
+      pt.x = proj[0];
+      pt.y = proj[1];
+    } else {
+      const dx = proj[0] - pt.x;
+      const dy = proj[1] - pt.y;
+      if (!a.fixed) movePoint(a, -dx, -dy);
+      if (!b.fixed) movePoint(b, -dx, -dy);
+    }
+    return err;
+  },
+
+
+  residual(c, { points, lines }) {
+    const pt = points.get(c.point); const line = lines.get(c.line);
+    if (!pt || !line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    const dx = b.x - a.x; const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Signed distance from pt to the infinite line
+    return [((pt.x - a.x) * dy - (pt.y - a.y) * dx) / len];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/concentric.ts">
+import type { CircleId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces two circles to share the same center point.
+     *
+     * The centers are merged to their average position (or snapped to the fixed
+     * one if either is fixed). Contributes **2 equations**
+     * (one per axis): `center_b − center_a = [0, 0]`.
+     */
+    concentric: { a: CircleId; b: CircleId };
+  }
+}
+
+registerConstraint<'concentric', ConstraintTypeMap['concentric']>({
+  type: 'concentric',
+  label: 'CONC',
+  isDimension: false,
+  equations: 2,
+
+  displayPosition(c, { circles, points }) {
+    const c1 = circles.get(c.a);
+    const c2 = circles.get(c.b);
+    if (c1 && c2) {
+      const p1 = points.get(c1.center);
+      const p2 = points.get(c2.center);
+      if (p1 && p2) return midpoint(p1, p2);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { circles, points, tolerance }) {
+    const c1 = circles.get(c.a);
+    const c2 = circles.get(c.b);
+    if (!c1 || !c2) return 0;
+    const p1 = points.get(c1.center);
+    const p2 = points.get(c2.center);
+    if (!p1 || !p2) return 0;
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const err = Math.sqrt(dx * dx + dy * dy);
+    if (err <= tolerance) return err;
+    if (p1.fixed && p2.fixed) return err;
+    if (p1.fixed) {
+      p2.x = p1.x; p2.y = p1.y;
+    } else if (p2.fixed) {
+      p1.x = p2.x; p1.y = p2.y;
+    } else {
+      const mid = midpoint(p1, p2);
+      p1.x = mid[0]; p1.y = mid[1];
+      p2.x = mid[0]; p2.y = mid[1];
+    }
+    return err;
+  },
+
+
+  residual(c, { circles, points }) {
+    const c1 = circles.get(c.a); const c2 = circles.get(c.b);
+    if (!c1 || !c2) return [0, 0];
+    const p1 = points.get(c1.center); const p2 = points.get(c2.center);
+    if (!p1 || !p2) return [0, 0];
+    return [p2.x - p1.x, p2.y - p1.y];
+  },
+
+  computeDof(_c, _ctx) {
+    // concentric constrains circle centers — not tracked in point refCount
+  },
+});
+</file>
+
+<file path="defs/diameter.ts">
+import type { CircleId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the diameter of a circle to `value` (i.e. `radius = value / 2`).
+     *
+     * Has no effect if the circle's `fixedRadius` flag is set.
+     * Contributes **1 equation**: `radius − value / 2 = 0`.
+     */
+    diameter: { circle: CircleId; value: number };
+  }
+}
+
+registerConstraint<'diameter', ConstraintTypeMap['diameter']>({
+  type: 'diameter',
+  label: 'DIA',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { circles, points }) {
+    const circle = circles.get(c.circle);
+    if (circle) {
+      const center = points.get(circle.center);
+      if (center) return [center.x + circle.radius, center.y];
+    }
+    return [0, 0];
+  },
+
+  solve(c, { circles, tolerance }) {
+    const circle = circles.get(c.circle);
+    if (!circle) return 0;
+    const target = c.value / 2;
+    const err = Math.abs(circle.radius - target);
+    if (err <= tolerance) return err;
+    if (!circle.fixedRadius) circle.radius = target;
+    return err;
+  },
+
+
+  residual(c, { circles }) {
+    const circle = circles.get(c.circle);
+    if (!circle) return [0];
+    return [circle.radius - c.value / 2];
+  },
+
+  computeDof(_c, _ctx) {
+    // diameter constrains circle radius (not a point DOF)
+  },
+});
+</file>
+
+<file path="defs/distance.ts">
+import type { PointId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, distance } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the Euclidean distance between two points to `value`.
+     *
+     * Points are moved symmetrically along the current direction vector so the
+     * center of the pair stays fixed. Contributes **1 equation**:
+     * `|b − a| − value = 0`.
+     */
+    distance: { a: PointId; b: PointId; value: number };
+  }
+}
+
+registerConstraint<'distance', ConstraintTypeMap['distance']>({
+  type: 'distance',
+  label: 'DIST',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (a && b) return midpoint(a, b);
+    return [0, 0];
+  },
+
+  solve(c, { points, tolerance }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return 0;
+    const len = distance(a, b) || 1;
+    const err = Math.abs(len - c.value);
+    if (err <= tolerance) return err;
+    const dir: [number, number] = [(b.x - a.x) / len, (b.y - a.y) / len];
+    if (a.fixed && b.fixed) return err;
+    if (a.fixed) {
+      b.x = a.x + dir[0] * c.value; b.y = a.y + dir[1] * c.value;
+    } else if (b.fixed) {
+      a.x = b.x - dir[0] * c.value; a.y = b.y - dir[1] * c.value;
+    } else {
+      const mid = midpoint(a, b);
+      a.x = mid[0] - dir[0] * c.value / 2; a.y = mid[1] - dir[1] * c.value / 2;
+      b.x = mid[0] + dir[0] * c.value / 2; b.y = mid[1] + dir[1] * c.value / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return [0];
+    return [Math.hypot(b.x - a.x, b.y - a.y) - c.value];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
+    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/equal.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp, distance, lineDirection } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to have the same length.
+     *
+     * Line `a`'s length is used as the target; `b`'s endpoints are scaled
+     * symmetrically along `b`'s current direction to match it.
+     * Contributes **1 equation**: `|b| − |a| = 0`.
+     */
+    equal: { a: LineId; b: LineId };
+  }
+}
+
+registerConstraint<'equal', ConstraintTypeMap['equal']>({
+  type: 'equal',
+  label: 'EQ',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    if (lineA) {
+      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return 0;
+    const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return 0;
+    const lenA = distance(a1, a2);
+    const lenB = distance(b1, b2) || 1;
+    const err = Math.abs(lenB - lenA);
+    if (err <= tolerance) return err;
+    if (b1.fixed && b2.fixed) return err;
+    const dir = lineDirection(b1, b2);
+    if (b1.fixed) {
+      b2.x = b1.x + dir[0] * lenA; b2.y = b1.y + dir[1] * lenA;
+    } else if (b2.fixed) {
+      b1.x = b2.x - dir[0] * lenA; b1.y = b2.y - dir[1] * lenA;
+    } else {
+      const mid = midpoint(b1, b2);
+      b1.x = mid[0] - dir[0] * lenA / 2; b1.y = mid[1] - dir[1] * lenA / 2;
+      b2.x = mid[0] + dir[0] * lenA / 2; b2.y = mid[1] + dir[1] * lenA / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0];
+    return [Math.hypot(a2.x - a1.x, a2.y - a1.y) - Math.hypot(b2.x - b1.x, b2.y - b1.y)];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const lineA = lines.find((l) => l.id === c.a);
+    const lineB = lines.find((l) => l.id === c.b);
+    if (lineA) {
+      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
+      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
+    }
+    if (lineB) {
+      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
+      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/equalRadius.ts">
+import type { CircleId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces two circles to have the same radius.
+     *
+     * When both radii are free they are averaged. When one has `fixedRadius`
+     * the other is snapped to it. Contributes **1 equation**:
+     * `radius_b − radius_a = 0`.
+     */
+    equalRadius: { a: CircleId; b: CircleId };
+  }
+}
+
+registerConstraint<'equalRadius', ConstraintTypeMap['equalRadius']>({
+  type: 'equalRadius',
+  label: 'EQR',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { circles, points }) {
+    const ca = circles.get(c.a);
+    const cb = circles.get(c.b);
+    if (ca && cb) {
+      const pa = points.get(ca.center);
+      const pb = points.get(cb.center);
+      if (pa && pb) return [(pa.x + pb.x) / 2 + ca.radius, (pa.y + pb.y) / 2];
+    }
+    return [0, 0];
+  },
+
+  solve(c, { circles, tolerance }) {
+    const ca = circles.get(c.a);
+    const cb = circles.get(c.b);
+    if (!ca || !cb) return 0;
+    const err = Math.abs(ca.radius - cb.radius);
+    if (err <= tolerance) return err;
+
+    if (!ca.fixedRadius && !cb.fixedRadius) {
+      const avg = (ca.radius + cb.radius) / 2;
+      ca.radius = avg;
+      cb.radius = avg;
+    } else if (ca.fixedRadius) {
+      if (!cb.fixedRadius) cb.radius = ca.radius;
+    } else {
+      ca.radius = cb.radius;
+    }
+    return err;
+  },
+
+
+  residual(c, { circles }) {
+    const ca = circles.get(c.a); const cb = circles.get(c.b);
+    if (!ca || !cb) return [0];
+    return [cb.radius - ca.radius];
+  },
+
+  computeDof(_c, _ctx) {
+    // Constrains circle radii, not point DOF
+  },
+});
+</file>
+
+<file path="defs/fixed.ts">
+import type { PointId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Pins a point to an absolute position `(x, y)` in sketch space.
+     *
+     * Applied during the **presolve** pass (before iteration), not as a
+     * per-iteration equation. The point's `fixed` flag is set to `true` so
+     * other constraints treat it as immovable. Contributes **0 equations**
+     * to the DOF count because the DOF is removed by setting `pt.fixed`.
+     */
+    fixed: { point: PointId; x: number; y: number };
+  }
+}
+
+registerConstraint<'fixed', ConstraintTypeMap['fixed']>({
+  type: 'fixed',
+  label: 'FIX',
+  isDimension: false,
+  equations: 0,
+
+  displayPosition(c, { points }) {
+    const pt = points.get(c.point);
+    if (pt) return [pt.x + 2.5, pt.y + 2.5];
+    return [0, 0];
+  },
+
+  presolve(c, { points }) {
+    const pt = points.get(c.point);
+    if (!pt) return;
+    pt.fixed = true;
+    pt.x = c.x;
+    pt.y = c.y;
+  },
+
+  solve(_c, _ctx) {
+    // Applied in presolve — nothing to do per-iteration
+    return 0;
+  },
+
+
+  residual(_c, _ctx) {
+    return []; // Point is pinned via presolve — no residual equations
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
+  },
+});
+</file>
+
+<file path="defs/hDistance.ts">
+import type { PointId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the signed horizontal distance from point `a` to point `b` to `value`.
+     *
+     * The constraint is directional: `b.x − a.x = value`. A positive value places
+     * `b` to the right of `a`; negative places it to the left.
+     * Contributes **1 equation**.
+     */
+    hDistance: { a: PointId; b: PointId; value: number };
+  }
+}
+
+registerConstraint<'hDistance', ConstraintTypeMap['hDistance']>({
+  type: 'hDistance',
+  label: 'HD',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (a && b) return midpoint(a, b);
+    return [0, 0];
+  },
+
+  solve(c, { points, tolerance }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return 0;
+    const err = Math.abs((b.x - a.x) - c.value);
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+    if (a.fixed) {
+      b.x = a.x + c.value;
+    } else if (b.fixed) {
+      a.x = b.x - c.value;
+    } else {
+      const midX = (a.x + b.x) / 2;
+      a.x = midX - c.value / 2;
+      b.x = midX + c.value / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return [0];
+    return [b.x - a.x - c.value];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
+    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/horizontal.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces a line to be horizontal (parallel to the X axis).
+     *
+     * Both endpoints are moved to their average Y coordinate so the line
+     * remains centered in place. Contributes **1 equation**: `b.y − a.y = 0`.
+     */
+    horizontal: { line: LineId };
+  }
+}
+
+registerConstraint<'horizontal', ConstraintTypeMap['horizontal']>({
+  type: 'horizontal',
+  label: 'H',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (line) {
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (a && b) return midpointPerp(a, b, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const line = lines.get(c.line);
+    if (!line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+    const err = Math.abs(b.y - a.y);
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+    const y = (a.y + b.y) / 2;
+    if (!a.fixed) a.y = y;
+    if (!b.fixed) b.y = y;
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    return [b.y - a.y];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const line = lines.find((l) => l.id === c.line);
+    if (line) {
+      refCount.set(line.a, (refCount.get(line.a) ?? 0) + 1);
+      refCount.set(line.b, (refCount.get(line.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/index.ts">
+// Side-effect imports: each file calls registerConstraint() at module load time.
+import './coincident';
+import './horizontal';
+import './vertical';
+import './parallel';
+import './perpendicular';
+import './tangent';
+import './equal';
+import './symmetric';
+import './concentric';
+import './collinear';
+import './fixed';
+import './midpoint';
+import './pointOnCircle';
+import './pointOnLine';
+import './distance';
+import './length';
+import './angle';
+import './radius';
+import './diameter';
+import './hDistance';
+import './vDistance';
+import './lineDistance';
+import './absoluteAngle';
+import './equalRadius';
+import './arcLength';
+import './lineTangentArc';
+import './shapeCentroidX';
+import './shapeCentroidY';
+import './shapeWidth';
+import './shapeHeight';
+import './shapeArea';
+import './shapeEqualCentroid';
+import './pointOnLine';
+import './pointLineDistance';
+import './ccw';
+import './angleBetween';
+
+// Re-export named types that external code imports directly
+export type { LineDistanceConstraint } from './lineDistance';
+</file>
+
+<file path="defs/length.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp, distance, lineDirection } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the length of a line segment to `value`.
+     *
+     * Endpoints are scaled symmetrically about the line's midpoint while
+     * preserving its direction. Contributes **1 equation**:
+     * `|b − a| − value = 0`.
+     */
+    length: { line: LineId; value: number };
+  }
+}
+
+registerConstraint<'length', ConstraintTypeMap['length']>({
+  type: 'length',
+  label: 'LEN',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (line) {
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (a && b) return midpointPerp(a, b, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const line = lines.get(c.line);
+    if (!line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+    const len = distance(a, b) || 1;
+    const err = Math.abs(len - c.value);
+    if (err <= tolerance) return err;
+    const dir = lineDirection(a, b);
+    if (a.fixed && b.fixed) return err;
+    if (a.fixed) {
+      b.x = a.x + dir[0] * c.value; b.y = a.y + dir[1] * c.value;
+    } else if (b.fixed) {
+      a.x = b.x - dir[0] * c.value; a.y = b.y - dir[1] * c.value;
+    } else {
+      const mid = midpoint(a, b);
+      a.x = mid[0] - dir[0] * c.value / 2; a.y = mid[1] - dir[1] * c.value / 2;
+      b.x = mid[0] + dir[0] * c.value / 2; b.y = mid[1] + dir[1] * c.value / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    return [Math.hypot(b.x - a.x, b.y - a.y) - c.value];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const line = lines.find((l) => l.id === c.line);
+    if (line) {
+      refCount.set(line.a, (refCount.get(line.a) ?? 0) + 1);
+      refCount.set(line.b, (refCount.get(line.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/lineDistance.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to be parallel **and** separated by a signed
+     * perpendicular distance of `value`.
+     *
+     * The distance is measured from the midpoint of `a` to the midpoint of `b`
+     * along `a`'s left-normal direction. Positive values place `b` to the left
+     * of `a` (when facing `a`'s direction).
+     *
+     * This constraint combines two equations:
+     * 1. `cross(unit_a, unit_b) = 0` — parallelism
+     * 2. `perpDist(mid_b, line_a) − value = 0` — offset distance
+     *
+     * Contributes **2 equations**.
+     */
+    lineDistance: { a: LineId; b: LineId; value: number };
+  }
+}
+
+/** Exported for backward-compatibility with forge-public-api.ts */
+export type LineDistanceConstraint = { id: string; type: 'lineDistance' } & { a: LineId; b: LineId; value: number };
+
+registerConstraint<'lineDistance', ConstraintTypeMap['lineDistance']>({
+  type: 'lineDistance',
+  label: 'LDIST',
+  isDimension: true,
+  equations: 2,
+
+  displayPosition(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    if (lineA) {
+      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return 0;
+    const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return 0;
+
+    // Step 1: enforce parallelism (rotate B to match A's angle)
+    const angleA = angleOfLine(a1, a2);
+    const angleB = angleOfLine(b1, b2);
+    const diff = angleA - angleB;
+    const diffFlipped = angleA + Math.PI - angleB;
+    const useFlipped = Math.abs(normalizeAngle(diffFlipped)) < Math.abs(normalizeAngle(diff));
+    const targetAngle = useFlipped ? angleA + Math.PI : angleA;
+    const angleDelta = normalizeAngle(targetAngle - angleB);
+    if (Math.abs(angleDelta) > tolerance * 0.01) {
+      const midBx = (b1.x + b2.x) / 2;
+      const midBy = (b1.y + b2.y) / 2;
+      const lenB = distance(b1, b2) || 1;
+      const cos = Math.cos(targetAngle);
+      const sin = Math.sin(targetAngle);
+      if (!b1.fixed) { b1.x = midBx - cos * lenB / 2; b1.y = midBy - sin * lenB / 2; }
+      if (!b2.fixed) { b2.x = midBx + cos * lenB / 2; b2.y = midBy + sin * lenB / 2; }
+    }
+
+    // Step 2: compute signed perpendicular distance from A to midpoint of B
+    const dxA = a2.x - a1.x;
+    const dyA = a2.y - a1.y;
+    const lenA = Math.sqrt(dxA * dxA + dyA * dyA) || 1;
+    const nx = -dyA / lenA;
+    const ny = dxA / lenA;
+    const midBx2 = (b1.x + b2.x) / 2;
+    const midBy2 = (b1.y + b2.y) / 2;
+    const midAx = (a1.x + a2.x) / 2;
+    const midAy = (a1.y + a2.y) / 2;
+    const currentDist = (midBx2 - midAx) * nx + (midBy2 - midAy) * ny;
+    const err = Math.abs(currentDist - c.value);
+    if (err <= tolerance) return err;
+
+    // Shift line B along the normal so the distance matches the target
+    const shift = c.value - currentDist;
+    const allBFixed = b1.fixed && b2.fixed;
+    const allAFixed = a1.fixed && a2.fixed;
+    if (allBFixed && allAFixed) return err;
+    if (allAFixed || !allBFixed) {
+      if (!b1.fixed) { b1.x += nx * shift; b1.y += ny * shift; }
+      if (!b2.fixed) { b2.x += nx * shift; b2.y += ny * shift; }
+    } else {
+      if (!a1.fixed) { a1.x -= nx * shift; a1.y -= ny * shift; }
+      if (!a2.fixed) { a2.x -= nx * shift; a2.y -= ny * shift; }
+    }
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0, 0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0, 0];
+    const dax = a2.x - a1.x; const day = a2.y - a1.y;
+    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1;
+    const lenB = Math.hypot(dbx, dby) || 1;
+    // 1) Parallel: cross of unit directions = 0
+    const parallel = (dax / lenA) * (dby / lenB) - (day / lenA) * (dbx / lenB);
+    // 2) Signed perpendicular distance from midpoint of b to line a = value
+    const nx = -day / lenA; const ny = dax / lenA;
+    const midBx = (b1.x + b2.x) / 2; const midBy = (b1.y + b2.y) / 2;
+    const midAx = (a1.x + a2.x) / 2; const midAy = (a1.y + a2.y) / 2;
+    const dist = (midBx - midAx) * nx + (midBy - midAy) * ny;
+    return [parallel, dist - c.value];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const lineA = lines.find((l) => l.id === c.a);
+    const lineB = lines.find((l) => l.id === c.b);
+    if (lineA) {
+      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
+      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
+    }
+    if (lineB) {
+      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
+      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/lineTangentArc.ts">
+import type { ArcId, LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Constrains a line to be tangent to an arc at the arc's start or end point.
+     *
+     * Tangency requires the line's direction to be perpendicular to the arc's
+     * radius at the contact point. Set `atStart: true` to use the arc's start
+     * point as the tangency contact; `false` uses the end point.
+     *
+     * The solver rotates the line (around its midpoint, or from the fixed end)
+     * so that `dot(unit_line, unit_radius) = 0`.
+     * Contributes **1 equation**.
+     */
+    lineTangentArc: { line: LineId; arc: ArcId; atStart: boolean };
+  }
+}
+
+registerConstraint<'lineTangentArc', ConstraintTypeMap['lineTangentArc']>({
+  type: 'lineTangentArc',
+  label: 'TAN',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, arcs, points }) {
+    const line = lines.get(c.line);
+    const arc = arcs.get(c.arc);
+    if (!line || !arc) return [0, 0];
+    const pt = points.get(c.atStart ? arc.start : arc.end);
+    if (!pt) return [0, 0];
+    return [pt.x + 2.5, pt.y + 2.5];
+  },
+
+  solve(c, { lines, arcs, points, tolerance }) {
+    const line = lines.get(c.line);
+    const arc = arcs.get(c.arc);
+    if (!line || !arc) return 0;
+    const lineA = points.get(line.a);
+    const lineB = points.get(line.b);
+    const center = points.get(arc.center);
+    const tangentPt = points.get(c.atStart ? arc.start : arc.end);
+    if (!lineA || !lineB || !center || !tangentPt) return 0;
+
+    // Tangency condition: line direction ⊥ radius at tangent point.
+    // cross(lineDir, radiusDir) = 0  →  (bx-ax)*(py-cy) - (by-ay)*(px-cx) = 0
+    const rdx = tangentPt.x - center.x;
+    const rdy = tangentPt.y - center.y;
+    const ldx = lineB.x - lineA.x;
+    const ldy = lineB.y - lineA.y;
+    const cross = ldx * rdy - ldy * rdx;
+    const len = Math.sqrt(ldx * ldx + ldy * ldy) || 1;
+    const rLen = Math.sqrt(rdx * rdx + rdy * rdy) || 1;
+    const err = Math.abs(cross) / (len * rLen);
+    if (err <= tolerance) return err;
+
+    // Rotate the line so its direction is perpendicular to the radius.
+    // Tangent direction at tangent point: (-rdy/rLen, rdx/rLen)
+    const tx = -rdy / rLen;
+    const ty = rdx / rLen;
+    const half = len / 2;
+    const mx = (lineA.x + lineB.x) / 2;
+    const my = (lineA.y + lineB.y) / 2;
+
+    if (!lineA.fixed && !lineB.fixed) {
+      lineA.x = mx - tx * half; lineA.y = my - ty * half;
+      lineB.x = mx + tx * half; lineB.y = my + ty * half;
+    } else if (lineA.fixed) {
+      lineB.x = lineA.x + tx * len; lineB.y = lineA.y + ty * len;
+    } else {
+      lineA.x = lineB.x - tx * len; lineA.y = lineB.y - ty * len;
+    }
+    return err;
+  },
+
+  residual(c, { lines, arcs, points }) {
+    const line = lines.get(c.line); const arc = arcs.get(c.arc);
+    if (!line || !arc) return [0];
+    const la = points.get(line.a); const lb = points.get(line.b);
+    const center = points.get(arc.center);
+    const tangentPt = points.get(c.atStart ? arc.start : arc.end);
+    if (!la || !lb || !center || !tangentPt) return [0];
+    const ldx = lb.x - la.x; const ldy = lb.y - la.y;
+    const rdx = tangentPt.x - center.x; const rdy = tangentPt.y - center.y;
+    const lenL = Math.hypot(ldx, ldy) || 1;
+    const lenR = Math.hypot(rdx, rdy) || 1;
+    // Tangency: line direction must be perpendicular to the radius at the tangent point,
+    // i.e. dot(unit_line, unit_radius) = 0.
+    return [(ldx / lenL) * (rdx / lenR) + (ldy / lenL) * (rdy / lenR)];
+  },
+
+  computeDof(_c, _ctx) {},
+});
+</file>
+
+<file path="defs/midpoint.ts">
+import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces a point to sit at the exact midpoint of a line segment.
+     *
+     * When the midpoint is free the solver snaps it to `(a + b) / 2`. When the
+     * midpoint is fixed both line endpoints are translated equally to place their
+     * midpoint at the fixed position. Contributes **2 equations**
+     * (one per axis): `point − (a + b) / 2 = [0, 0]`.
+     */
+    midpoint: { point: PointId; line: LineId };
+  }
+}
+
+registerConstraint<'midpoint', ConstraintTypeMap['midpoint']>({
+  type: 'midpoint',
+  label: 'MID',
+  isDimension: false,
+  equations: 2,
+
+  displayPosition(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (line) {
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (a && b) return midpointPerp(a, b, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { points, lines, tolerance }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const err = Math.sqrt((pt.x - mx) ** 2 + (pt.y - my) ** 2);
+    if (err <= tolerance) return err;
+    if (!pt.fixed) {
+      pt.x = mx;
+      pt.y = my;
+    } else {
+      const dx = pt.x - mx;
+      const dy = pt.y - my;
+      if (!a.fixed) { a.x += dx; a.y += dy; }
+      if (!b.fixed) { b.x += dx; b.y += dy; }
+    }
+    return err;
+  },
+
+
+  residual(c, { points, lines }) {
+    const pt = points.get(c.point); const line = lines.get(c.line);
+    if (!pt || !line) return [0, 0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0, 0];
+    return [pt.x - (a.x + b.x) / 2, pt.y - (a.y + b.y) / 2];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 2);
+  },
+});
+</file>
+
+<file path="defs/parallel.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to be parallel.
+     *
+     * The direction of `b` is rotated to match `a`'s direction (either
+     * co-directional or anti-parallel — whichever is closer to the current
+     * orientation). Line `a` is treated as the reference; only `b` is moved.
+     * Contributes **1 equation**: `cross(unit_a, unit_b) = 0`.
+     */
+    parallel: { a: LineId; b: LineId };
+  }
+}
+
+registerConstraint<'parallel', ConstraintTypeMap['parallel']>({
+  type: 'parallel',
+  label: 'PAR',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    if (lineA) {
+      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return 0;
+    const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return 0;
+    const baseAngle = angleOfLine(a1, a2);
+    const current = angleOfLine(b1, b2);
+    const d0 = Math.abs(normalizeAngle(current - baseAngle));
+    const dPI = Math.abs(normalizeAngle(current - (baseAngle + Math.PI)));
+    const target = d0 <= dPI ? baseAngle : baseAngle + Math.PI;
+    const err = Math.abs(normalizeAngle(current - target));
+    if (err <= tolerance) return err;
+    if (b1.fixed && b2.fixed) return err;
+    const len = distance(b1, b2) || 1;
+    const dir: [number, number] = [Math.cos(target), Math.sin(target)];
+    if (b1.fixed) {
+      b2.x = b1.x + dir[0] * len; b2.y = b1.y + dir[1] * len;
+    } else if (b2.fixed) {
+      b1.x = b2.x - dir[0] * len; b1.y = b2.y - dir[1] * len;
+    } else {
+      const mid = midpoint(b1, b2);
+      b1.x = mid[0] - dir[0] * len / 2; b1.y = mid[1] - dir[1] * len / 2;
+      b2.x = mid[0] + dir[0] * len / 2; b2.y = mid[1] + dir[1] * len / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0];
+    const dax = a2.x - a1.x; const day = a2.y - a1.y;
+    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1;
+    const lenB = Math.hypot(dbx, dby) || 1;
+    // Cross product of unit direction vectors
+    return [(dax / lenA) * (dby / lenB) - (day / lenA) * (dbx / lenB)];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const lineA = lines.find((l) => l.id === c.a);
+    const lineB = lines.find((l) => l.id === c.b);
+    if (lineA) {
+      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
+      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
+    }
+    if (lineB) {
+      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
+      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/perpendicular.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp, angleOfLine, normalizeAngle, distance } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces lines `a` and `b` to be perpendicular (90° apart).
+     *
+     * The direction of `b` is rotated to be ±90° from `a`, choosing the
+     * sign closest to the current orientation. Line `a` is the reference;
+     * only `b` is moved. Contributes **1 equation**: `dot(unit_a, unit_b) = 0`.
+     */
+    perpendicular: { a: LineId; b: LineId };
+  }
+}
+
+registerConstraint<'perpendicular', ConstraintTypeMap['perpendicular']>({
+  type: 'perpendicular',
+  label: 'PERP',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const lineA = lines.get(c.a);
+    if (lineA) {
+      const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+      if (a1 && a2) return midpointPerp(a1, a2, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const lineA = lines.get(c.a);
+    const lineB = lines.get(c.b);
+    if (!lineA || !lineB) return 0;
+    const a1 = points.get(lineA.a); const a2 = points.get(lineA.b);
+    const b1 = points.get(lineB.a); const b2 = points.get(lineB.b);
+    if (!a1 || !a2 || !b1 || !b2) return 0;
+    const baseAngle = angleOfLine(a1, a2);
+    const current = angleOfLine(b1, b2);
+    const d90 = Math.abs(normalizeAngle(current - (baseAngle + Math.PI / 2)));
+    const dN90 = Math.abs(normalizeAngle(current - (baseAngle - Math.PI / 2)));
+    const target = d90 <= dN90 ? baseAngle + Math.PI / 2 : baseAngle - Math.PI / 2;
+    const err = Math.abs(normalizeAngle(current - target));
+    if (err <= tolerance) return err;
+    if (b1.fixed && b2.fixed) return err;
+    const len = distance(b1, b2) || 1;
+    const dir: [number, number] = [Math.cos(target), Math.sin(target)];
+    if (b1.fixed) {
+      b2.x = b1.x + dir[0] * len; b2.y = b1.y + dir[1] * len;
+    } else if (b2.fixed) {
+      b1.x = b2.x - dir[0] * len; b1.y = b2.y - dir[1] * len;
+    } else {
+      const mid = midpoint(b1, b2);
+      b1.x = mid[0] - dir[0] * len / 2; b1.y = mid[1] - dir[1] * len / 2;
+      b2.x = mid[0] + dir[0] * len / 2; b2.y = mid[1] + dir[1] * len / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const la = lines.get(c.a); const lb = lines.get(c.b);
+    if (!la || !lb) return [0];
+    const a1 = points.get(la.a); const a2 = points.get(la.b);
+    const b1 = points.get(lb.a); const b2 = points.get(lb.b);
+    if (!a1 || !a2 || !b1 || !b2) return [0];
+    const dax = a2.x - a1.x; const day = a2.y - a1.y;
+    const dbx = b2.x - b1.x; const dby = b2.y - b1.y;
+    const lenA = Math.hypot(dax, day) || 1;
+    const lenB = Math.hypot(dbx, dby) || 1;
+    // Dot product of unit direction vectors = 0 for perpendicular
+    return [(dax / lenA) * (dbx / lenB) + (day / lenA) * (dby / lenB)];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const lineA = lines.find((l) => l.id === c.a);
+    const lineB = lines.find((l) => l.id === c.b);
+    if (lineA) {
+      refCount.set(lineA.a, (refCount.get(lineA.a) ?? 0) + 1);
+      refCount.set(lineA.b, (refCount.get(lineA.b) ?? 0) + 1);
+    }
+    if (lineB) {
+      refCount.set(lineB.a, (refCount.get(lineB.a) ?? 0) + 1);
+      refCount.set(lineB.b, (refCount.get(lineB.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="defs/pointLineDistance.ts">
+import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Constrains the signed perpendicular distance from a point to an infinite line.
+     *
+     * Positive `value` places the point to the **left** of the line
+     * (when facing the line's direction from `a` to `b`). Negative places it
+     * to the right. Zero is equivalent to `collinear`.
+     * Contributes **1 equation**: `perpDist(point, line) − value = 0`.
+     */
+    pointLineDistance: { point: PointId; line: LineId; value: number };
+  }
+}
+
+registerConstraint<'pointLineDistance', ConstraintTypeMap['pointLineDistance']>({
+  type: 'pointLineDistance',
+  label: 'PDIST',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const pt = points.get(c.point);
+    if (pt) return [pt.x + 2.5, pt.y + 2.5];
+    return [0, 0];
+  },
+
+  solve(c, { points, lines, movePoint, tolerance }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return 0;
+
+    // Left-normal: (-dy, dx) / len
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    const current = (pt.x - a.x) * nx + (pt.y - a.y) * ny;
+    const err = Math.abs(current - c.value);
+    if (err <= tolerance) return err;
+
+    const shift = c.value - current;
+    if (!pt.fixed) {
+      pt.x += nx * shift;
+      pt.y += ny * shift;
+    } else {
+      // Point is fixed — translate the line instead
+      if (!a.fixed) movePoint(a, -nx * shift, -ny * shift);
+      if (!b.fixed) movePoint(b, -nx * shift, -ny * shift);
+    }
+    return err;
+  },
+
+  residual(c, { points, lines }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return [0];
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return [0];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    return [(pt.x - a.x) * nx + (pt.y - a.y) * ny - c.value];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/pointOnCircle.ts">
+import type { PointId, CircleId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces a point to lie exactly on the circumference of a circle.
+     *
+     * The point is moved radially so its distance from the center equals the
+     * radius. Contributes **1 equation**: `|point − center| − radius = 0`.
+     */
+    pointOnCircle: { point: PointId; circle: CircleId };
+  }
+}
+
+registerConstraint<'pointOnCircle', ConstraintTypeMap['pointOnCircle']>({
+  type: 'pointOnCircle',
+  label: 'POC',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const pt = points.get(c.point);
+    if (pt) return [pt.x, pt.y];
+    return [0, 0];
+  },
+
+  solve(c, { points, circles, tolerance }) {
+    const pt = points.get(c.point);
+    const circle = circles.get(c.circle);
+    if (!pt || !circle) return 0;
+    const center = points.get(circle.center);
+    if (!center) return 0;
+    const dx = pt.x - center.x;
+    const dy = pt.y - center.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const err = Math.abs(dist - circle.radius);
+    if (err <= tolerance) return err;
+    if (!pt.fixed) {
+      pt.x = center.x + (dx / dist) * circle.radius;
+      pt.y = center.y + (dy / dist) * circle.radius;
+    } else if (!center.fixed) {
+      center.x = pt.x - (dx / dist) * circle.radius;
+      center.y = pt.y - (dy / dist) * circle.radius;
+    }
+    return err;
+  },
+
+
+  residual(c, { points, circles }) {
+    const pt = points.get(c.point); const circle = circles.get(c.circle);
+    if (!pt || !circle) return [0];
+    const center = points.get(circle.center);
+    if (!center) return [0];
+    return [Math.hypot(pt.x - center.x, pt.y - center.y) - circle.radius];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/pointOnLine.ts">
+import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces a point to lie on a **bounded** line segment — not merely the
+     * infinite extension of the line.
+     *
+     * The point is projected onto the segment and the parameter `t` is clamped
+     * to `[0, 1]`.  When `t` is already inside that range the behaviour is
+     * identical to `collinear`.  When the point would project outside the
+     * segment it is snapped to the nearest endpoint instead.
+     *
+     * Contributes **1 equation** (like `collinear`): the point can still slide
+     * along the segment, giving it one remaining degree of freedom.
+     */
+    pointOnLine: { point: PointId; line: LineId };
+  }
+}
+
+registerConstraint<'pointOnLine', ConstraintTypeMap['pointOnLine']>({
+  type: 'pointOnLine',
+  label: 'POL',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const pt = points.get(c.point);
+    if (pt) return [pt.x, pt.y];
+    return [0, 0];
+  },
+
+  solve(c, { points, lines, movePoint, tolerance }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-9) return 0;
+
+    const t = ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2;
+    const tc = Math.max(0, Math.min(1, t));
+    const projX = a.x + tc * dx;
+    const projY = a.y + tc * dy;
+
+    const err = Math.sqrt((pt.x - projX) ** 2 + (pt.y - projY) ** 2);
+    if (err <= tolerance) return err;
+
+    if (!pt.fixed) {
+      pt.x = projX;
+      pt.y = projY;
+    } else {
+      const ddx = projX - pt.x;
+      const ddy = projY - pt.y;
+      if (!a.fixed) movePoint(a, -ddx, -ddy);
+      if (!b.fixed) movePoint(b, -ddx, -ddy);
+    }
+    return err;
+  },
+
+  residual(c, { points, lines }) {
+    const pt = points.get(c.point);
+    const line = lines.get(c.line);
+    if (!pt || !line) return [0];
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return [0];
+
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-9) return [0];
+    const len = Math.sqrt(len2);
+
+    const t = ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2;
+
+    if (t < 0) {
+      // Point projects before endpoint a — return negative distance so NR
+      // drives it toward a.
+      return [-Math.hypot(pt.x - a.x, pt.y - a.y)];
+    }
+    if (t > 1) {
+      // Point projects past endpoint b — return positive distance so NR
+      // drives it toward b.
+      return [Math.hypot(pt.x - b.x, pt.y - b.y)];
+    }
+    // Interior: signed perpendicular distance to the infinite line (same as collinear).
+    return [((pt.x - a.x) * dy - (pt.y - a.y) * dx) / len];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.point, (refCount.get(c.point) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/radius.ts">
+import type { CircleId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the radius of a circle to `value`.
+     *
+     * Has no effect if the circle's `fixedRadius` flag is set.
+     * Contributes **1 equation**: `radius − value = 0`.
+     */
+    radius: { circle: CircleId; value: number };
+  }
+}
+
+registerConstraint<'radius', ConstraintTypeMap['radius']>({
+  type: 'radius',
+  label: 'R',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { circles, points }) {
+    const circle = circles.get(c.circle);
+    if (circle) {
+      const center = points.get(circle.center);
+      if (center) return [center.x + circle.radius, center.y];
+    }
+    return [0, 0];
+  },
+
+  solve(c, { circles, tolerance }) {
+    const circle = circles.get(c.circle);
+    if (!circle) return 0;
+    const err = Math.abs(circle.radius - c.value);
+    if (err <= tolerance) return err;
+    if (!circle.fixedRadius) circle.radius = c.value;
+    return err;
+  },
+
+
+  residual(c, { circles }) {
+    const circle = circles.get(c.circle);
+    if (!circle) return [0];
+    return [circle.radius - c.value];
+  },
+
+  computeDof(_c, _ctx) {
+    // radius constrains circle radius (not a point DOF)
+  },
+});
+</file>
+
+<file path="defs/shapeArea.ts">
+import type { ShapeId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { shapeVertices, shapeCentroid, traverseShapeVertices, polygonSignedArea } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the enclosed area of a polygon shape to `value`.
+     *
+     * Area is computed via the shoelace formula on the ordered vertex list.
+     * All non-fixed vertices are scaled uniformly from the polygon's arithmetic
+     * centroid: `scale = sqrt(target / current)`, so the shape's proportions
+     * and position are preserved. Contributes **1 equation**.
+     */
+    shapeArea: { shape: ShapeId; value: number };
+  }
+}
+
+registerConstraint<'shapeArea', ConstraintTypeMap['shapeArea']>({
+  type: 'shapeArea',
+  label: 'AREA',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { shapes, lines, points }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return [0, 0];
+    const pts = shapeVertices(shape, lines, points);
+    return shapeCentroid(pts);
+  },
+
+  solve(c, { shapes, lines, points, tolerance }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return 0;
+    // Prefer ordered traversal for correct signed area; fall back to unordered
+    const ordered = traverseShapeVertices(shape, lines, points);
+    const pts = ordered ?? shapeVertices(shape, lines, points);
+    if (pts.length < 3) return 0;
+    const area = Math.abs(polygonSignedArea(pts));
+    const err = Math.abs(area - c.value);
+    if (err <= tolerance) return err;
+    if (area < 1e-9) return err;
+    // Uniform scale from centroid: new_area = area * scale²  →  scale = sqrt(target / area)
+    const scale = Math.sqrt(c.value / area);
+    const [cx, cy] = shapeCentroid(pts);
+    for (const pt of pts) {
+      if (!pt.fixed) {
+        pt.x = cx + (pt.x - cx) * scale;
+        pt.y = cy + (pt.y - cy) * scale;
+      }
+    }
+    return err;
+  },
+
+  computeDof(c, { refCount, lines, shapes }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return;
+    const seen = new Set<string>();
+    for (const lineId of shape.lines) {
+      const l = lines.find((ln) => ln.id === lineId);
+      if (!l) continue;
+      for (const ptId of [l.a, l.b]) {
+        if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
+      }
+    }
+  },
+});
+</file>
+
+<file path="defs/shapeCentroidX.ts">
+import type { ShapeId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { shapeVertices, shapeCentroid } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the X coordinate of a polygon's arithmetic centroid to `value`.
+     *
+     * All non-fixed vertices are translated horizontally by the same amount so
+     * that `mean(vertices.x) = value`. The shape's size, proportions, and Y
+     * position are unaffected. Contributes **1 equation**.
+     */
+    shapeCentroidX: { shape: ShapeId; value: number };
+  }
+}
+
+registerConstraint<'shapeCentroidX', ConstraintTypeMap['shapeCentroidX']>({
+  type: 'shapeCentroidX',
+  label: 'CX',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { shapes, lines, points }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return [0, 0];
+    const pts = shapeVertices(shape, lines, points);
+    return shapeCentroid(pts);
+  },
+
+  solve(c, { shapes, lines, points, tolerance }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return 0;
+    const pts = shapeVertices(shape, lines, points);
+    if (pts.length === 0) return 0;
+    const [cx] = shapeCentroid(pts);
+    const err = Math.abs(cx - c.value);
+    if (err <= tolerance) return err;
+    const shift = c.value - cx;
+    for (const pt of pts) {
+      if (!pt.fixed) pt.x += shift;
+    }
+    return err;
+  },
+
+  computeDof(c, { refCount, lines, shapes }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return;
+    const seen = new Set<string>();
+    for (const lineId of shape.lines) {
+      const l = lines.find((ln) => ln.id === lineId);
+      if (!l) continue;
+      for (const ptId of [l.a, l.b]) {
+        if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
+      }
+    }
+  },
+});
+</file>
+
+<file path="defs/shapeCentroidY.ts">
+import type { ShapeId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { shapeVertices, shapeCentroid } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the Y coordinate of a polygon's arithmetic centroid to `value`.
+     *
+     * All non-fixed vertices are translated vertically by the same amount so
+     * that `mean(vertices.y) = value`. The shape's size, proportions, and X
+     * position are unaffected. Contributes **1 equation**.
+     */
+    shapeCentroidY: { shape: ShapeId; value: number };
+  }
+}
+
+registerConstraint<'shapeCentroidY', ConstraintTypeMap['shapeCentroidY']>({
+  type: 'shapeCentroidY',
+  label: 'CY',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { shapes, lines, points }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return [0, 0];
+    const pts = shapeVertices(shape, lines, points);
+    return shapeCentroid(pts);
+  },
+
+  solve(c, { shapes, lines, points, tolerance }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return 0;
+    const pts = shapeVertices(shape, lines, points);
+    if (pts.length === 0) return 0;
+    const [, cy] = shapeCentroid(pts);
+    const err = Math.abs(cy - c.value);
+    if (err <= tolerance) return err;
+    const shift = c.value - cy;
+    for (const pt of pts) {
+      if (!pt.fixed) pt.y += shift;
+    }
+    return err;
+  },
+
+  computeDof(c, { refCount, lines, shapes }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return;
+    const seen = new Set<string>();
+    for (const lineId of shape.lines) {
+      const l = lines.find((ln) => ln.id === lineId);
+      if (!l) continue;
+      for (const ptId of [l.a, l.b]) {
+        if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
+      }
+    }
+  },
+});
+</file>
+
+<file path="defs/shapeEqualCentroid.ts">
+import type { ShapeId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { shapeVertices, shapeCentroid } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces two shapes to share the same centroid.
+     *
+     * Translates the non-fixed vertices of each shape so that their arithmetic
+     * centroids coincide at the mean of the two current centroids.
+     * Contributes **2 equations**: `cx(a) − cx(b) = 0` and `cy(a) − cy(b) = 0`.
+     */
+    shapeEqualCentroid: { a: ShapeId; b: ShapeId };
+  }
+}
+
+registerConstraint<'shapeEqualCentroid', ConstraintTypeMap['shapeEqualCentroid']>({
+  type: 'shapeEqualCentroid',
+  label: 'CC',
+  isDimension: false,
+  equations: 2,
+
+  displayPosition(c, { shapes, lines, points }) {
+    const shapeA = shapes.get(c.a);
+    const shapeB = shapes.get(c.b);
+    if (!shapeA || !shapeB) return [0, 0];
+    const [ax, ay] = shapeCentroid(shapeVertices(shapeA, lines, points));
+    const [bx, by] = shapeCentroid(shapeVertices(shapeB, lines, points));
+    return [(ax + bx) / 2, (ay + by) / 2];
+  },
+
+  solve(c, { shapes, lines, points, tolerance }) {
+    const shapeA = shapes.get(c.a);
+    const shapeB = shapes.get(c.b);
+    if (!shapeA || !shapeB) return 0;
+    const ptsA = shapeVertices(shapeA, lines, points);
+    const ptsB = shapeVertices(shapeB, lines, points);
+    if (ptsA.length === 0 || ptsB.length === 0) return 0;
+
+    const [ax, ay] = shapeCentroid(ptsA);
+    const [bx, by] = shapeCentroid(ptsB);
+
+    const errX = Math.abs(ax - bx);
+    const errY = Math.abs(ay - by);
+    const err = Math.max(errX, errY);
+    if (err <= tolerance) return err;
+
+    // Translate each shape toward the midpoint between their centroids.
+    const tx = (ax + bx) / 2;
+    const ty = (ay + by) / 2;
+
+    for (const pt of ptsA) {
+      if (!pt.fixed) { pt.x += tx - ax; pt.y += ty - ay; }
+    }
+    for (const pt of ptsB) {
+      if (!pt.fixed) { pt.x += tx - bx; pt.y += ty - by; }
+    }
+    return err;
+  },
+
+  residual(c, { shapes, lines, points }) {
+    const shapeA = shapes.get(c.a);
+    const shapeB = shapes.get(c.b);
+    if (!shapeA || !shapeB) return [0, 0];
+    const [ax, ay] = shapeCentroid(shapeVertices(shapeA, lines, points));
+    const [bx, by] = shapeCentroid(shapeVertices(shapeB, lines, points));
+    return [ax - bx, ay - by];
+  },
+
+  computeDof(c, { refCount, lines, shapes }) {
+    for (const shapeId of [c.a, c.b]) {
+      const shape = shapes.get(shapeId);
+      if (!shape) continue;
+      const seen = new Set<string>();
+      for (const lineId of shape.lines) {
+        const l = lines.find((ln) => ln.id === lineId);
+        if (!l) continue;
+        for (const ptId of [l.a, l.b]) {
+          if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
+        }
+      }
+    }
+  },
+});
+</file>
+
+<file path="defs/shapeHeight.ts">
+import type { ShapeId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { shapeVertices, shapeBoundingBox } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the axis-aligned bounding-box height of a polygon shape to `value`.
+     *
+     * All non-fixed vertices are scaled vertically (`y` only) from the
+     * bounding-box center: `pt.y = cy + (pt.y − cy) × (value / height)`.
+     * The shape's width and X position are unaffected.
+     * Contributes **1 equation**.
+     */
+    shapeHeight: { shape: ShapeId; value: number };
+  }
+}
+
+registerConstraint<'shapeHeight', ConstraintTypeMap['shapeHeight']>({
+  type: 'shapeHeight',
+  label: 'H',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { shapes, lines, points }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return [0, 0];
+    const pts = shapeVertices(shape, lines, points);
+    if (pts.length === 0) return [0, 0];
+    const { cx, cy } = shapeBoundingBox(pts);
+    return [cx, cy];
+  },
+
+  solve(c, { shapes, lines, points, tolerance }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return 0;
+    const pts = shapeVertices(shape, lines, points);
+    if (pts.length === 0) return 0;
+    const bbox = shapeBoundingBox(pts);
+    const err = Math.abs(bbox.height - c.value);
+    if (err <= tolerance) return err;
+    if (bbox.height < 1e-9) return err;
+    const scale = c.value / bbox.height;
+    for (const pt of pts) {
+      if (!pt.fixed) pt.y = bbox.cy + (pt.y - bbox.cy) * scale;
+    }
+    return err;
+  },
+
+  computeDof(c, { refCount, lines, shapes }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return;
+    const seen = new Set<string>();
+    for (const lineId of shape.lines) {
+      const l = lines.find((ln) => ln.id === lineId);
+      if (!l) continue;
+      for (const ptId of [l.a, l.b]) {
+        if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
+      }
+    }
+  },
+});
+</file>
+
+<file path="defs/shapeWidth.ts">
+import type { ShapeId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { shapeVertices, shapeBoundingBox } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the axis-aligned bounding-box width of a polygon shape to `value`.
+     *
+     * All non-fixed vertices are scaled horizontally (`x` only) from the
+     * bounding-box center: `pt.x = cx + (pt.x − cx) × (value / width)`.
+     * The shape's height and Y position are unaffected.
+     * Contributes **1 equation**.
+     */
+    shapeWidth: { shape: ShapeId; value: number };
+  }
+}
+
+registerConstraint<'shapeWidth', ConstraintTypeMap['shapeWidth']>({
+  type: 'shapeWidth',
+  label: 'W',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { shapes, lines, points }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return [0, 0];
+    const pts = shapeVertices(shape, lines, points);
+    if (pts.length === 0) return [0, 0];
+    const { cx, cy } = shapeBoundingBox(pts);
+    return [cx, cy];
+  },
+
+  solve(c, { shapes, lines, points, tolerance }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return 0;
+    const pts = shapeVertices(shape, lines, points);
+    if (pts.length === 0) return 0;
+    const bbox = shapeBoundingBox(pts);
+    const err = Math.abs(bbox.width - c.value);
+    if (err <= tolerance) return err;
+    if (bbox.width < 1e-9) return err;
+    const scale = c.value / bbox.width;
+    for (const pt of pts) {
+      if (!pt.fixed) pt.x = bbox.cx + (pt.x - bbox.cx) * scale;
+    }
+    return err;
+  },
+
+  computeDof(c, { refCount, lines, shapes }) {
+    const shape = shapes.get(c.shape);
+    if (!shape) return;
+    const seen = new Set<string>();
+    for (const lineId of shape.lines) {
+      const l = lines.find((ln) => ln.id === lineId);
+      if (!l) continue;
+      for (const ptId of [l.a, l.b]) {
+        if (!seen.has(ptId)) { seen.add(ptId); refCount.set(ptId, (refCount.get(ptId) ?? 0) + 1); }
+      }
+    }
+  },
+});
+</file>
+
+<file path="defs/symmetric.ts">
+import type { PointId, LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, reflectPointAcrossLine } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces points `a` and `b` to be mirror images of each other across
+     * the infinite line through `axis`.
+     *
+     * When neither point is fixed, `b` is moved to the reflection of `a`.
+     * When `b` is fixed, `a` is moved instead. Contributes **2 equations**
+     * (one per axis): `b − reflect(a, axis) = [0, 0]`.
+     */
+    symmetric: { a: PointId; b: PointId; axis: LineId };
+  }
+}
+
+registerConstraint<'symmetric', ConstraintTypeMap['symmetric']>({
+  type: 'symmetric',
+  label: 'SYM',
+  isDimension: false,
+  equations: 2,
+
+  displayPosition(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (a && b) return midpoint(a, b);
+    return [0, 0];
+  },
+
+  solve(c, { points, lines, tolerance }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    const axis = lines.get(c.axis);
+    if (!a || !b || !axis) return 0;
+    const ax1 = points.get(axis.a);
+    const ax2 = points.get(axis.b);
+    if (!ax1 || !ax2) return 0;
+    const ra = reflectPointAcrossLine(a, ax1, ax2);
+    const rb = reflectPointAcrossLine(b, ax1, ax2);
+    const err = Math.sqrt((b.x - ra[0]) ** 2 + (b.y - ra[1]) ** 2);
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+    if (a.fixed) {
+      b.x = ra[0]; b.y = ra[1];
+    } else if (b.fixed) {
+      a.x = rb[0]; a.y = rb[1];
+    } else {
+      b.x = ra[0]; b.y = ra[1];
+    }
+    return err;
+  },
+
+
+  residual(c, { points, lines }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    const axis = lines.get(c.axis);
+    if (!a || !b || !axis) return [0, 0];
+    const ax1 = points.get(axis.a); const ax2 = points.get(axis.b);
+    if (!ax1 || !ax2) return [0, 0];
+    // Reflect a across axis
+    const dx = ax2.x - ax1.x; const dy = ax2.y - ax1.y;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = ((a.x - ax1.x) * dx + (a.y - ax1.y) * dy) / len2;
+    const px = ax1.x + t * dx; const py = ax1.y + t * dy;
+    const rx = 2 * px - a.x; const ry = 2 * py - a.y;
+    return [b.x - rx, b.y - ry];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
+    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/tangent.ts">
+import type { LineId, CircleId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, distance } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Constrains tangency between a line and a circle, or between two circles.
+     *
+     * **Line–circle** (`line` + `circle`): the perpendicular distance from the
+     * circle's center to the infinite line equals the circle's radius.
+     *
+     * **Circle–circle** (`a` + `b`): the two circles are externally tangent —
+     * the distance between centers equals the sum of their radii.
+     *
+     * Exactly one mode must be active (provide either `line`+`circle` or `a`+`b`).
+     * Contributes **1 equation**.
+     */
+    tangent: { line?: LineId; circle?: CircleId; a?: CircleId; b?: CircleId };
+  }
+}
+
+registerConstraint<'tangent', ConstraintTypeMap['tangent']>({
+  type: 'tangent',
+  label: 'TAN',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, circles, points }) {
+    if (c.line && c.circle) {
+      const line = lines.get(c.line);
+      if (line) {
+        const a = points.get(line.a);
+        const b = points.get(line.b);
+        if (a && b) return midpoint(a, b);
+      }
+    } else if (c.a && c.b) {
+      const c1 = circles.get(c.a);
+      const c2 = circles.get(c.b);
+      if (c1 && c2) {
+        const p1 = points.get(c1.center);
+        const p2 = points.get(c2.center);
+        if (p1 && p2) return midpoint(p1, p2);
+      }
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, circles, points, tolerance }) {
+    if (c.line && c.circle) {
+      const line = lines.get(c.line);
+      const circle = circles.get(c.circle);
+      if (!line || !circle) return 0;
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      const center = points.get(circle.center);
+      if (!a || !b || !center) return 0;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      const dist = (center.x - a.x) * nx + (center.y - a.y) * ny;
+      const err = Math.abs(Math.abs(dist) - circle.radius);
+      if (err <= tolerance) return err;
+      const shift = dist > 0 ? dist - circle.radius : dist + circle.radius;
+      const distA = Math.hypot(a.x - center.x, a.y - center.y);
+      const distB = Math.hypot(b.x - center.x, b.y - center.y);
+      const moveA = distA <= distB;
+      if (moveA) {
+        if (!a.fixed) { a.x -= nx * shift; a.y -= ny * shift; }
+        else if (!b.fixed) { b.x -= nx * shift; b.y -= ny * shift; }
+        else if (!center.fixed) { center.x -= nx * shift; center.y -= ny * shift; }
+      } else {
+        if (!b.fixed) { b.x -= nx * shift; b.y -= ny * shift; }
+        else if (!a.fixed) { a.x -= nx * shift; a.y -= ny * shift; }
+        else if (!center.fixed) { center.x -= nx * shift; center.y -= ny * shift; }
+      }
+      return err;
+    }
+
+    if (c.a && c.b) {
+      const c1 = circles.get(c.a);
+      const c2 = circles.get(c.b);
+      if (!c1 || !c2) return 0;
+      const p1 = points.get(c1.center);
+      const p2 = points.get(c2.center);
+      if (!p1 || !p2) return 0;
+      const target = c1.radius + c2.radius;
+      const len = distance(p1, p2) || 1;
+      const err = Math.abs(len - target);
+      if (err <= tolerance) return err;
+      const dir: [number, number] = [(p2.x - p1.x) / len, (p2.y - p1.y) / len];
+      if (p1.fixed && p2.fixed) return err;
+      if (p1.fixed) {
+        p2.x = p1.x + dir[0] * target; p2.y = p1.y + dir[1] * target;
+      } else if (p2.fixed) {
+        p1.x = p2.x - dir[0] * target; p1.y = p2.y - dir[1] * target;
+      } else {
+        const mid = midpoint(p1, p2);
+        p1.x = mid[0] - dir[0] * target / 2; p1.y = mid[1] - dir[1] * target / 2;
+        p2.x = mid[0] + dir[0] * target / 2; p2.y = mid[1] + dir[1] * target / 2;
+      }
+      return err;
+    }
+
+    return 0;
+  },
+
+
+  residual(c, { lines, circles, points }) {
+    if (c.line && c.circle) {
+      const line = lines.get(c.line); const circle = circles.get(c.circle);
+      if (!line || !circle) return [0];
+      const a = points.get(line.a); const b = points.get(line.b);
+      const center = points.get(circle.center);
+      if (!a || !b || !center) return [0];
+      const dx = b.x - a.x; const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const dist = ((center.x - a.x) * (-dy) + (center.y - a.y) * dx) / len;
+      return [Math.abs(dist) - circle.radius];
+    }
+    if (c.a && c.b) {
+      const c1 = circles.get(c.a); const c2 = circles.get(c.b);
+      if (!c1 || !c2) return [0];
+      const p1 = points.get(c1.center); const p2 = points.get(c2.center);
+      if (!p1 || !p2) return [0];
+      return [Math.hypot(p2.x - p1.x, p2.y - p1.y) - (c1.radius + c2.radius)];
+    }
+    return [0];
+  },
+
+  computeDof(_c, _ctx) {
+    // tangent constrains 1 DOF but it's complex — not tracked for simplicity
+  },
+});
+</file>
+
+<file path="defs/vDistance.ts">
+import type { PointId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Sets the signed vertical distance from point `a` to point `b` to `value`.
+     *
+     * The constraint is directional: `b.y − a.y = value`. A positive value places
+     * `b` above `a`; negative places it below.
+     * Contributes **1 equation**.
+     */
+    vDistance: { a: PointId; b: PointId; value: number };
+  }
+}
+
+registerConstraint<'vDistance', ConstraintTypeMap['vDistance']>({
+  type: 'vDistance',
+  label: 'VD',
+  isDimension: true,
+  equations: 1,
+
+  displayPosition(c, { points }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (a && b) return midpoint(a, b);
+    return [0, 0];
+  },
+
+  solve(c, { points, tolerance }) {
+    const a = points.get(c.a);
+    const b = points.get(c.b);
+    if (!a || !b) return 0;
+    const err = Math.abs((b.y - a.y) - c.value);
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+    if (a.fixed) {
+      b.y = a.y + c.value;
+    } else if (b.fixed) {
+      a.y = b.y - c.value;
+    } else {
+      const midY = (a.y + b.y) / 2;
+      a.y = midY - c.value / 2;
+      b.y = midY + c.value / 2;
+    }
+    return err;
+  },
+
+
+  residual(c, { points }) {
+    const a = points.get(c.a); const b = points.get(c.b);
+    if (!a || !b) return [0];
+    return [b.y - a.y - c.value];
+  },
+
+  computeDof(c, { refCount }) {
+    refCount.set(c.a, (refCount.get(c.a) ?? 0) + 1);
+    refCount.set(c.b, (refCount.get(c.b) ?? 0) + 1);
+  },
+});
+</file>
+
+<file path="defs/vertical.ts">
+import type { LineId, ConstraintTypeMap } from '../types';
+import { registerConstraint } from '../registry';
+import { midpoint, midpointPerp } from '../helpers';
+
+declare module '../types' {
+  interface ConstraintTypeMap {
+    /**
+     * Forces a line to be vertical (parallel to the Y axis).
+     *
+     * Both endpoints are moved to their average X coordinate so the line
+     * remains centered in place. Contributes **1 equation**: `b.x − a.x = 0`.
+     */
+    vertical: { line: LineId };
+  }
+}
+
+registerConstraint<'vertical', ConstraintTypeMap['vertical']>({
+  type: 'vertical',
+  label: 'V',
+  isDimension: false,
+  equations: 1,
+
+  displayPosition(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (line) {
+      const a = points.get(line.a);
+      const b = points.get(line.b);
+      if (a && b) return midpointPerp(a, b, 3);
+    }
+    return [0, 0];
+  },
+
+  solve(c, { lines, points, tolerance }) {
+    const line = lines.get(c.line);
+    if (!line) return 0;
+    const a = points.get(line.a);
+    const b = points.get(line.b);
+    if (!a || !b) return 0;
+    const err = Math.abs(b.x - a.x);
+    if (err <= tolerance) return err;
+    if (a.fixed && b.fixed) return err;
+    const x = (a.x + b.x) / 2;
+    if (!a.fixed) a.x = x;
+    if (!b.fixed) b.x = x;
+    return err;
+  },
+
+
+  residual(c, { lines, points }) {
+    const line = lines.get(c.line);
+    if (!line) return [0];
+    const a = points.get(line.a); const b = points.get(line.b);
+    if (!a || !b) return [0];
+    return [b.x - a.x];
+  },
+
+  computeDof(c, { refCount, lines }) {
+    const line = lines.find((l) => l.id === c.line);
+    if (line) {
+      refCount.set(line.a, (refCount.get(line.a) ?? 0) + 1);
+      refCount.set(line.b, (refCount.get(line.b) ?? 0) + 1);
+    }
+  },
+});
+</file>
+
+<file path="builder.ts">
+import type {
+  ArcId,
+  CircleId,
+  ConstraintBuilderMethods,
+  ConstraintDefinition,
+  LineId,
+  PointId,
+  ShapeId,
+  SketchArc,
+  SketchCircle,
+  SketchConstraint,
+  SketchLine,
+  SketchLoop,
+  SketchPoint,
+  SketchShape,
+  SolveOptions,
+} from './types';
+import { DEFAULT_TOLERANCE, getConstraintDef, getPendingBuilderMethods } from './registry';
+import { decomposeAndSolve } from './decompose';
+import { ConstraintSketch, solveConstraintDefinition } from './sketch';
+
+const toRad = (deg: number): number => (deg * Math.PI) / 180;
+
+export interface ConstrainedSketchOptions {
+  /** When true, adding a constraint that cannot be satisfied throws instead of silently discarding it. */
+  strict?: boolean;
+}
+
+// The interface merge makes TypeScript see all installed builder methods on the class.
+export interface ConstrainedSketchBuilder extends ConstraintBuilderMethods {}
+
+export class ConstrainedSketchBuilder {
+  private points: SketchPoint[] = [];
+  private lines: SketchLine[] = [];
+  private circles: SketchCircle[] = [];
+  private arcs: SketchArc[] = [];
+  private shapes: SketchShape[] = [];
+  private constraints: SketchConstraint[] = [];
+  private loops: SketchLoop[] = [];
+  private rejectedConstraints: SketchConstraint[] = [];
+  /** Maps rejected constraint ID → human-readable reason string. */
+  private rejectionReasons = new Map<string, string>();
+  private cursor: PointId | null = null;
+  private loopStart: PointId | null = null;
+  private nextId = 1;
+  private strict: boolean;
+
+  constructor(options: ConstrainedSketchOptions = {}) {
+    this.strict = options.strict ?? false;
+    // Install any builder methods registered before this instance was created.
+    const pending = getPendingBuilderMethods();
+    pending.forEach((fn, type) => {
+      const proto = ConstrainedSketchBuilder.prototype as unknown as Record<string, unknown>;
+      if (!proto[type]) {
+        proto[type] = fn;
+      }
+    });
+  }
+
+  point(x: number, y: number, fixed = false): PointId {
+    const id = `pt-${this.nextId++}`;
+    this.points.push({ id, x, y, fixed });
+    return id;
+  }
+
+  pointAt(index: number): PointId {
+    const pt = this.points[index];
+    if (!pt) throw new Error(`Point index ${index} out of range`);
+    return pt.id;
+  }
+
+  line(a: PointId, b: PointId, construction = false): LineId {
+    const id = `ln-${this.nextId++}`;
+    this.lines.push({ id, a, b, construction });
+    return id;
+  }
+
+  lineAt(index: number): LineId {
+    const line = this.lines[index];
+    if (!line) throw new Error(`Line index ${index} out of range`);
+    return line.id;
+  }
+
+  circle(center: PointId, radius: number, construction = false, segments = 48): CircleId {
+    const id = `c-${this.nextId++}`;
+    this.circles.push({ id, center, radius, construction, fixedRadius: false, segments });
+    if (!construction) {
+      this.loops.push({ type: 'circle', circle: id });
+    }
+    return id;
+  }
+
+  circleAt(index: number): CircleId {
+    const circle = this.circles[index];
+    if (!circle) throw new Error(`Circle index ${index} out of range`);
+    return circle.id;
+  }
+
+  moveTo(x: number, y: number): this {
+    const id = this.point(x, y);
+    this.cursor = id;
+    this.loopStart = id;
+    this.loops.push({ type: 'profile', segments: [] });
+    return this;
+  }
+
+  lineTo(x: number, y: number): this {
+    if (!this.cursor) return this.moveTo(x, y);
+    const id = this.point(x, y);
+    const lineId = this.line(this.cursor, id);
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'line', line: lineId });
+    this.cursor = id;
+    return this;
+  }
+
+  lineH(dx: number): this {
+    const cursorPt = this.getPoint(this.cursor);
+    if (!cursorPt) return this;
+    return this.lineTo(cursorPt.x + dx, cursorPt.y);
+  }
+
+  lineV(dy: number): this {
+    const cursorPt = this.getPoint(this.cursor);
+    if (!cursorPt) return this;
+    return this.lineTo(cursorPt.x, cursorPt.y + dy);
+  }
+
+  lineAngled(length: number, degrees: number): this {
+    const cursorPt = this.getPoint(this.cursor);
+    if (!cursorPt) return this;
+    const rad = toRad(degrees);
+    return this.lineTo(cursorPt.x + Math.cos(rad) * length, cursorPt.y + Math.sin(rad) * length);
+  }
+
+  /**
+   * Draw a circular arc from the current cursor position to (x, y) with the given radius.
+   * If `clockwise` is true the arc sweeps clockwise; otherwise counter-clockwise.
+   * The arc center is computed automatically.
+   */
+  arcTo(x: number, y: number, radius: number, clockwise = false): this {
+    if (!this.cursor) return this.moveTo(x, y);
+    const endId = this.point(x, y);
+    const arcId = this.addArc(this.cursor, endId, radius, clockwise);
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'arc', arc: arcId });
+    this.cursor = endId;
+    return this;
+  }
+
+  /**
+   * Create an arc from an explicit center point.
+   * `start` and `end` are existing PointIds that must lie on the arc's circle.
+   * Returns the ArcId. Does NOT advance the cursor.
+   */
+  arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise = false): ArcId {
+    const center = this.getPoint(centerId);
+    const start = this.getPoint(startId);
+    if (!center || !start) throw new Error('arcByCenter: invalid point IDs');
+    const radius = Math.hypot(start.x - center.x, start.y - center.y);
+    const id: ArcId = `arc-${this.nextId++}`;
+    this.arcs.push({ id, center: centerId, start: startId, end: endId, radius, clockwise, construction: false });
+    return id;
+  }
+
+  close(): this {
+    if (!this.cursor || !this.loopStart || this.cursor === this.loopStart) return this;
+    const lineId = this.line(this.cursor, this.loopStart);
+    const loop = this.loops[this.loops.length - 1];
+    if (loop?.type === 'profile') loop.segments.push({ kind: 'line', line: lineId });
+    this.cursor = this.loopStart;
+    return this;
+  }
+
+  addLoopCircle(center: PointId, radius: number, segments = 48): this {
+    this.circle(center, radius, false, segments);
+    return this;
+  }
+
+  /**
+   * Register a named shape (closed polygon) from an ordered list of line IDs.
+   * Returns the ShapeId for use in shape constraints (shapeWidth, shapeCentroidX, etc.).
+   */
+  shape(lines: LineId[]): ShapeId {
+    const id: ShapeId = `shp-${this.nextId++}`;
+    this.shapes.push({ id, lines: [...lines] });
+    return id;
+  }
+
+  constrain(constraint: Omit<SketchConstraint, 'id'>): this {
+    const id = `cst-${this.nextId++}`;
+    const next = { ...constraint, id } as SketchConstraint;
+    const def = this.buildDefinition(next);
+    const { maxError } = decomposeAndSolve(def, { iterations: 40, tolerance: DEFAULT_TOLERANCE });
+    if (maxError > DEFAULT_TOLERANCE * 5) {
+      // Build a human-readable rejection reason: show constraint params,
+      // the maxError, and which existing constraint has the highest residual
+      // (the likely "blame" — often it's not the new constraint at all).
+      const reason = buildRejectionReason(next, def, maxError);
+      if (this.strict) {
+        throw new Error(reason);
+      }
+      this.rejectedConstraints.push(next);
+      this.rejectionReasons.set(next.id, reason);
+      return this;
+    }
+    // Sync solved positions back into the builder's live entities so that
+    // subsequent constraints start from an already-satisfied configuration.
+    // This is the core bug fix: without this, each new constraint re-solves
+    // from stale initial positions, which can cause drift and false rejections.
+    if (maxError <= DEFAULT_TOLERANCE) {
+      for (let i = 0; i < this.points.length; i++) {
+        this.points[i].x = def.points[i].x;
+        this.points[i].y = def.points[i].y;
+      }
+      for (let i = 0; i < this.circles.length; i++) {
+        this.circles[i].radius = def.circles[i].radius;
+      }
+      const defArcs = def.arcs ?? [];
+      for (let i = 0; i < this.arcs.length; i++) {
+        if (i < defArcs.length) this.arcs[i].radius = defArcs[i].radius;
+      }
+    }
+    if (next.type === 'fixed') {
+      const c = next as unknown as { point: PointId; x: number; y: number };
+      const pt = this.points.find((p) => p.id === c.point);
+      if (pt) {
+        pt.fixed = true;
+        pt.x = c.x;
+        pt.y = c.y;
+      }
+    }
+    this.constraints.push(next);
+    return this;
+  }
+
+  // ─── Input Entity Resolution ─────────────────────────────────────────────
+  // Each resolve* helper accepts either a bare ID string, a full entity object
+  // with an `id` field, or (for points) an {x, y} coordinate pair that is
+  // auto-imported.  This lets callers pass rich objects from other APIs without
+  // having to manually extract the ID.
+
+  private resolvePointId(p: any): PointId {
+    if (typeof p === 'string') return p;
+    if (p && typeof p === 'object') {
+      if ('id' in p && typeof p.id === 'string') return p.id;
+      if ('x' in p && 'y' in p) return this.importPoint(p);
+    }
+    throw new Error(`Invalid point reference: ${p}`);
+  }
+
+  private resolveLineId(l: any): LineId {
+    if (typeof l === 'string') return l;
+    if (l && typeof l === 'object') {
+      if ('id' in l && typeof l.id === 'string') return l.id;
+      if ('start' in l && 'end' in l) return this.importLine(l);
+    }
+    throw new Error(`Invalid line reference: ${l}`);
+  }
+
+  private resolveCircleId(c: any): CircleId {
+    if (typeof c === 'string') return c;
+    if (c && typeof c === 'object' && 'id' in c && typeof c.id === 'string') return c.id;
+    throw new Error(`Invalid circle reference: ${c}`);
+  }
+
+  private resolveArcId(a: any): ArcId {
+    if (typeof a === 'string') return a;
+    if (a && typeof a === 'object' && 'id' in a && typeof a.id === 'string') return a.id;
+    throw new Error(`Invalid arc reference: ${a}`);
+  }
+
+  private resolveShapeId(s: any): ShapeId {
+    if (typeof s === 'string') return s;
+    if (s && typeof s === 'object' && 'id' in s && typeof s.id === 'string') return s.id;
+    throw new Error(`Invalid shape reference: ${s}`);
+  }
+
+  // ─── Ergonomic constraint helpers ────────────────────────────────────────────
+
+  /** Constrain a line to be horizontal. */
+  horizontal(line: any): this {
+    return this.constrain({ type: 'horizontal', line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain a line to be vertical. */
+  vertical(line: any): this {
+    return this.constrain({ type: 'vertical', line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two lines to be parallel. */
+  parallel(a: any, b: any): this {
+    return this.constrain({ type: 'parallel', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two lines to be perpendicular. */
+  perpendicular(a: any, b: any): this {
+    return this.constrain({ type: 'perpendicular', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
+   * Tangent constraint.
+   * - `tangent(line, circle)` — line is tangent to a circle.
+   * - `tangent(circleA, circleB)` — two circles are externally tangent.
+   */
+  tangent(a: any, b: any): this {
+    let aId: string;
+    try {
+      aId = this.resolveLineId(a);
+      if (!this.lines.some(l => l.id === aId)) throw new Error();
+      return this.constrain({ type: 'tangent', line: aId, circle: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
+    } catch {
+      aId = this.resolveCircleId(a);
+      return this.constrain({ type: 'tangent', a: aId, b: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
+    }
+  }
+
+  /** Constrain two lines to have equal length. */
+  equal(a: any, b: any): this {
+    return this.constrain({ type: 'equal', a: this.resolveLineId(a), b: this.resolveLineId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two points to be at the same location. */
+  coincident(a: any, b: any): this {
+    return this.constrain({ type: 'coincident', a: this.resolvePointId(a), b: this.resolvePointId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two circles to share the same center. */
+  concentric(a: any, b: any): this {
+    return this.constrain({ type: 'concentric', a: this.resolveCircleId(a), b: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain a point to lie on an infinite line (collinear). */
+  collinear(point: any, line: any): this {
+    return this.constrain({ type: 'collinear', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two points to be symmetric about an axis line. */
+  symmetric(a: any, b: any, axis: any): this {
+    return this.constrain({ type: 'symmetric', a: this.resolvePointId(a), b: this.resolvePointId(b), axis: this.resolveLineId(axis) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Fix a point at a specific location (or at its current position if x/y are omitted). */
+  fix(point: any, x?: number, y?: number): this {
+    const ptId = this.resolvePointId(point);
+    const pt = this.points.find((p) => p.id === ptId);
+    if (!pt) throw new Error(`fix(): point "${ptId}" not found in sketch`);
+    return this.constrain({ type: 'fixed', point: ptId, x: x ?? pt.x, y: y ?? pt.y } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain a point to lie at the midpoint of a line. */
+  midpoint(point: any, line: any): this {
+    return this.constrain({ type: 'midpoint', point: this.resolvePointId(point), line: this.resolveLineId(line) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain a point to lie on the perimeter of a circle. */
+  pointOnCircle(point: any, circle: any): this {
+    return this.constrain({ type: 'pointOnCircle', point: this.resolvePointId(point), circle: this.resolveCircleId(circle) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain a point to lie on a bounded line segment (not its infinite extension). */
+  pointOnLine(point: PointId, line: LineId): this {
+    return this.constrain({ type: 'pointOnLine', point, line } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the distance between two points. */
+  distance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'distance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the length of a line. */
+  length(line: any, value: number): this {
+    return this.constrain({ type: 'length', line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the angle from line `a` to line `b` (degrees). */
+  angle(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'angle', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the radius of a circle. */
+  radius(circle: any, value: number): this {
+    return this.constrain({ type: 'radius', circle: this.resolveCircleId(circle), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the diameter of a circle. */
+  diameter(circle: any, value: number): this {
+    return this.constrain({ type: 'diameter', circle: this.resolveCircleId(circle), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the horizontal distance between two points (b.x − a.x = value). */
+  hDistance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'hDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the vertical distance between two points (b.y − a.y = value). */
+  vDistance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'vDistance', a: this.resolvePointId(a), b: this.resolvePointId(b), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
+   * Constrain the signed perpendicular distance from a point to a line.
+   * Positive `value` places the point to the **left** of the line (a→b direction).
+   * Zero is equivalent to `collinear`.
+   */
+  pointLineDistance(point: any, line: any, value: number): this {
+    return this.constrain({ type: 'pointLineDistance', point: this.resolvePointId(point), line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
+   * Constrain the perpendicular (offset) distance between two lines.
+   * Also implicitly enforces parallelism.
+   *
+   * Positive `value` places line `b` on the **left** side of line `a`
+   * (according to `a`'s direction vector). Negative places it on the right.
+   */
+  lineDistance(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'lineDistance', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the absolute angle of a line from the positive X-axis (degrees). */
+  absoluteAngle(line: any, value: number): this {
+    return this.constrain({ type: 'absoluteAngle', line: this.resolveLineId(line), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two circles to have equal radii. */
+  equalRadius(a: any, b: any): this {
+    return this.constrain({ type: 'equalRadius', a: this.resolveCircleId(a), b: this.resolveCircleId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the arc length of an arc (radius × sweep angle). */
+  arcLength(arc: any, value: number): this {
+    return this.constrain({ type: 'arcLength', arc: this.resolveArcId(arc), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /**
+   * Constrain a line to be tangent to an arc at the arc's start (`atStart=true`) or end point.
+   * Combine with `coincident` to enforce the shared endpoint.
+   */
+  lineTangentArc(line: any, arc: any, atStart: boolean): this {
+    return this.constrain({ type: 'lineTangentArc', line: this.resolveLineId(line), arc: this.resolveArcId(arc), atStart } as Omit<SketchConstraint, 'id'>);
+  }
+
+  // ─── Shape constraint helpers ─────────────────────────────────────────────
+
+  /** Constrain the bounding-box width of a shape. */
+  shapeWidth(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeWidth', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the bounding-box height of a shape. */
+  shapeHeight(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeHeight', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the X coordinate of a shape's centroid. */
+  shapeCentroidX(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeCentroidX', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the Y coordinate of a shape's centroid. */
+  shapeCentroidY(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeCentroidY', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the area of a shape. */
+  shapeArea(shape: any, value: number): this {
+    return this.constrain({ type: 'shapeArea', shape: this.resolveShapeId(shape), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain two shapes to share the same centroid. */
+  shapeEqualCentroid(a: any, b: any): this {
+    return this.constrain({ type: 'shapeEqualCentroid', a: this.resolveShapeId(a), b: this.resolveShapeId(b) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Constrain the unsigned angle between two lines (accepts both orientations). */
+  angleBetween(a: any, b: any, value: number): this {
+    return this.constrain({ type: 'angleBetween', a: this.resolveLineId(a), b: this.resolveLineId(b), value } as Omit<SketchConstraint, 'id'>);
+  }
+
+  /** Enforce counter-clockwise winding on a polygon defined by its vertices. */
+  ccw(...points: any[]): this {
+    return this.constrain({ type: 'ccw', points: points.map(p => this.resolvePointId(p)) } as Omit<SketchConstraint, 'id'>);
+  }
+
+  // ─── Loop helpers ──────────────────────────────────────────────────────────
+
+  /**
+   * Register a closed polygon loop from an explicit ordered list of point IDs.
+   */
+  addLoop(points: any[]): this {
+    if (points.length < 3) throw new Error('addLoop(): needs at least 3 points');
+    this.loops.push({ type: 'poly', points: points.map(p => this.resolvePointId(p)) });
+    return this;
+  }
+
+  solve(options: SolveOptions = {}): ConstraintSketch {
+    return solveConstraintDefinition(this.buildDefinition(), options);
+  }
+
+  /**
+   * Run the solver without building a full `ConstraintSketch`.
+   * Useful for lightweight constraint validation or progress monitoring.
+   * Returns the final maxError, the number of rejected constraints, and
+   * the solved `ConstraintDefinition` with updated point positions.
+   */
+  solveConstraintsOnly(options: SolveOptions = {}): {
+    maxError: number;
+    rejectedCount: number;
+    definition: ConstraintDefinition;
+  } {
+    const def = this.buildDefinition();
+    const { maxError } = decomposeAndSolve(def, options);
+    return { maxError, rejectedCount: def.rejectedConstraints.length, definition: def };
+  }
+
+  private buildDefinition(extraConstraint?: SketchConstraint): ConstraintDefinition {
+    return {
+      points: this.points.map((p) => ({ ...p })),
+      lines: this.lines.map((l) => ({ ...l })),
+      circles: this.circles.map((c) => ({ ...c })),
+      arcs: this.arcs.map((a) => ({ ...a })),
+      shapes: this.shapes.map((s) => ({ ...s, lines: [...s.lines] })),
+      loops: this.loops.map((loop) => {
+        if (loop.type === 'poly') return { type: 'poly', points: [...loop.points] };
+        if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };
+        return { type: 'profile', segments: loop.segments.map((s) => ({ ...s })) };
+      }),
+      constraints: extraConstraint ? [...this.constraints, extraConstraint] : [...this.constraints],
+      rejectedConstraints: [...this.rejectedConstraints],
+      rejectionReasons: new Map(this.rejectionReasons),
+    };
+  }
+
+  private getPoint(id: PointId | null): SketchPoint | null {
+    if (!id) return null;
+    return this.points.find((p) => p.id === id) ?? null;
+  }
+
+  /** Compute arc center from start/end points, radius, and clockwise flag; create the arc entity. */
+  private addArc(startId: PointId, endId: PointId, radius: number, clockwise: boolean): ArcId {
+    const start = this.getPoint(startId)!;
+    const end = this.getPoint(endId)!;
+    const mx = (start.x + end.x) / 2;
+    const my = (start.y + end.y) / 2;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const r = Math.max(radius, d / 2 + 1e-9); // clamp to minimum viable radius
+    const h = Math.sqrt(r * r - (d / 2) * (d / 2));
+    // Left-perpendicular of (start→end); guard against coincident start/end.
+    const invD = d > 1e-9 ? 1 / d : 0;
+    const px = -dy * invD;
+    const py = dx * invD;
+    // CCW → center left of direction; CW → center right.
+    const sign = clockwise ? -1 : 1;
+    const cx = mx + sign * h * px;
+    const cy = my + sign * h * py;
+    const centerId = this.point(cx, cy);
+    const id: ArcId = `arc-${this.nextId++}`;
+    this.arcs.push({ id, center: centerId, start: startId, end: endId, radius: r, clockwise, construction: false });
+    return id;
+  }
+
+  /** Import a Point2D, returning its PointId */
+  importPoint(pt: { x: number; y: number }, fixed = false): PointId {
+    return this.point(pt.x, pt.y, fixed);
+  }
+
+  /** Import a Line2D (two points + line), returning its LineId */
+  importLine(l: { start: { x: number; y: number }; end: { x: number; y: number } }, fixed = false): LineId {
+    const a = this.importPoint(l.start, fixed);
+    const b = this.importPoint(l.end, fixed);
+    return this.line(a, b);
+  }
+
+  /** Import a Rectangle2D as 4 points + 4 lines, returning side LineIds keyed by name */
+  importRectangle(r: {
+    vertices: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }, { x: number; y: number }];
+  }, fixed = false): { bottom: LineId; right: LineId; top: LineId; left: LineId; points: [PointId, PointId, PointId, PointId] } {
+    const [bl, br, tr, tl] = r.vertices.map((v) => this.importPoint(v, fixed)) as [PointId, PointId, PointId, PointId];
+    return {
+      bottom: this.line(bl, br),
+      right: this.line(br, tr),
+      top: this.line(tr, tl),
+      left: this.line(tl, bl),
+      points: [bl, br, tr, tl],
+    };
+  }
+
+  // ─── Cross-sketch reference geometry ───────────────────────────────────────
+
+  /**
+   * Add a fixed reference point at (x, y).
+   */
+  referencePoint(x: number, y: number): PointId {
+    const id = `ref-pt-${this.nextId++}`;
+    this.points.push({ id, x, y, fixed: true });
+    return id;
+  }
+
+  /**
+   * Add a fixed reference line from (x1, y1) to (x2, y2).
+   */
+  referenceLine(x1: number, y1: number, x2: number, y2: number): LineId {
+    const a = this.referencePoint(x1, y1);
+    const b = this.referencePoint(x2, y2);
+    const id = `ref-ln-${this.nextId++}`;
+    this.lines.push({ id, a, b, construction: true });
+    return id;
+  }
+
+  /**
+   * Import a single named entity (point or line) from a solved `ConstraintSketch`
+   * as fixed reference geometry in this builder.
+   */
+  referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | null {
+    const srcPoint = source.definition.points.find((p) => p.id === entityId);
+    if (srcPoint) {
+      return this.referencePoint(srcPoint.x, srcPoint.y);
+    }
+    const srcLine = source.definition.lines.find((l) => l.id === entityId);
+    if (srcLine) {
+      const srcA = source.definition.points.find((p) => p.id === srcLine.a);
+      const srcB = source.definition.points.find((p) => p.id === srcLine.b);
+      if (srcA && srcB) {
+        return this.referenceLine(srcA.x, srcA.y, srcB.x, srcB.y);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Import ALL non-construction entities from a solved `ConstraintSketch` as
+   * fixed reference geometry.
+   */
+  referenceAllFrom(
+    source: ConstraintSketch,
+  ): { points: Map<string, PointId>; lines: Map<string, LineId> } {
+    const pointMap = new Map<string, PointId>();
+    const lineMap = new Map<string, LineId>();
+
+    for (const p of source.definition.points) {
+      pointMap.set(p.id, this.referencePoint(p.x, p.y));
+    }
+
+    for (const l of source.definition.lines) {
+      if (l.construction) continue;
+      const aId = pointMap.get(l.a);
+      const bId = pointMap.get(l.b);
+      if (!aId || !bId) continue;
+      const newLineId = `ref-ln-${this.nextId++}`;
+      this.lines.push({ id: newLineId, a: aId, b: bId, construction: true });
+      lineMap.set(l.id, newLineId);
+    }
+
+    return { points: pointMap, lines: lineMap };
+  }
+}
+
+/**
+ * Build a human-readable rejection reason string.
+ * Includes the constraint params, the maxError after test-solve, and the
+ * "blame" — the existing constraint with the highest residual (which may
+ * be the real culprit, not the newly added one).
+ */
+function buildRejectionReason(
+  constraint: SketchConstraint,
+  def: ConstraintDefinition,
+  maxError: number,
+): string {
+  // Summarise the constraint's own params (type + any value/entity refs).
+  const params = Object.entries(constraint)
+    .filter(([k]) => k !== 'id' && k !== 'type')
+    .map(([k, v]) => `${k}=${typeof v === 'number' ? (v as number).toFixed(2) : v}`)
+    .join(', ');
+
+  // Find the existing constraint with the highest individual error (the "blame").
+  // We do a quick single-pass solve to read per-constraint errors.
+  const points = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = new Map(def.lines.map((l) => [l.id, l] as const));
+  const circles = new Map(def.circles.map((c) => [c.id, c] as const));
+  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
+  const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
+  const ctx: import('./types').SolverContext = {
+    points, lines, circles, arcs, shapes,
+    tolerance: DEFAULT_TOLERANCE,
+    movePoint: () => false,
+  };
+
+  let blameType = '';
+  let blameId = '';
+  let blameError = 0;
+  for (const c of def.constraints) {
+    const cdef = getConstraintDef(c.type);
+    if (!cdef?.residual) continue;
+    const res = cdef.residual(c as never, ctx);
+    const err = Math.max(...res.map(Math.abs), 0);
+    if (err > blameError) {
+      blameError = err;
+      blameType = c.type;
+      blameId = c.id;
+    }
+  }
+
+  let reason = `${constraint.type}(${params}): maxError=${maxError.toFixed(4)}`;
+  if (blameId && blameId !== constraint.id && blameError > DEFAULT_TOLERANCE) {
+    reason += ` — highest residual from ${blameType} (${blameId}, err=${blameError.toFixed(4)})`;
+  }
+  return reason;
+}
+
+export function constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder {
+  return new ConstrainedSketchBuilder(options);
+}
+</file>
+
+<file path="decompose.ts">
+/**
+ * Graph-based constraint decomposition.
+ *
+ * Builds a connectivity graph (Union-Find) over all geometric entities and
+ * partitions the constraint system into independent connected components.
+ * Each component is solved separately, reducing the Jacobian size from O(n²)
+ * to O((n/k)²) per component and eliminating cross-component basin-of-attraction
+ * conflicts.
+ *
+ * Connectivity rules:
+ *   - Lines implicitly couple their two endpoints.
+ *   - Circles implicitly couple their center point.
+ *   - Arcs implicitly couple center, start, and end points.
+ *   - Shapes implicitly couple all their lines (and transitively, points).
+ *   - Each constraint couples all entities it references.
+ *
+ * When there is only one component the solver is called directly (zero overhead).
+ */
+
+import type { ConstraintDefinition, SketchConstraint, SolveOptions } from './types';
+import { solveConstraints } from './registry';
+
+// ─── Union-Find ─────────────────────────────────────────────────────────────────
+
+class UnionFind {
+  private parent = new Map<string, string>();
+  private rank = new Map<string, number>();
+
+  add(x: string): void {
+    if (!this.parent.has(x)) {
+      this.parent.set(x, x);
+      this.rank.set(x, 0);
+    }
+  }
+
+  find(x: string): string {
+    this.add(x);
+    let r = x;
+    while (this.parent.get(r) !== r) r = this.parent.get(r)!;
+    // Path compression
+    let c = x;
+    while (c !== r) {
+      const next = this.parent.get(c)!;
+      this.parent.set(c, r);
+      c = next;
+    }
+    return r;
+  }
+
+  union(x: string, y: string): void {
+    const rx = this.find(x);
+    const ry = this.find(y);
+    if (rx === ry) return;
+    const rankX = this.rank.get(rx)!;
+    const rankY = this.rank.get(ry)!;
+    if (rankX < rankY) this.parent.set(rx, ry);
+    else if (rankX > rankY) this.parent.set(ry, rx);
+    else { this.parent.set(ry, rx); this.rank.set(rx, rankX + 1); }
+  }
+}
+
+// ─── Entity-ID extraction ───────────────────────────────────────────────────────
+
+/**
+ * Extract all entity IDs referenced by a constraint via generic field scan.
+ * Picks up every string-valued field (except `id` and `type`) and every string
+ * element inside array fields (e.g. `ccw.points`).  This is robust against
+ * future constraint types — no per-type switch required.
+ */
+const extractEntityIds = (constraint: SketchConstraint): string[] => {
+  const ids: string[] = [];
+  for (const [key, val] of Object.entries(constraint)) {
+    if (key === 'id' || key === 'type') continue;
+    if (typeof val === 'string') ids.push(val);
+    else if (Array.isArray(val)) {
+      for (const v of val) { if (typeof v === 'string') ids.push(v); }
+    }
+  }
+  return ids;
+};
+
+// ─── Decompose & Solve ──────────────────────────────────────────────────────────
+
+export const decomposeAndSolve = (
+  def: ConstraintDefinition,
+  options: SolveOptions,
+): { maxError: number } => {
+  // Fast path: trivial systems don't benefit from decomposition.
+  if (def.constraints.length <= 1) return solveConstraints(def, options);
+
+  const uf = new UnionFind();
+
+  // Register all entities.
+  for (const p of def.points) uf.add(p.id);
+  for (const l of def.lines) uf.add(l.id);
+  for (const c of def.circles) uf.add(c.id);
+  for (const a of def.arcs ?? []) uf.add(a.id);
+  for (const s of def.shapes ?? []) uf.add(s.id);
+
+  // Structural edges: composite entities → constituent points.
+  for (const l of def.lines) { uf.union(l.id, l.a); uf.union(l.id, l.b); }
+  for (const c of def.circles) { uf.union(c.id, c.center); }
+  for (const a of def.arcs ?? []) {
+    uf.union(a.id, a.center);
+    uf.union(a.id, a.start);
+    uf.union(a.id, a.end);
+  }
+  for (const s of def.shapes ?? []) {
+    for (const lineId of s.lines) uf.union(s.id, lineId);
+  }
+
+  // Constraint edges: union all entity IDs each constraint references.
+  for (const constraint of def.constraints) {
+    const ids = extractEntityIds(constraint);
+    for (let i = 1; i < ids.length; i++) uf.union(ids[0], ids[i]);
+  }
+
+  // Group entity IDs by component root.
+  const componentOf = new Map<string, string>(); // entity ID → component root
+  const roots = new Set<string>();
+  const allIds = [
+    ...def.points.map(p => p.id),
+    ...def.lines.map(l => l.id),
+    ...def.circles.map(c => c.id),
+    ...(def.arcs ?? []).map(a => a.id),
+    ...(def.shapes ?? []).map(s => s.id),
+  ];
+  for (const id of allIds) {
+    const root = uf.find(id);
+    componentOf.set(id, root);
+    roots.add(root);
+  }
+
+  // Single component → solve directly, no decomposition overhead.
+  if (roots.size <= 1) return solveConstraints(def, options);
+
+  // Solve each component independently.  Sub-definitions share the same entity
+  // object references as the original, so solver mutations (point.x, etc.)
+  // propagate back automatically.
+  let maxError = 0;
+  for (const root of roots) {
+    const inComponent = (id: string) => componentOf.get(id) === root;
+
+    const subPoints = def.points.filter(p => inComponent(p.id));
+    const subLines = def.lines.filter(l => inComponent(l.id));
+    const subCircles = def.circles.filter(c => inComponent(c.id));
+    const subArcs = (def.arcs ?? []).filter(a => inComponent(a.id));
+    const subShapes = (def.shapes ?? []).filter(s => inComponent(s.id));
+    const subConstraints = def.constraints.filter(c => {
+      const ids = extractEntityIds(c);
+      return ids.length > 0 && inComponent(ids[0]);
+    });
+
+    if (subConstraints.length === 0) continue;
+
+    const result = solveConstraints({
+      points: subPoints,
+      lines: subLines,
+      circles: subCircles,
+      arcs: subArcs,
+      shapes: subShapes,
+      loops: [],
+      constraints: subConstraints,
+      rejectedConstraints: [],
+    }, options);
+    maxError = Math.max(maxError, result.maxError);
+  }
+
+  return { maxError };
+};
+</file>
+
+<file path="helpers.ts">
+import type { LineId, PointId, SketchLine, SketchPoint, SketchShape } from './types';
+
+export const toRad = (deg: number): number => (deg * Math.PI) / 180;
+
+export const distance = (a: SketchPoint, b: SketchPoint): number => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+export const midpoint = (a: SketchPoint, b: SketchPoint): [number, number] => [
+  (a.x + b.x) / 2,
+  (a.y + b.y) / 2,
+];
+
+/** Midpoint of a→b offset by `dist` units in the CCW-perpendicular direction. */
+export const midpointPerp = (a: SketchPoint, b: SketchPoint, dist: number): [number, number] => {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < 1e-9) return [mx + dist, my];
+  return [mx - (b.y - a.y) / len * dist, my + (b.x - a.x) / len * dist];
+};
+
+export const lineDirection = (a: SketchPoint, b: SketchPoint): [number, number] => {
+  const len = distance(a, b) || 1;
+  return [(b.x - a.x) / len, (b.y - a.y) / len];
+};
+
+export const angleOfLine = (a: SketchPoint, b: SketchPoint): number =>
+  Math.atan2(b.y - a.y, b.x - a.x);
+
+export const normalizeAngle = (angle: number): number => {
+  let a = angle;
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+};
+
+export const projectPointToLine = (
+  pt: SketchPoint,
+  a: SketchPoint,
+  b: SketchPoint,
+): [number, number] => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-9) return [a.x, a.y];
+  const t = ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2;
+  return [a.x + t * dx, a.y + t * dy];
+};
+
+// ─── Shape helpers ────────────────────────────────────────────────────────────
+
+/** Return all unique points that make up a shape's lines. */
+export const shapeVertices = (
+  shape: SketchShape,
+  lines: Map<LineId, SketchLine>,
+  points: Map<PointId, SketchPoint>,
+): SketchPoint[] => {
+  const seen = new Set<PointId>();
+  const result: SketchPoint[] = [];
+  for (const lineId of shape.lines) {
+    const line = lines.get(lineId);
+    if (!line) continue;
+    for (const ptId of [line.a, line.b]) {
+      if (!seen.has(ptId)) {
+        seen.add(ptId);
+        const pt = points.get(ptId);
+        if (pt) result.push(pt);
+      }
+    }
+  }
+  return result;
+};
+
+/** Arithmetic centroid of a set of points. */
+export const shapeCentroid = (pts: SketchPoint[]): [number, number] => {
+  if (pts.length === 0) return [0, 0];
+  let sx = 0; let sy = 0;
+  for (const p of pts) { sx += p.x; sy += p.y; }
+  return [sx / pts.length, sy / pts.length];
+};
+
+export interface BoundingBox {
+  minX: number; maxX: number;
+  minY: number; maxY: number;
+  width: number; height: number;
+  cx: number; cy: number;
+}
+
+/** Axis-aligned bounding box of a set of points. */
+export const shapeBoundingBox = (pts: SketchPoint[]): BoundingBox => {
+  if (pts.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0, cx: 0, cy: 0 };
+  let minX = pts[0].x; let maxX = pts[0].x;
+  let minY = pts[0].y; let maxY = pts[0].y;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+};
+
+/**
+ * Traverse the chain of lines to get an ordered vertex list.
+ * Assumes lines form a proper closed polygon (each pair of adjacent lines shares exactly one endpoint).
+ * Returns null if the lines don't form a valid closed chain.
+ */
+export const traverseShapeVertices = (
+  shape: SketchShape,
+  lines: Map<LineId, SketchLine>,
+  points: Map<PointId, SketchPoint>,
+): SketchPoint[] | null => {
+  if (shape.lines.length === 0) return null;
+  // Build adjacency: pointId -> list of [otherPointId]
+  const adj = new Map<PointId, PointId[]>();
+  for (const lineId of shape.lines) {
+    const l = lines.get(lineId);
+    if (!l) return null;
+    if (!adj.has(l.a)) adj.set(l.a, []);
+    if (!adj.has(l.b)) adj.set(l.b, []);
+    adj.get(l.a)!.push(l.b);
+    adj.get(l.b)!.push(l.a);
+  }
+  const firstLine = lines.get(shape.lines[0]);
+  if (!firstLine) return null;
+  const result: SketchPoint[] = [];
+  let current = firstLine.a;
+  let prev: PointId | null = null;
+  for (let i = 0; i < shape.lines.length; i += 1) {
+    const pt = points.get(current);
+    if (!pt) return null;
+    result.push(pt);
+    const neighbors = adj.get(current) ?? [];
+    const next = neighbors.find((n) => n !== prev);
+    if (next === undefined) break;
+    prev = current;
+    current = next;
+  }
+  return result.length === shape.lines.length ? result : null;
+};
+
+/** Signed polygon area via the shoelace formula. Positive = counter-clockwise. */
+export const polygonSignedArea = (pts: SketchPoint[]): number => {
+  let area = 0;
+  const n = pts.length;
+  for (let i = 0; i < n; i += 1) {
+    const j = (i + 1) % n;
+    area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  return area / 2;
+};
+
+// ─── Arc helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Sweep angle (in radians) from `startAngle` to `endAngle` along the given
+ * direction.  Always returns a value in (0, 2π] — a zero-length arc is treated
+ * as a full circle so constraints don't degenerate.
+ */
+export const arcSweep = (
+  startAngle: number, endAngle: number, clockwise: boolean,
+): number => {
+  const sweep = clockwise
+    ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
+    : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
+  return sweep < 1e-9 ? 2 * Math.PI : sweep;
+};
+
+export const reflectPointAcrossLine = (
+  pt: SketchPoint,
+  a: SketchPoint,
+  b: SketchPoint,
+): [number, number] => {
+  const proj = projectPointToLine(pt, a, b);
+  return [2 * proj[0] - pt.x, 2 * proj[1] - pt.y];
+};
+</file>
+
+<file path="index.ts">
+// Load all constraint definitions (side effects: populates the registry)
+import './defs/index';
+
+import type { SketchConstraint } from './types';
+
+// Re-export everything consumers need
+export type {
+  PointId,
+  LineId,
+  CircleId,
+  ArcId,
+  ShapeId,
+  SketchPoint,
+  SketchLine,
+  SketchCircle,
+  SketchArc,
+  SketchShape,
+  SketchLoop,
+  ProfileSegment,
+  ConstraintDisplay,
+  SketchConstraintMeta,
+  ConstraintDefinition,
+  SolveOptions,
+  ConstraintType,
+  SketchConstraint,
+  ConstraintTypeMap,
+  ConstraintBuilderMethods,
+  ConstraintDef,
+  SolverContext,
+  DisplayContext,
+  DofContext,
+} from './types';
+
+export type { LineDistanceConstraint } from './defs/index';
+
+export type { ConstrainedSketchOptions } from './builder';
+export { ConstrainedSketchBuilder, constrainedSketch } from './builder';
+
+export {
+  ConstraintSketch,
+  isConstraintSketch,
+  solveConstraintDefinition,
+  updateConstraintValue,
+  cloneDefinition,
+} from './sketch';
+
+export { registerConstraint, installBuilderMethod, getConstraintDef } from './registry';
+
+// ─── Backward-compatible constraint interface aliases ──────────────────────────
+// These match the old exported interface names from constraints.ts so existing
+// code that imports them by name continues to compile.
+
+export type CoincidentConstraint = Extract<SketchConstraint, { type: 'coincident' }>;
+export type HorizontalConstraint = Extract<SketchConstraint, { type: 'horizontal' }>;
+export type VerticalConstraint = Extract<SketchConstraint, { type: 'vertical' }>;
+export type ParallelConstraint = Extract<SketchConstraint, { type: 'parallel' }>;
+export type PerpendicularConstraint = Extract<SketchConstraint, { type: 'perpendicular' }>;
+export type TangentConstraint = Extract<SketchConstraint, { type: 'tangent' }>;
+export type EqualConstraint = Extract<SketchConstraint, { type: 'equal' }>;
+export type SymmetricConstraint = Extract<SketchConstraint, { type: 'symmetric' }>;
+export type ConcentricConstraint = Extract<SketchConstraint, { type: 'concentric' }>;
+export type CollinearConstraint = Extract<SketchConstraint, { type: 'collinear' }>;
+export type FixedConstraint = Extract<SketchConstraint, { type: 'fixed' }>;
+export type MidpointConstraint = Extract<SketchConstraint, { type: 'midpoint' }>;
+export type PointOnCircleConstraint = Extract<SketchConstraint, { type: 'pointOnCircle' }>;
+export type DistanceConstraint = Extract<SketchConstraint, { type: 'distance' }>;
+export type LengthConstraint = Extract<SketchConstraint, { type: 'length' }>;
+export type AngleConstraint = Extract<SketchConstraint, { type: 'angle' }>;
+export type RadiusConstraint = Extract<SketchConstraint, { type: 'radius' }>;
+export type DiameterConstraint = Extract<SketchConstraint, { type: 'diameter' }>;
+export type HorizontalDistanceConstraint = Extract<SketchConstraint, { type: 'hDistance' }>;
+export type VerticalDistanceConstraint = Extract<SketchConstraint, { type: 'vDistance' }>;
+export type AbsoluteAngleConstraint = Extract<SketchConstraint, { type: 'absoluteAngle' }>;
+export type EqualRadiusConstraint = Extract<SketchConstraint, { type: 'equalRadius' }>;
+export type ArcLengthConstraint = Extract<SketchConstraint, { type: 'arcLength' }>;
+export type LineTangentArcConstraint = Extract<SketchConstraint, { type: 'lineTangentArc' }>;
+</file>
+
+<file path="registry.ts">
+import type {
+  ConstraintDef,
+  ConstraintDefinition,
+  ConstraintDisplay,
+  ConstraintType,
+  DofContext,
+  DisplayContext,
+  PointId,
+  SketchConstraint,
+  SketchPoint,
+  SolverContext,
+  SolveOptions,
+} from './types';
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const registry = new Map<string, ConstraintDef<string, any>>();
+
+export function registerConstraint<TType extends string, TData extends object>(
+  def: ConstraintDef<TType, TData>,
+): void {
+  registry.set(def.type, def as unknown as ConstraintDef<string, object>);
+}
+
+export function getConstraintDef(type: string): ConstraintDef | undefined {
+  return registry.get(type);
+}
+
+// ─── Builder method installation ──────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function installBuilderMethod(type: string, fn: (...args: any[]) => any): void {
+  // Deferred — applied by builder.ts after class definition.
+  // builder.ts calls applyBuilderMethods(); each def file calls installBuilderMethod()
+  // which stores the fn here, and builder picks them up.
+  pendingBuilderMethods.set(type, fn);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pendingBuilderMethods = new Map<string, (...args: any[]) => any>();
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getPendingBuilderMethods(): Map<string, (...args: any[]) => any> {
+  return pendingBuilderMethods;
+}
+
+// ─── Registry-derived helpers ──────────────────────────────────────────────────
+
+export const buildLabel = (type: ConstraintType | string): string =>
+  registry.get(type)?.label ?? 'C';
+
+export const isDimensionConstraint = (type: ConstraintType | string): boolean =>
+  registry.get(type)?.isDimension ?? false;
+
+export const getConstraintValue = (constraint: SketchConstraint): number | undefined => {
+  const def = registry.get(constraint.type);
+  if (!def?.isDimension) return undefined;
+  return (constraint as unknown as { value?: number }).value;
+};
+
+export const setConstraintValue = (constraint: SketchConstraint, value: number): void => {
+  const def = registry.get(constraint.type);
+  if (!def?.isDimension) return;
+  (constraint as unknown as { value: number }).value = value;
+};
+
+// ─── Global nonlinear least-squares solver ─────────────────────────────────────
+//
+// The previous implementation mixed a good global idea (LM on residuals) with a
+// weak local one: each constraint also contained its own imperative “move this
+// endpoint” projector and the solver still depended heavily on those local
+// nudges, multi-start spreading, and repeated GS passes.  That architecture is
+// fundamentally fragile because each projector only sees one constraint at a
+// time, while a production sketch solver must optimise the coupled system as a
+// whole.
+//
+// This rewrite makes the global system the primary solver:
+//   1. Build a single state vector over all free geometric variables.
+//   2. Evaluate a single residual vector for the entire sketch.
+//   3. Add internal geometric consistency equations (e.g. arc endpoint/radius
+//      consistency) directly into that residual model.
+//   4. Solve with a trust-region Levenberg–Marquardt loop using:
+//        - central-difference Jacobians with variable-aware step sizes,
+//        - Marquardt diagonal damping,
+//        - row equilibration based on Jacobian row norms,
+//        - bounded steps in scaled variable space,
+//        - deterministic restart seeding.
+//
+// Constraint-local `solve()` methods remain only as a compatibility fallback and
+// as an optional warm-start projector.  They are no longer the core algorithm.
+// This is the key architectural change that makes the solver meaningfully more
+// powerful instead of merely “a bit less flaky”.
+
+/** Symmetric positive-definite solve using Cholesky factorisation. */
+function solveCholesky(A: number[][], b: number[]): number[] | null {
+  const n = A.length;
+  const L: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = 0;
+      for (let k = 0; k < j; k++) sum += L[i][k] * L[j][k];
+      if (i === j) {
+        const value = A[i][i] - sum;
+        if (value <= 0) return null;
+        L[i][i] = Math.sqrt(value);
+      } else {
+        L[i][j] = (A[i][j] - sum) / L[j][j];
+      }
+    }
+  }
+
+  const y = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let k = 0; k < i; k++) sum += L[i][k] * y[k];
+    y[i] = (b[i] - sum) / L[i][i];
+  }
+
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    let sum = 0;
+    for (let k = i + 1; k < n; k++) sum += L[k][i] * x[k];
+    x[i] = (y[i] - sum) / L[i][i];
+  }
+
+  return x;
+}
+
+/** Gaussian-elimination fallback for highly degenerate systems. */
+function solveGaussian(A: number[][], b: number[]): number[] {
+  const n = A.length;
+  const aug = A.map((row, i) => [...row, b[i]]);
+
+  for (let i = 0; i < n; i++) {
+    let pivotRow = i;
+    let pivotAbs = Math.abs(aug[i][i]);
+    for (let r = i + 1; r < n; r++) {
+      const value = Math.abs(aug[r][i]);
+      if (value > pivotAbs) {
+        pivotAbs = value;
+        pivotRow = r;
+      }
+    }
+    [aug[i], aug[pivotRow]] = [aug[pivotRow], aug[i]];
+    if (pivotAbs < 1e-14) continue;
+
+    for (let r = i + 1; r < n; r++) {
+      const factor = aug[r][i] / aug[i][i];
+      for (let c = i; c <= n; c++) aug[r][c] -= factor * aug[i][c];
+    }
+  }
+
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    if (Math.abs(aug[i][i]) < 1e-14) {
+      x[i] = 0;
+      continue;
+    }
+    let value = aug[i][n];
+    for (let c = i + 1; c < n; c++) value -= aug[i][c] * x[c];
+    x[i] = value / aug[i][i];
+  }
+
+  return x;
+}
+
+interface SolverVariable {
+  get(): number;
+  set(value: number): void;
+  /** Characteristic physical scale for this variable, used for finite differences and step limiting. */
+  scale: number;
+}
+
+interface ResidualEvaluation {
+  values: number[];
+  maxAbs: number;
+}
+
+interface LinearizedSystem {
+  residual: number[];
+  jacobian: number[][];
+  weights: number[];
+  weightedResidual: number[];
+  weightedJacobian: number[][];
+  maxAbsResidual: number;
+  weightedCost: number;
+}
+
+/**
+ * Reference length used for numerical differentiation, step limiting, and
+ * deterministic restart magnitudes.  The goal is unit awareness without
+ * requiring every individual constraint to declare a custom scale.
+ */
+function computeReferenceLength(def: ConstraintDefinition): number {
+  const xs: number[] = [];
+  const ys: number[] = [];
+
+  for (const p of def.points) {
+    xs.push(p.x);
+    ys.push(p.y);
+  }
+
+  for (const circle of def.circles) {
+    xs.push(circle.radius, -circle.radius);
+    ys.push(circle.radius, -circle.radius);
+  }
+
+  for (const arc of def.arcs ?? []) {
+    xs.push(arc.radius, -arc.radius);
+    ys.push(arc.radius, -arc.radius);
+  }
+
+  if (xs.length === 0 || ys.length === 0) return 1;
+  const spanX = Math.max(...xs) - Math.min(...xs);
+  const spanY = Math.max(...ys) - Math.min(...ys);
+  return Math.max(Math.hypot(spanX, spanY), 1);
+}
+
+function buildVariables(def: ConstraintDefinition, referenceLength: number): SolverVariable[] {
+  const scale = Math.max(referenceLength, 1);
+  const variables: SolverVariable[] = [];
+
+  for (const point of def.points) {
+    if (point.fixed) continue;
+    variables.push(
+      {
+        get: () => point.x,
+        set: (value: number) => { point.x = value; },
+        scale,
+      },
+      {
+        get: () => point.y,
+        set: (value: number) => { point.y = value; },
+        scale,
+      },
+    );
+  }
+
+  for (const circle of def.circles) {
+    if (circle.fixedRadius) continue;
+    variables.push({
+      get: () => circle.radius,
+      set: (value: number) => { circle.radius = Math.max(1e-9, value); },
+      scale,
+    });
+  }
+
+  for (const arc of def.arcs ?? []) {
+    variables.push({
+      get: () => arc.radius,
+      set: (value: number) => { arc.radius = Math.max(1e-9, value); },
+      scale,
+    });
+  }
+
+  return variables;
+}
+
+function captureState(variables: SolverVariable[]): number[] {
+  return variables.map((variable) => variable.get());
+}
+
+function applyState(variables: SolverVariable[], state: number[]): void {
+  for (let i = 0; i < variables.length; i++) variables[i].set(state[i]);
+}
+
+function evaluateResiduals(def: ConstraintDefinition, ctx: SolverContext): ResidualEvaluation | null {
+  const values: number[] = [];
+
+  for (const constraint of def.constraints) {
+    const constraintDef = registry.get(constraint.type);
+    if (!constraintDef?.residual) return null;
+    values.push(...constraintDef.residual(constraint as never, ctx));
+  }
+
+  // Internal arc consistency equations.
+  // An arc owns a scalar radius variable, while its start/end points live in the
+  // shared point state vector.  These equations tie the three together so the
+  // global optimiser sees one coherent geometric model instead of a later
+  // projection hack.
+  for (const arc of def.arcs ?? []) {
+    const center = ctx.points.get(arc.center);
+    const start = ctx.points.get(arc.start);
+    const end = ctx.points.get(arc.end);
+    if (!center || !start || !end) continue;
+    values.push(
+      Math.hypot(start.x - center.x, start.y - center.y) - arc.radius,
+      Math.hypot(end.x - center.x, end.y - center.y) - arc.radius,
+    );
+  }
+
+  let maxAbs = 0;
+  for (const value of values) maxAbs = Math.max(maxAbs, Math.abs(value));
+  return { values, maxAbs };
+}
+
+function computeRowWeights(jacobian: number[][], referenceLength: number): number[] {
+  const minNorm = 1e-9 / Math.max(referenceLength, 1);
+  return jacobian.map((row) => {
+    let normSq = 0;
+    for (const value of row) normSq += value * value;
+    const norm = Math.sqrt(normSq);
+    return 1 / Math.max(norm, minNorm);
+  });
+}
+
+function weightResidual(residual: number[], weights: number[]): number[] {
+  return residual.map((value, i) => value * weights[i]);
+}
+
+function weightJacobian(jacobian: number[][], weights: number[]): number[][] {
+  return jacobian.map((row, i) => row.map((value) => value * weights[i]));
+}
+
+function weightedCost(residual: number[]): number {
+  let cost = 0;
+  for (const value of residual) cost += value * value;
+  return 0.5 * cost;
+}
+
+function finiteDifferenceStep(value: number, scale: number): number {
+  return 1e-6 * Math.max(1, Math.abs(value), scale);
+}
+
+function linearizeSystem(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  variables: SolverVariable[],
+  referenceLength: number,
+): LinearizedSystem | null {
+  const base = evaluateResiduals(def, ctx);
+  if (!base) return null;
+
+  const parameterCount = variables.length;
+  const equationCount = base.values.length;
+  const jacobian: number[][] = Array.from({ length: equationCount }, () => new Array(parameterCount).fill(0));
+
+  if (parameterCount > 0 && equationCount > 0) {
+    const state = captureState(variables);
+
+    for (let column = 0; column < parameterCount; column++) {
+      const baseValue = state[column];
+      const step = finiteDifferenceStep(baseValue, variables[column].scale);
+
+      const plusState = [...state];
+      plusState[column] = baseValue + step;
+      applyState(variables, plusState);
+      const plusEval = evaluateResiduals(def, ctx);
+      if (!plusEval) {
+        applyState(variables, state);
+        return null;
+      }
+
+      const minusState = [...state];
+      minusState[column] = baseValue - step;
+      applyState(variables, minusState);
+      const minusEval = evaluateResiduals(def, ctx);
+      if (!minusEval) {
+        applyState(variables, state);
+        return null;
+      }
+
+      for (let row = 0; row < equationCount; row++) {
+        jacobian[row][column] = (plusEval.values[row] - minusEval.values[row]) / (2 * step);
+      }
+    }
+
+    applyState(variables, state);
+  }
+
+  const weights = computeRowWeights(jacobian, referenceLength);
+  const weightedResidual = weightResidual(base.values, weights);
+  const weightedJacobian = weightJacobian(jacobian, weights);
+
+  return {
+    residual: base.values,
+    jacobian,
+    weights,
+    weightedResidual,
+    weightedJacobian,
+    maxAbsResidual: base.maxAbs,
+    weightedCost: weightedCost(weightedResidual),
+  };
+}
+
+function solveLevenbergMarquardtStep(
+  weightedJacobian: number[][],
+  weightedResidual: number[],
+  lambda: number,
+): { dx: number[]; predictedReduction: number } | null {
+  const equationCount = weightedJacobian.length;
+  const variableCount = equationCount > 0 ? weightedJacobian[0].length : 0;
+  if (variableCount === 0) return { dx: [], predictedReduction: 0 };
+
+  const jtJ: number[][] = Array.from({ length: variableCount }, () => new Array(variableCount).fill(0));
+  const jtR: number[] = new Array(variableCount).fill(0);
+
+  for (let row = 0; row < equationCount; row++) {
+    for (let i = 0; i < variableCount; i++) {
+      const ji = weightedJacobian[row][i];
+      jtR[i] += ji * weightedResidual[row];
+      for (let j = 0; j <= i; j++) jtJ[i][j] += ji * weightedJacobian[row][j];
+    }
+  }
+
+  for (let i = 0; i < variableCount; i++) {
+    for (let j = 0; j < i; j++) jtJ[j][i] = jtJ[i][j];
+  }
+
+  const A = jtJ.map((row, i) => [...row]);
+  for (let i = 0; i < variableCount; i++) A[i][i] += lambda * (jtJ[i][i] + 1e-9);
+
+  const rhs = jtR.map((value) => -value);
+  const dx = solveCholesky(A, rhs) ?? solveGaussian(A, rhs);
+
+  let predictedReduction = 0;
+  for (let i = 0; i < variableCount; i++) {
+    let jtJdx = 0;
+    for (let j = 0; j < variableCount; j++) jtJdx += jtJ[i][j] * dx[j];
+    predictedReduction += dx[i] * (-jtR[i] - 0.5 * jtJdx);
+  }
+
+  return { dx, predictedReduction };
+}
+
+function scaledStepNorm(dx: number[], variables: SolverVariable[]): number {
+  let sum = 0;
+  for (let i = 0; i < dx.length; i++) {
+    const s = dx[i] / Math.max(variables[i].scale, 1e-9);
+    sum += s * s;
+  }
+  return Math.sqrt(sum);
+}
+
+function limitStep(dx: number[], variables: SolverVariable[], maxScaledNorm: number): number[] {
+  const norm = scaledStepNorm(dx, variables);
+  if (norm <= maxScaledNorm || norm < 1e-12) return dx;
+  const scale = maxScaledNorm / norm;
+  return dx.map((value) => value * scale);
+}
+
+function runProjectorWarmStart(def: ConstraintDefinition, ctx: SolverContext, iterations: number): void {
+  if (iterations <= 0) return;
+  for (let iter = 0; iter < iterations; iter++) {
+    for (const constraint of def.constraints) {
+      const constraintDef = registry.get(constraint.type);
+      if (!constraintDef) continue;
+      constraintDef.solve(constraint as never, ctx);
+    }
+  }
+}
+
+function seedRestart(
+  def: ConstraintDefinition,
+  variables: SolverVariable[],
+  initialState: number[],
+  attempt: number,
+  referenceLength: number,
+): void {
+  applyState(variables, initialState);
+  if (attempt === 0) return;
+
+  const radius = referenceLength * (0.15 + 0.2 * Math.min(attempt, 4));
+  const goldenAngle = 2.399963229728653;
+  let pointIndex = 0;
+
+  for (const point of def.points) {
+    if (point.fixed) continue;
+    const angle = (attempt * 1.37 + pointIndex) * goldenAngle;
+    const localRadius = radius * (1 + (pointIndex % 4) * 0.15);
+    point.x += localRadius * Math.cos(angle);
+    point.y += localRadius * Math.sin(angle);
+    pointIndex++;
+  }
+
+  let circleIndex = 0;
+  for (const circle of def.circles) {
+    if (circle.fixedRadius) continue;
+    const scale = 1 + 0.1 * ((attempt + circleIndex) % 3 - 1);
+    circle.radius = Math.max(1e-6, circle.radius * scale);
+    circleIndex++;
+  }
+
+  let arcIndex = 0;
+  for (const arc of def.arcs ?? []) {
+    const scale = 1 + 0.1 * ((attempt + arcIndex + 1) % 3 - 1);
+    arc.radius = Math.max(1e-6, arc.radius * scale);
+    arcIndex++;
+  }
+}
+
+function solveGlobalSystem(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  iterations: number,
+  tolerance: number,
+  restarts: number,
+  warmStartIterations: number,
+  maxScaledStep: number,
+): number {
+  const referenceLength = computeReferenceLength(def);
+  const variables = buildVariables(def, referenceLength);
+
+  if (variables.length === 0) {
+    const evalResult = evaluateResiduals(def, ctx);
+    return evalResult?.maxAbs ?? 0;
+  }
+
+  const initialState = captureState(variables);
+  let bestState = [...initialState];
+  let bestError = Infinity;
+
+  for (let attempt = 0; attempt < restarts; attempt++) {
+    seedRestart(def, variables, initialState, attempt, referenceLength);
+    runProjectorWarmStart(def, ctx, warmStartIterations);
+
+    let lambda = 1e-3;
+    let nu = 2;
+    let linearized = linearizeSystem(def, ctx, variables, referenceLength);
+    if (!linearized) return Infinity;
+
+    for (let iter = 0; iter < iterations; iter++) {
+      if (linearized.maxAbsResidual <= tolerance) break;
+
+      const stepResult = solveLevenbergMarquardtStep(
+        linearized.weightedJacobian,
+        linearized.weightedResidual,
+        lambda,
+      );
+      if (!stepResult) break;
+
+      const state = captureState(variables);
+      let { dx, predictedReduction } = stepResult;
+      dx = limitStep(dx, variables, maxScaledStep);
+      predictedReduction *= Math.min(1, maxScaledStep / Math.max(scaledStepNorm(stepResult.dx, variables), maxScaledStep));
+
+      let accepted = false;
+      let localNu = nu;
+      let localLambda = lambda;
+
+      for (let inner = 0; inner < 12; inner++) {
+        const trialState = state.map((value, index) => value + dx[index]);
+        applyState(variables, trialState);
+
+        const trial = linearizeSystem(def, ctx, variables, referenceLength);
+        if (!trial) {
+          applyState(variables, state);
+          break;
+        }
+
+        const actualReduction = linearized.weightedCost - trial.weightedCost;
+        const rho = predictedReduction > 0 ? actualReduction / predictedReduction : 0;
+
+        if (actualReduction > 0) {
+          accepted = true;
+          linearized = trial;
+          lambda = rho > 0
+            ? localLambda * Math.max(1 / 3, 1 - Math.pow(2 * rho - 1, 3))
+            : localLambda;
+          nu = 2;
+          break;
+        }
+
+        applyState(variables, state);
+        localLambda *= localNu;
+        localNu *= 2;
+        const retry = solveLevenbergMarquardtStep(
+          linearized.weightedJacobian,
+          linearized.weightedResidual,
+          localLambda,
+        );
+        if (!retry) break;
+        dx = limitStep(retry.dx, variables, maxScaledStep);
+        predictedReduction = retry.predictedReduction;
+      }
+
+      if (!accepted) break;
+    }
+
+    const finalEval = evaluateResiduals(def, ctx);
+    const finalError = finalEval?.maxAbs ?? Infinity;
+    if (finalError < bestError) {
+      bestError = finalError;
+      bestState = captureState(variables);
+    }
+    if (bestError <= tolerance) break;
+  }
+
+  applyState(variables, bestState);
+  return bestError;
+}
+
+function legacyGaussSeidelSolve(
+  def: ConstraintDefinition,
+  ctx: SolverContext,
+  iterations: number,
+): number {
+  let maxError = 0;
+  const gsIterations = Math.max(iterations * 5, 200);
+
+  for (let iter = 0; iter < gsIterations; iter++) {
+    maxError = 0;
+    for (const constraint of def.constraints) {
+      const constraintDef = registry.get(constraint.type);
+      if (!constraintDef) continue;
+      maxError = Math.max(maxError, constraintDef.solve(constraint as never, ctx));
+    }
+    if (maxError <= ctx.tolerance) break;
+  }
+
+  return maxError;
+}
+
+// ─── Solver ────────────────────────────────────────────────────────────────────
+
+export const DEFAULT_TOLERANCE = 1e-3;
+
+export const solveConstraints = (
+  def: ConstraintDefinition,
+  options: SolveOptions,
+): { maxError: number } => {
+  const iterations = options.iterations ?? 80;
+  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  const restarts = options.restarts ?? 6;
+  const warmStartIterations = options.warmStartIterations ?? 6;
+  const maxScaledStep = options.maxScaledStep ?? 2.5;
+
+  const points = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = new Map(def.lines.map((l) => [l.id, l] as const));
+  const circles = new Map(def.circles.map((c) => [c.id, c] as const));
+  const arcs = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
+  const shapes = new Map((def.shapes ?? []).map((s) => [s.id, s] as const));
+
+  const movePoint = (pt: SketchPoint, dx: number, dy: number): boolean => {
+    if (pt.fixed) return false;
+    pt.x += dx;
+    pt.y += dy;
+    return true;
+  };
+
+  const ctx: SolverContext = {
+    points,
+    lines,
+    circles,
+    arcs,
+    shapes,
+    tolerance,
+    movePoint,
+  };
+
+  for (const constraint of def.constraints) {
+    const constraintDef = registry.get(constraint.type);
+    constraintDef?.presolve?.(constraint as never, ctx);
+  }
+
+  const hasFullResidualModel = def.constraints.every((constraint) => {
+    const constraintDef = registry.get(constraint.type);
+    return constraintDef?.residual != null;
+  });
+
+  const maxError = hasFullResidualModel
+    ? solveGlobalSystem(def, ctx, iterations, tolerance, restarts, warmStartIterations, maxScaledStep)
+    : legacyGaussSeidelSolve(def, ctx, iterations);
+
+  return { maxError };
+};
+
+// ─── Display ───────────────────────────────────────────────────────────────────
+
+export const buildConstraintDisplays = (
+  def: ConstraintDefinition,
+  conflictingIds: Set<string>,
+  redundantIds: Set<string> = new Set(),
+  rejectionReasons?: Map<string, string>,
+): ConstraintDisplay[] => {
+  const ctx: DisplayContext = {
+    points: new Map(def.points.map((p) => [p.id, p] as const)),
+    lines: new Map(def.lines.map((l) => [l.id, l] as const)),
+    circles: new Map(def.circles.map((c) => [c.id, c] as const)),
+    arcs: new Map((def.arcs ?? []).map((a) => [a.id, a] as const)),
+    shapes: new Map((def.shapes ?? []).map((s) => [s.id, s] as const)),
+  };
+
+  const displays = def.constraints.map((constraint) => {
+    const constraintDef = registry.get(constraint.type);
+    const position: [number, number] = constraintDef
+      ? constraintDef.displayPosition(constraint as never, ctx)
+      : [0, 0];
+
+    return {
+      id: constraint.id,
+      type: constraint.type,
+      label: buildLabel(constraint.type),
+      position,
+      value: getConstraintValue(constraint),
+      isDimension: isDimensionConstraint(constraint.type),
+      isConflicting: conflictingIds.has(constraint.id),
+      isRedundant: redundantIds.has(constraint.id),
+      rejectionReason: rejectionReasons?.get(constraint.id),
+    };
+  });
+
+  // Iteratively spread labels that are too close together.
+  const MIN_SEP = 5;
+  const pos = displays.map((d) => [d.position[0], d.position[1]] as [number, number]);
+  for (let iter = 0; iter < 30; iter++) {
+    let moved = false;
+    for (let i = 0; i < pos.length; i++) {
+      for (let j = i + 1; j < pos.length; j++) {
+        const dx = pos[j][0] - pos[i][0];
+        const dy = pos[j][1] - pos[i][1];
+        const d = Math.hypot(dx, dy);
+        if (d < MIN_SEP) {
+          const push = (MIN_SEP - d) / 2 + 0.05;
+          let nx: number; let ny: number;
+          if (d < 0.01) {
+            // Exact overlap — use index-based angle to break symmetry
+            const a = (i * Math.PI * 2) / Math.max(displays.length, 2);
+            nx = Math.cos(a); ny = Math.sin(a);
+          } else {
+            nx = dx / d; ny = dy / d;
+          }
+          pos[i][0] -= nx * push; pos[i][1] -= ny * push;
+          pos[j][0] += nx * push; pos[j][1] += ny * push;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  return displays.map((d, i) => ({ ...d, position: pos[i] }));
+};
+
+// ─── DOF / status computation ──────────────────────────────────────────────────
+
+export const computeStatus = (
+  def: ConstraintDefinition,
+  maxError: number,
+  tolerance: number,
+): { status: 'under' | 'fully' | 'over'; dof: number } => {
+  // Free variables: each non-fixed point contributes 2 (x, y);
+  // each non-fixedRadius circle contributes 1 (radius);
+  // each arc contributes 1 (radius) but its implicit constraints remove 2,
+  // so net arc contribution = 1 - 2 = -1 (already partially constrained by definition).
+  const freeVars =
+    def.points.filter((p) => !p.fixed).length * 2 +
+    def.circles.filter((c) => !c.fixedRadius).length +
+    (def.arcs ?? []).length * (1 - 2); // radius DOF minus 2 implicit equations
+
+  // Constraint equations: sum of equations declared by each constraint def.
+  // 'fixed' constraints declare equations=0 because pt.fixed already removes the point's DOF.
+  const constraintEqs = def.constraints.reduce((sum, c) => {
+    const cdef = registry.get(c.type);
+    return sum + (cdef?.equations ?? 0);
+  }, 0);
+
+  const dof = freeVars - constraintEqs;
+
+  // Conflict/over-constraint: solver failed to satisfy the constraints.
+
+  if (maxError > tolerance * 5) return { status: 'over', dof };
+  if (dof > 0) return { status: 'under', dof };
+  if (dof < 0) return { status: 'over', dof };
+  return { status: 'fully', dof: 0 };
+};
+</file>
+
+<file path="sketch.ts">
+import { Sketch } from '../core';
+import { polygon } from '../primitives';
+import { union2d } from '../booleans';
+import { getWasm } from '../../kernel';
+import type {
+  ConstraintDefinition,
+  SketchConstraintMeta,
+  SolverContext,
+  SketchPoint,
+  SolveOptions,
+} from './types';
+import {
+  DEFAULT_TOLERANCE,
+  buildConstraintDisplays,
+  computeStatus,
+  getConstraintDef,
+  setConstraintValue,
+} from './registry';
+import { decomposeAndSolve } from './decompose';
+
+// ─── Arc tessellation ──────────────────────────────────────────────────────────
+
+/**
+ * Tessellate an arc into a polyline.
+ * Returns `segments` points from (exclusive) startAngle toward endAngle.
+ * The start point itself is NOT included; the caller must prepend it.
+ */
+const tessellateArc = (
+  cx: number, cy: number, radius: number,
+  startAngle: number, endAngle: number,
+  clockwise: boolean, segments: number,
+): [number, number][] => {
+  let sweep = clockwise
+    ? (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI)
+    : (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI);
+  if (sweep < 1e-9) sweep = 2 * Math.PI; // full circle fallback
+  const dir = clockwise ? -1 : 1;
+  const pts: [number, number][] = [];
+  for (let k = 1; k <= segments; k++) {
+    const t = (k / segments) * sweep;
+    const a = startAngle + dir * t;
+    pts.push([cx + radius * Math.cos(a), cy + radius * Math.sin(a)]);
+  }
+  return pts;
+};
+
+// ─── Geometry builders ─────────────────────────────────────────────────────────
+
+export const cloneDefinition = (def: ConstraintDefinition): ConstraintDefinition => ({
+  points: def.points.map((p) => ({ ...p })),
+  lines: def.lines.map((l) => ({ ...l })),
+  circles: def.circles.map((c) => ({ ...c })),
+  arcs: (def.arcs ?? []).map((a) => ({ ...a })),
+  shapes: (def.shapes ?? []).map((s) => ({ ...s, lines: [...s.lines] })),
+  loops: def.loops.map((loop) => {
+    if (loop.type === 'poly') return { type: 'poly', points: [...loop.points] };
+    if (loop.type === 'circle') return { type: 'circle', circle: loop.circle };
+    return { type: 'profile', segments: loop.segments.map((s) => ({ ...s })) };
+  }),
+  constraints: def.constraints.map((c) => ({ ...c } as typeof c)),
+  rejectedConstraints: def.rejectedConstraints.map((c) => ({ ...c } as typeof c)),
+  rejectionReasons: def.rejectionReasons ? new Map(def.rejectionReasons) : undefined,
+});
+
+export const buildSketchFromDefinition = (def: ConstraintDefinition): Sketch => {
+  const loops: Sketch[] = [];
+  const ptMap = new Map(def.points.map((p) => [p.id, p] as const));
+  const lineMap = new Map(def.lines.map((l) => [l.id, l] as const));
+  const arcMap = new Map((def.arcs ?? []).map((a) => [a.id, a] as const));
+  const ARC_SEGMENTS = 32;
+
+  def.loops.forEach((loop) => {
+    if (loop.type === 'poly') {
+      const pts: [number, number][] = loop.points.map((id) => {
+        const pt = ptMap.get(id);
+        if (!pt) throw new Error(`Missing point ${id}`);
+        return [pt.x, pt.y];
+      });
+      if (pts.length >= 3) loops.push(polygon(pts));
+    } else if (loop.type === 'circle') {
+      const circleDef = def.circles.find((c) => c.id === loop.circle);
+      if (!circleDef) throw new Error(`Missing circle ${loop.circle}`);
+      const center = ptMap.get(circleDef.center);
+      if (!center) throw new Error(`Missing center ${circleDef.center}`);
+      const circle = new Sketch(getWasm().CrossSection.circle(circleDef.radius, circleDef.segments));
+      loops.push(circle.translate(center.x, center.y));
+    } else if (loop.type === 'profile') {
+      // Build a polyline by concatenating line endpoints and arc tessellations.
+      const pts: [number, number][] = [];
+      for (const seg of loop.segments) {
+        if (seg.kind === 'line') {
+          const l = lineMap.get(seg.line);
+          if (!l) continue;
+          // On the very first segment, also push the start point.
+          if (pts.length === 0) {
+            const a = ptMap.get(l.a);
+            if (a) pts.push([a.x, a.y]);
+          }
+          const b = ptMap.get(l.b);
+          if (b) pts.push([b.x, b.y]);
+        } else if (seg.kind === 'arc') {
+          const arc = arcMap.get(seg.arc);
+          if (!arc) continue;
+          const center = ptMap.get(arc.center);
+          const start = ptMap.get(arc.start);
+          const end = ptMap.get(arc.end);
+          if (!center || !start || !end) continue;
+          if (pts.length === 0) pts.push([start.x, start.y]);
+          const startAngle = Math.atan2(start.y - center.y, start.x - center.x);
+          const endAngle = Math.atan2(end.y - center.y, end.x - center.x);
+          const arcPts = tessellateArc(center.x, center.y, arc.radius, startAngle, endAngle, arc.clockwise, ARC_SEGMENTS);
+          pts.push(...arcPts);
+        }
+      }
+      if (pts.length >= 3) loops.push(polygon(pts));
+    }
+  });
+
+  if (loops.length === 0) {
+    const unit = getWasm().CrossSection.square([1, 1], false);
+    return new Sketch(getWasm().CrossSection.difference([unit, unit]));
+  }
+
+  return union2d(...loops);
+};
+
+export const buildConstructionGeometry = (
+  def: ConstraintDefinition,
+): SketchConstraintMeta['construction'] => {
+  const pointMap = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = def.lines
+    .filter((line) => line.construction)
+    .map((line) => {
+      const a = pointMap.get(line.a);
+      const b = pointMap.get(line.b);
+      if (!a || !b) return null;
+      return { a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
+    })
+    .filter((line): line is { a: [number, number]; b: [number, number] } => line !== null);
+
+  const circles = def.circles
+    .filter((circle) => circle.construction)
+    .map((circle) => {
+      const center = pointMap.get(circle.center);
+      if (!center) return null;
+      return { center: [center.x, center.y] as [number, number], radius: circle.radius };
+    })
+    .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
+
+  const arcs = (def.arcs ?? [])
+    .filter((arc) => arc.construction)
+    .map((arc) => {
+      const center = pointMap.get(arc.center);
+      const start = pointMap.get(arc.start);
+      const end = pointMap.get(arc.end);
+      if (!center || !start || !end) return null;
+      return {
+        center: [center.x, center.y] as [number, number],
+        start: [start.x, start.y] as [number, number],
+        end: [end.x, end.y] as [number, number],
+        radius: arc.radius,
+        clockwise: arc.clockwise,
+      };
+    })
+    .filter((arc): arc is NonNullable<typeof arc> => arc !== null);
+
+  return { lines, circles, arcs };
+};
+
+export const buildEdgeGeometry = (def: ConstraintDefinition): SketchConstraintMeta['edges'] => {
+  const pointMap = new Map(def.points.map((p) => [p.id, p] as const));
+  const lines = def.lines
+    .filter((line) => !line.construction)
+    .map((line) => {
+      const a = pointMap.get(line.a);
+      const b = pointMap.get(line.b);
+      if (!a || !b) return null;
+      return { a: [a.x, a.y] as [number, number], b: [b.x, b.y] as [number, number] };
+    })
+    .filter((line): line is { a: [number, number]; b: [number, number] } => line !== null);
+
+  const circles = def.circles
+    .filter((circle) => !circle.construction)
+    .map((circle) => {
+      const center = pointMap.get(circle.center);
+      if (!center) return null;
+      return { center: [center.x, center.y] as [number, number], radius: circle.radius };
+    })
+    .filter((circle): circle is { center: [number, number]; radius: number } => circle !== null);
+
+  const arcs = (def.arcs ?? [])
+    .filter((arc) => !arc.construction)
+    .map((arc) => {
+      const center = pointMap.get(arc.center);
+      const start = pointMap.get(arc.start);
+      const end = pointMap.get(arc.end);
+      if (!center || !start || !end) return null;
+      return {
+        center: [center.x, center.y] as [number, number],
+        start: [start.x, start.y] as [number, number],
+        end: [end.x, end.y] as [number, number],
+        radius: arc.radius,
+        clockwise: arc.clockwise,
+      };
+    })
+    .filter((arc): arc is NonNullable<typeof arc> => arc !== null);
+
+  const points = def.points.map((p) => ({ id: p.id, pos: [p.x, p.y] as [number, number] }));
+
+  return { lines, circles, arcs, points };
+};
+
+// ─── ConstraintSketch ─────────────────────────────────────────────────────────
+
+export class ConstraintSketch extends Sketch {
+  constructor(
+    cross: Sketch['cross'],
+    public readonly constraintMeta: SketchConstraintMeta,
+    public readonly definition: ConstraintDefinition,
+  ) {
+    super(cross);
+  }
+
+  /**
+   * Enumerate all bounded regions formed by the line arrangement of this sketch.
+   * Construction lines are excluded. Regions are returned largest-first by area.
+   */
+  detectArrangement(): Sketch[] { throw new Error('Not implemented'); }
+
+  /**
+   * Select the single arrangement region that contains the given seed point.
+   * Throws if no region contains the seed.
+   */
+  detectArrangementRegion(seed: [number, number]): Sketch { throw new Error('Not implemented'); }
+
+  withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch {
+    const next = cloneDefinition(this.definition);
+    const target = next.constraints.find((c) => c.id === constraintId);
+    if (!target) return this;
+    setConstraintValue(target, value);
+    return solveConstraintDefinition(next);
+  }
+
+  /**
+   * Return a human-readable diagnostic string of the solved state.
+   */
+  inspect(): string {
+    const meta = this.constraintMeta;
+    const def = this.definition;
+    const lines: string[] = [];
+
+    lines.push(`status: ${meta.status}  maxError: ${meta.maxError.toFixed(6)}`);
+
+    if (meta.rejected.length > 0) {
+      lines.push(`REJECTED (${meta.rejected.length}):`);
+      meta.rejected.forEach((r) => {
+        const reason = r.rejectionReason ? ` — ${r.rejectionReason}` : '';
+        lines.push(`  ${r.type} ${r.label} (${r.id})${reason}`);
+      });
+    }
+
+    lines.push('points:');
+    def.points.forEach((p) => {
+      lines.push(`  ${p.id}: (${p.x.toFixed(3)}, ${p.y.toFixed(3)})${p.fixed ? ' FIXED' : ''}`);
+    });
+
+    lines.push('lines:');
+    const ptMap = new Map(def.points.map((p) => [p.id, p] as const));
+    def.lines.forEach((l) => {
+      const a = ptMap.get(l.a);
+      const b = ptMap.get(l.b);
+      if (!a || !b) return;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      lines.push(
+        `  ${l.id}: ${l.a}\u2192${l.b}  angle=${ang.toFixed(1)}\u00B0  len=${len.toFixed(3)}${l.construction ? ' (construction)' : ''}`,
+      );
+    });
+
+    lines.push('loops:');
+    def.loops.forEach((loop, i) => {
+      if (loop.type === 'poly') {
+        const coords = loop.points.map((id) => ptMap.get(id)).filter(Boolean) as import('./types').SketchPoint[];
+        let area = 0;
+        for (let j = 0; j < coords.length; j += 1) {
+          const k = (j + 1) % coords.length;
+          area += coords[j].x * coords[k].y - coords[k].x * coords[j].y;
+        }
+        area /= 2;
+        lines.push(`  [${i}]: ${coords.length}-gon  area=${area.toFixed(1)}`);
+      } else if (loop.type === 'circle') {
+        const c = def.circles.find((cc) => cc.id === loop.circle);
+        const cen = c ? ptMap.get(c.center) : null;
+        lines.push(
+          `  [${i}]: circle r=${c ? c.radius.toFixed(2) : '?'} at (${cen ? cen.x.toFixed(1) : '?'},${cen ? cen.y.toFixed(1) : '?'})`,
+        );
+      } else {
+        lines.push(`  [${i}]: profile (${loop.segments.length} segments)`);
+      }
+    });
+
+    return lines.join('\n');
+  }
+}
+
+export const isConstraintSketch = (sketch: Sketch | null | undefined): sketch is ConstraintSketch =>
+  sketch instanceof ConstraintSketch;
+
+// ─── solveConstraintDefinition ────────────────────────────────────────────────
+
+export const solveConstraintDefinition = (
+  def: ConstraintDefinition,
+  options: SolveOptions = {},
+): ConstraintSketch => {
+  const working = cloneDefinition(def);
+  const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
+  const { maxError } = decomposeAndSolve(working, options);
+  const { status, dof } = computeStatus(working, maxError, tolerance);
+  // Conflicting = solver couldn't converge (genuinely incompatible constraints).
+  const conflicts = new Set<string>(
+    maxError > tolerance * 5 ? working.constraints.map((c) => c.id) : [],
+  );
+  // Redundant = solver converged but DOF is negative.
+  // For each constraint: solve without it from the original (pre-solve) positions, then check
+  // if that constraint's residual is still ~0. If yes, the other constraints already force it.
+  const redundant = new Set<string>();
+  if (dof < 0 && maxError <= tolerance * 5) {
+    for (const c of def.constraints) {
+      const cdef = getConstraintDef(c.type);
+      if (!cdef?.residual) continue;
+      const testDef = cloneDefinition(def);
+      testDef.constraints = testDef.constraints.filter((tc) => tc.id !== c.id);
+      decomposeAndSolve(testDef, { iterations: options.iterations, tolerance });
+      const testCtx: SolverContext = {
+        points: new Map(testDef.points.map((p) => [p.id, p] as const)),
+        lines: new Map(testDef.lines.map((l) => [l.id, l] as const)),
+        circles: new Map(testDef.circles.map((ci) => [ci.id, ci] as const)),
+        arcs: new Map((testDef.arcs ?? []).map((a) => [a.id, a] as const)),
+        shapes: new Map((testDef.shapes ?? []).map((s) => [s.id, s] as const)),
+        tolerance,
+        movePoint: () => false,
+      };
+      const res = cdef.residual(c as never, testCtx);
+      if (Math.max(...res.map(Math.abs)) < tolerance) redundant.add(c.id);
+    }
+  }
+  const constraints = buildConstraintDisplays(working, conflicts, redundant);
+  const rejected = buildConstraintDisplays(
+    { ...working, constraints: working.rejectedConstraints, rejectedConstraints: [] },
+    new Set(working.rejectedConstraints.map((c) => c.id)),
+    new Set(),
+    working.rejectionReasons,
+  );
+  const sketch = buildSketchFromDefinition(working);
+  const construction = buildConstructionGeometry(working);
+  const edges = buildEdgeGeometry(working);
+  return new ConstraintSketch(
+    sketch.cross,
+    { status, dof, maxError, constraints, rejected, construction, edges },
+    working,
+  );
+};
+
+export const updateConstraintValue = (
+  sketch: ConstraintSketch,
+  constraintId: string,
+  value: number,
+): ConstraintSketch => {
+  const next = cloneDefinition(sketch.definition);
+  const target = next.constraints.find((c) => c.id === constraintId);
+  if (!target) return sketch;
+  setConstraintValue(target, value);
+  return solveConstraintDefinition(next);
+};
+</file>
+
+<file path="types.ts">
+export type PointId = string;
+export type LineId = string;
+export type CircleId = string;
+export type ArcId = string;
+export type ShapeId = string;
+
+export interface SketchArc {
+  id: ArcId;
+  /** Center point of the arc's circle. */
+  center: PointId;
+  /** Point on the arc where it begins. Must lie on the circle. */
+  start: PointId;
+  /** Point on the arc where it ends. Must lie on the circle. */
+  end: PointId;
+  /** Current solved radius — kept consistent with |center–start| and |center–end| by the solver. */
+  radius: number;
+  /** True → arc sweeps clockwise from start to end; false → counter-clockwise. */
+  clockwise: boolean;
+  construction: boolean;
+}
+
+export interface SketchShape {
+  id: ShapeId;
+  /** Ordered list of line IDs forming a closed polygon. */
+  lines: LineId[];
+}
+
+export interface SketchPoint {
+  id: PointId;
+  x: number;
+  y: number;
+  fixed: boolean;
+}
+
+export interface SketchLine {
+  id: LineId;
+  a: PointId;
+  b: PointId;
+  construction: boolean;
+}
+
+export interface SketchCircle {
+  id: CircleId;
+  center: PointId;
+  radius: number;
+  construction: boolean;
+  fixedRadius: boolean;
+  segments: number;
+}
+
+/** A segment in a mixed line/arc profile loop. */
+export type ProfileSegment =
+  | { kind: 'line'; line: LineId }
+  | { kind: 'arc'; arc: ArcId };
+
+export type SketchLoop =
+  | { type: 'poly'; points: PointId[] }
+  | { type: 'circle'; circle: CircleId }
+  /** Mixed profile of line and arc segments forming a closed loop. */
+  | { type: 'profile'; segments: ProfileSegment[] };
+
+export interface ConstraintDisplay {
+  id: string;
+  type: string;
+  label: string;
+  position: [number, number];
+  value?: number;
+  isDimension: boolean;
+  /** True when the solver failed to satisfy this constraint (genuinely conflicting geometry). */
+  isConflicting: boolean;
+  /** True when this constraint is mathematically redundant — it duplicates an equation already
+   * provided by another constraint, making the DOF count negative even though the solver converges. */
+  isRedundant: boolean;
+  /** For rejected constraints: why the builder rejected it (maxError, constraint params, blame). */
+  rejectionReason?: string;
+}
+
+export interface SketchConstraintMeta {
+  status: 'under' | 'fully' | 'over';
+  /** Net degrees of freedom: positive = under-constrained, 0 = fully, negative = over-constrained. */
+  dof: number;
+  maxError: number;
+  constraints: ConstraintDisplay[];
+  rejected: ConstraintDisplay[];
+  construction: {
+    lines: { a: [number, number]; b: [number, number] }[];
+    circles: { center: [number, number]; radius: number }[];
+    arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+  };
+  /** Non-construction geometry edges rendered as solid wireframe overlay. */
+  edges: {
+    lines: { a: [number, number]; b: [number, number] }[];
+    circles: { center: [number, number]; radius: number }[];
+    arcs: { center: [number, number]; start: [number, number]; end: [number, number]; radius: number; clockwise: boolean }[];
+    points: { id: string; pos: [number, number] }[];
+  };
+}
+
+export interface ConstraintDefinition {
+  points: SketchPoint[];
+  lines: SketchLine[];
+  circles: SketchCircle[];
+  arcs: SketchArc[];
+  shapes: SketchShape[];
+  loops: SketchLoop[];
+  constraints: SketchConstraint[];
+  rejectedConstraints: SketchConstraint[];
+  /** Maps rejected constraint ID → human-readable reason. Populated by the builder. */
+  rejectionReasons?: Map<string, string>;
+}
+
+export interface SolveOptions {
+  /** Maximum number of LM outer iterations per restart. */
+  iterations?: number;
+  /** Infinity-norm residual tolerance for declaring convergence. */
+  tolerance?: number;
+  /** Number of deterministic restart seeds used by the global solver. */
+  restarts?: number;
+  /** Optional projector iterations used only for initialisation, not as the main solver. */
+  warmStartIterations?: number;
+  /** Maximum LM step length in scaled variable space. Larger = bolder, smaller = safer. */
+  maxScaledStep?: number;
+}
+
+// ─── Extension interfaces (augmented by each constraint def file via declare module) ───
+
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface ConstraintTypeMap {}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface ConstraintBuilderMethods {}
+
+// Derived union types — automatically include every registered constraint:
+export type SketchConstraint = {
+  [K in keyof ConstraintTypeMap]: { id: string; type: K } & ConstraintTypeMap[K];
+}[keyof ConstraintTypeMap];
+
+export type ConstraintType = keyof ConstraintTypeMap;
+
+// ─── Solver / registry context types ───────────────────────────────────────────
+
+export interface SolverContext {
+  points: Map<PointId, SketchPoint>;
+  lines: Map<LineId, SketchLine>;
+  circles: Map<CircleId, SketchCircle>;
+  arcs: Map<ArcId, SketchArc>;
+  shapes: Map<ShapeId, SketchShape>;
+  tolerance: number;
+  movePoint: (pt: SketchPoint, dx: number, dy: number) => boolean;
+}
+
+export interface DisplayContext {
+  points: Map<PointId, SketchPoint>;
+  lines: Map<LineId, SketchLine>;
+  circles: Map<CircleId, SketchCircle>;
+  arcs: Map<ArcId, SketchArc>;
+  shapes: Map<ShapeId, SketchShape>;
+}
+
+export interface DofContext {
+  refCount: Map<PointId, number>;
+  lines: SketchLine[];
+  shapes: Map<ShapeId, SketchShape>;
+}
+
+// ─── Constraint definition descriptor ─────────────────────────────────────────
+
+export interface ConstraintDef<TType extends string = string, TData extends object = object> {
+  type: TType;
+  label: string;
+  isDimension: boolean;
+  /**
+   * Number of independent constraint equations this constraint provides.
+   * Used for proper DOF arithmetic: DOF = freeVars - sum(equations).
+   * Examples: coincident=2, horizontal=1, fixed=0 (point already pinned via pt.fixed).
+   */
+  equations?: number;
+  /** Optional pre-solve hook called once before the iteration loop (used by 'fixed'). */
+  presolve?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => void;
+  solve: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number;
+  /**
+   * Optional residual vector for the Newton-Raphson solver.
+   * Return an array of values that should all be 0 when the constraint is satisfied.
+   * The length must match `equations`. When defined for all active constraints, the
+   * NR solver is used instead of Gauss-Seidel, giving order-independent quadratic convergence.
+   */
+  residual?: (constraint: { id: string; type: TType } & TData, ctx: SolverContext) => number[];
+  displayPosition: (constraint: { id: string; type: TType } & TData, ctx: DisplayContext) => [number, number];
+  computeDof: (constraint: { id: string; type: TType } & TData, ctx: DofContext) => void;
+}
+</file>
+
+</files>

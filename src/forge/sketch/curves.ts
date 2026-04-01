@@ -1,17 +1,17 @@
-import { Sketch } from './core';
-import { polygon } from './primitives';
-import { stroke } from './path';
-import { levelSet, setShapeGeometryInfo, type Shape } from '../kernel';
 import {
-  scaleLevelSetBoundsPadding,
-  scaleLevelSetEdgeLength,
-  scaleSplineSamples,
-  scaleSweepPathSamples,
-} from '../quality';
+  buildLoftShapeCompilePlan,
+  buildSweepShapeCompilePlan,
+  buildVariableSweepShapeCompilePlan,
+  createOwnedShapeCompilePlan,
+} from '../compilePlan';
+import { buildShapeFromCompilePlan, getActiveBackend, type Shape } from '../kernel';
+import { scaleLevelSetBoundsPadding, scaleLevelSetEdgeLength, scaleSplineSamples, scaleSweepPathSamples } from '../quality';
+import { getSketchCompileProfilePlan, Sketch } from './core';
+import { stroke } from './path';
+import { polygon } from './primitives';
 
 type Vec2 = [number, number];
 type Vec3 = [number, number, number];
-type Loop2D = Vec2[];
 
 export interface Spline2DOptions {
   /** Closed loop (default true). */
@@ -57,7 +57,26 @@ export interface SweepOptions {
   up?: Vec3;
 }
 
-type SignedLoop = { pts: Loop2D; area: number };
+export interface VariableSweepSection {
+  /** Parameter along the spine (0 = start, 1 = end). */
+  t: number;
+  /** Cross-section profile at this station. */
+  profile: Sketch;
+}
+
+export interface VariableSweepOptions {
+  /** Number of samples when spine is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /**
+   * Preferred "up" vector for local profile frame.
+   * Auto fallback is used near parallel segments.
+   */
+  up?: Vec3;
+}
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
@@ -79,12 +98,8 @@ function vec3Dot(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-function vec3Cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+function _vec3Cross(a: Vec3, b: Vec3): Vec3 {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function vec3Len(v: Vec3): number {
@@ -95,81 +110,6 @@ function vec3Norm(v: Vec3): Vec3 {
   const len = vec3Len(v);
   if (len < 1e-9) return [0, 0, 1];
   return [v[0] / len, v[1] / len, v[2] / len];
-}
-
-function signedArea2D(loop: Loop2D): number {
-  let a = 0;
-  for (let i = 0; i < loop.length; i++) {
-    const [x1, y1] = loop[i];
-    const [x2, y2] = loop[(i + 1) % loop.length];
-    a += x1 * y2 - x2 * y1;
-  }
-  return a * 0.5;
-}
-
-function pointInLoop(p: Vec2, loop: Loop2D): boolean {
-  let inside = false;
-  const [px, py] = p;
-  for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-    const [xi, yi] = loop[i];
-    const [xj, yj] = loop[j];
-    const intersect =
-      ((yi > py) !== (yj > py))
-      && (px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-20) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
-function pointSegDist2D(p: Vec2, a: Vec2, b: Vec2): number {
-  const abx = b[0] - a[0];
-  const aby = b[1] - a[1];
-  const apx = p[0] - a[0];
-  const apy = p[1] - a[1];
-  const den = abx * abx + aby * aby;
-  const t = den < 1e-12 ? 0 : clamp((apx * abx + apy * aby) / den, 0, 1);
-  const qx = a[0] + abx * t;
-  const qy = a[1] + aby * t;
-  const dx = p[0] - qx;
-  const dy = p[1] - qy;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function loopSignedDistance(p: Vec2, loop: Loop2D): number {
-  let minDist = Infinity;
-  for (let i = 0; i < loop.length; i++) {
-    const a = loop[i];
-    const b = loop[(i + 1) % loop.length];
-    minDist = Math.min(minDist, pointSegDist2D(p, a, b));
-  }
-  const inside = pointInLoop(p, loop);
-  return inside ? minDist : -minDist;
-}
-
-function compileSketchSdf(sketch: Sketch): (x: number, y: number) => number {
-  const loopsRaw = sketch.toPolygons() as number[][][];
-  const loops: SignedLoop[] = loopsRaw
-    .filter((loop) => Array.isArray(loop) && loop.length >= 3)
-    .map((loop) => {
-      const pts = loop.map(([x, y]) => [x, y] as Vec2);
-      return { pts, area: signedArea2D(pts) };
-    });
-
-  if (loops.length === 0) {
-    return () => -1;
-  }
-
-  return (x: number, y: number): number => {
-    const p: Vec2 = [x, y];
-    let field = -Infinity;
-    for (const loop of loops) {
-      const f = loopSignedDistance(p, loop.pts);
-      // Positive-area loops are additive regions; negative-area loops are holes.
-      if (loop.area >= 0) field = Math.max(field, f);
-      else field = Math.min(field, -f);
-    }
-    return field;
-  };
 }
 
 function catmullRom2D(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number, tension: number): Vec2 {
@@ -187,10 +127,7 @@ function catmullRom2D(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number, tension
   const h01 = -2 * ttt + 3 * tt;
   const h11 = ttt - tt;
 
-  return [
-    h00 * p1[0] + h10 * m1x + h01 * p2[0] + h11 * m2x,
-    h00 * p1[1] + h10 * m1y + h01 * p2[1] + h11 * m2y,
-  ];
+  return [h00 * p1[0] + h10 * m1x + h01 * p2[0] + h11 * m2x, h00 * p1[1] + h10 * m1y + h01 * p2[1] + h11 * m2y];
 }
 
 function catmullRom3D(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number, tension: number): Vec3 {
@@ -336,10 +273,11 @@ export class Curve3D {
 }
 
 /**
- * Create a smooth 2D spline sketch from control points.
+ * Build a smooth Catmull-Rom spline sketch from 2D control points.
  *
- * - Closed spline returns a filled profile.
- * - Open spline requires strokeWidth to return a solid sketch.
+ * A closed spline (default) returns a filled profile. An open spline requires
+ * a strokeWidth option to produce a solid sketch. Use tension (0..1, default 0.5)
+ * to control curve tightness.
  */
 export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch {
   const closed = options.closed ?? true;
@@ -354,29 +292,33 @@ export function spline2d(points: Vec2[], options: Spline2DOptions = {}): Sketch 
   return stroke(sampled, options.strokeWidth, options.join ?? 'Round');
 }
 
-/** Create a reusable 3D spline curve object. */
+/**
+ * Create a reusable 3D spline curve object (Catmull-Rom).
+ *
+ * The returned Curve3D provides sample(), pointAt(t), tangentAt(t), and length() for
+ * downstream use in sweep() or manual path operations.
+ */
 export function spline3d(points: Vec3[], options: Spline3DOptions = {}): Curve3D {
   return new Curve3D(points, options);
 }
 
 /**
- * Loft between sketches along Z stations.
+ * Loft between multiple sketches along Z stations.
  *
- * Profiles can differ in topology/vertex count: interpolation is done on
- * signed-distance fields and meshed with level-set extraction.
+ * Profiles can differ in topology and vertex count: interpolation is done on
+ * signed-distance fields and meshed with level-set extraction. Heights must be
+ * strictly increasing. Compatible loft stacks can export through the OCCT exact route.
+ *
+ * Performance note: loft is significantly heavier than primitive/extrude/revolve.
+ * If the part is axis-symmetric (bottles, vases, knobs), prefer revolve().
  */
-export function loft(
-  profiles: Sketch[],
-  heights: number[],
-  options: LoftOptions = {},
-): Shape {
+export function loft(profiles: Sketch[], heights: number[], options: LoftOptions = {}): Shape {
   if (profiles.length < 2) throw new Error('loft requires at least two profiles');
   if (profiles.length !== heights.length) {
     throw new Error('loft requires heights.length === profiles.length');
   }
 
-  const pairs = profiles.map((profile, i) => ({ profile, z: heights[i] }))
-    .sort((a, b) => a.z - b.z);
+  const pairs = profiles.map((profile, i) => ({ profile, z: heights[i] })).sort((a, b) => a.z - b.z);
 
   for (let i = 1; i < pairs.length; i++) {
     if (Math.abs(pairs[i].z - pairs[i - 1].z) < 1e-8) {
@@ -384,7 +326,6 @@ export function loft(
     }
   }
 
-  const sdfs = pairs.map((entry) => compileSketchSdf(entry.profile));
   const zs = pairs.map((entry) => entry.z);
 
   let minX = Infinity;
@@ -406,108 +347,94 @@ export function loft(
   const edgeLength = scaleLevelSetEdgeLength(requestedEdgeLength);
   const requestedPad = options.boundsPadding ?? Math.max(edgeLength * 3, span * 0.06, 1.5);
   const pad = scaleLevelSetBoundsPadding(requestedPad);
-
-  const sdfAt = (x: number, y: number, z: number): number => {
-    let crossField: number;
-    if (z <= zMin) {
-      crossField = sdfs[0](x, y);
-    } else if (z >= zMax) {
-      crossField = sdfs[sdfs.length - 1](x, y);
-    } else {
-      let seg = 0;
-      while (seg + 1 < zs.length && z > zs[seg + 1]) seg++;
-      const z0 = zs[seg];
-      const z1 = zs[seg + 1];
-      const t = (z - z0) / (z1 - z0);
-      const f0 = sdfs[seg](x, y);
-      const f1 = sdfs[seg + 1](x, y);
-      crossField = f0 * (1 - t) + f1 * t;
-    }
-
-    // Cap at start/end planes.
-    const zCap = Math.min(z - zMin, zMax - z);
-    return Math.min(crossField, zCap);
-  };
-
-  const shape = levelSet(
-    ([x, y, z]) => sdfAt(x, y, z),
-    {
-      min: [minX - pad, minY - pad, zMin - pad],
-      max: [maxX + pad, maxY + pad, zMax + pad],
-    },
-    edgeLength,
+  const plan = buildLoftShapeCompilePlan(
+    pairs.map((entry) => getSketchCompileProfilePlan(entry.profile)),
+    zs,
+    { edgeLength, boundsPadding: pad },
   );
-  return setShapeGeometryInfo(shape, {
-    fidelity: 'sampled',
-    sources: ['loft', ...shape.geometryInfo().sources],
+  if (!plan) {
+    throw new Error('loft: one or more profiles is missing a compile plan. All sketches must have compile profile plans.');
+  }
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'loft')!;
+  const isOCCT = getActiveBackend() === 'occt';
+  return buildShapeFromCompilePlan(ownedPlan, pairs[0]?.profile.colorHex, {
+    fidelity: isOCCT ? 'kernel-native' : 'sampled',
+    sources: isOCCT ? ['loft'] : ['loft', 'level-set'],
   });
 }
 
-interface SweepSegment {
-  a: Vec3;
-  t: Vec3;
-  x: Vec3;
-  y: Vec3;
-  len: number;
-}
-
-function makeSweepFrame(tangent: Vec3, preferredUp: Vec3): { x: Vec3; y: Vec3 } {
-  let up = vec3Norm(preferredUp);
-  if (Math.abs(vec3Dot(up, tangent)) > 0.95) {
-    up = Math.abs(tangent[2]) < 0.95 ? [0, 0, 1] : [0, 1, 0];
-  }
-  let x = vec3Norm(vec3Cross(up, tangent));
-  if (vec3Len(x) < 1e-8) {
-    const fallback: Vec3 = Math.abs(tangent[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-    x = vec3Norm(vec3Cross(fallback, tangent));
-  }
-  const y = vec3Norm(vec3Cross(tangent, x));
-  return { x, y };
+export interface LoftAlongSpineOptions {
+  /** Number of samples when spine is a Curve3D. Default 48. */
+  samples?: number;
+  /** Marching-grid edge length for level-set meshing. Smaller = finer. */
+  edgeLength?: number;
+  /** Optional extra bounds padding. */
+  boundsPadding?: number;
+  /**
+   * Preferred "up" vector for local profile frame.
+   * Auto fallback is used near parallel segments.
+   */
+  up?: Vec3;
 }
 
 /**
- * Sweep a 2D profile along a 3D path.
+ * Loft between multiple profiles positioned along an arbitrary 3D spine curve.
  *
- * Path can be:
- * - `Curve3D` from spline3d(...)
- * - array of [x,y,z] points (polyline)
+ * Unlike loft() which only supports Z heights, loftAlongSpine() places each
+ * profile at a position along a 3D spine, oriented perpendicular to the spine
+ * tangent. This enables lofting along curved paths — e.g., a wing root-to-tip
+ * transition that follows a swept-back leading edge.
  *
- * The profile is interpreted in the local frame normal plane (x,y axes).
+ * The tValues array specifies where each profile sits along the spine (0 = start,
+ * 1 = end). Must have the same length as profiles and be in [0, 1].
+ *
+ * Internally uses variableSweep infrastructure with SDF interpolation.
+ *
+ * Performance note: uses level-set meshing, heavier than simple loft().
  */
-export function sweep(
-  profile: Sketch,
-  path: Curve3D | Vec3[],
-  options: SweepOptions = {},
-): Shape {
+export function loftAlongSpine(profiles: Sketch[], spine: Curve3D | Vec3[], tValues: number[], options: LoftAlongSpineOptions = {}): Shape {
+  if (profiles.length < 2) throw new Error('loftAlongSpine requires at least two profiles');
+  if (profiles.length !== tValues.length) {
+    throw new Error('loftAlongSpine requires tValues.length === profiles.length');
+  }
+  for (const t of tValues) {
+    if (t < 0 || t > 1) throw new Error(`loftAlongSpine: t=${t} is out of range [0, 1]`);
+  }
+
+  const sections: VariableSweepSection[] = profiles.map((profile, i) => ({
+    t: tValues[i],
+    profile,
+  }));
+
+  return variableSweep(spine, sections, {
+    samples: options.samples,
+    edgeLength: options.edgeLength,
+    boundsPadding: options.boundsPadding,
+    up: options.up,
+  });
+}
+
+/**
+ * Sweep a 2D profile along a 3D path to create a solid.
+ *
+ * Path can be a Curve3D from spline3d() or an array of [x,y,z] points (polyline).
+ * The profile is interpreted in the local frame normal plane. Compatible sweeps can
+ * export through the OCCT exact route using the canonical path representation.
+ *
+ * Performance note: sweep uses level-set meshing internally. Prefer direct
+ * primitives/extrude/revolve when they can express the same shape.
+ */
+export function sweep(profile: Sketch, path: Curve3D | Vec3[], options: SweepOptions = {}): Shape {
   const requestedPathSamples = Math.max(4, options.samples ?? 48);
   const effectivePathSamples = scaleSweepPathSamples(requestedPathSamples);
-  const pathPts = Array.isArray(path)
-    ? path
-    : path.sample(effectivePathSamples);
+  const pathPts = Array.isArray(path) ? path : path.sample(effectivePathSamples);
 
   if (pathPts.length < 2) throw new Error('sweep requires a path with at least two points');
 
-  const profileSdf = compileSketchSdf(profile);
   const up = options.up ?? [0, 0, 1];
 
-  const segments: SweepSegment[] = [];
-  for (let i = 0; i < pathPts.length - 1; i++) {
-    const a = pathPts[i];
-    const b = pathPts[i + 1];
-    const d = vec3Sub(b, a);
-    const len = vec3Len(d);
-    if (len < 1e-6) continue;
-    const t = vec3Scale(d, 1 / len);
-    const frame = makeSweepFrame(t, up);
-    segments.push({ a, t, x: frame.x, y: frame.y, len });
-  }
-  if (segments.length === 0) throw new Error('sweep path has no non-zero segments');
-
   const pb = profile.bounds();
-  const pr = Math.max(
-    Math.abs(pb.min[0]), Math.abs(pb.max[0]),
-    Math.abs(pb.min[1]), Math.abs(pb.max[1]),
-  );
+  const pr = Math.max(Math.abs(pb.min[0]), Math.abs(pb.max[0]), Math.abs(pb.min[1]), Math.abs(pb.max[1]));
 
   let minX = Infinity;
   let minY = Infinity;
@@ -534,31 +461,106 @@ export function sweep(
   const requestedPad = options.boundsPadding ?? Math.max(pr + edgeLength * 2, span * 0.04, 2);
   const pad = scaleLevelSetBoundsPadding(requestedPad);
 
-  const sweepSdf = (p: Vec3): number => {
-    let field = -Infinity;
-    for (const seg of segments) {
-      const v = vec3Sub(p, seg.a);
-      const w = vec3Dot(v, seg.t);
-      const u = vec3Dot(v, seg.x);
-      const q = vec3Dot(v, seg.y);
-      const profileField = profileSdf(u, q);
-      const capField = Math.min(w, seg.len - w);
-      const segField = Math.min(profileField, capField);
-      field = Math.max(field, segField);
-    }
-    return field;
-  };
-
-  const shape = levelSet(
-    (p) => sweepSdf(p as Vec3),
+  const plan = buildSweepShapeCompilePlan(
+    getSketchCompileProfilePlan(profile),
     {
-      min: [minX - pad, minY - pad, minZ - pad],
-      max: [maxX + pad, maxY + pad, maxZ + pad],
+      kind: 'polyline',
+      points: pathPts.map(([x, y, z]) => [x, y, z]),
     },
-    edgeLength,
+    { edgeLength, boundsPadding: pad, up },
   );
-  return setShapeGeometryInfo(shape, {
+  if (!plan) {
+    throw new Error('sweep: profile is missing a compile plan. The sketch must have a compile profile plan.');
+  }
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'sweep')!;
+  const isOCCTSweep = getActiveBackend() === 'occt';
+  return buildShapeFromCompilePlan(ownedPlan, profile.colorHex, {
+    fidelity: isOCCTSweep ? 'kernel-native' : 'sampled',
+    sources: isOCCTSweep ? ['sweep'] : ['sweep', 'level-set'],
+  });
+}
+
+/**
+ * Sweep a variable cross-section along a 3D spine curve.
+ *
+ * Unlike sweep(), which uses a single constant profile, variableSweep()
+ * interpolates between multiple profiles at different stations along the spine.
+ * This enables organic shapes like tapering tubes, bone-like structures, and
+ * sculptural forms.
+ *
+ * Each section specifies a t parameter (0 = start, 1 = end of spine) and a
+ * 2D profile sketch. The SDF-based level-set mesher smoothly blends between
+ * profiles at intermediate positions.
+ *
+ * Performance note: like sweep(), this uses level-set meshing internally.
+ */
+export function variableSweep(spine: Curve3D | Vec3[], sections: VariableSweepSection[], options: VariableSweepOptions = {}): Shape {
+  if (sections.length < 2) throw new Error('variableSweep requires at least two sections');
+
+  const sortedSections = [...sections].sort((a, b) => a.t - b.t);
+  for (const s of sortedSections) {
+    if (s.t < 0 || s.t > 1) throw new Error(`variableSweep: section t=${s.t} is out of range [0, 1]`);
+  }
+
+  const requestedPathSamples = Math.max(4, options.samples ?? 48);
+  const effectivePathSamples = scaleSweepPathSamples(requestedPathSamples);
+  const pathPts = Array.isArray(spine) ? spine : spine.sample(effectivePathSamples);
+
+  if (pathPts.length < 2) throw new Error('variableSweep requires a spine with at least two points');
+
+  const up: Vec3 = options.up ?? [0, 0, 1];
+
+  // Compute max profile radius across all sections
+  let maxPr = 0;
+  for (const s of sortedSections) {
+    const b = s.profile.bounds();
+    maxPr = Math.max(maxPr, Math.abs(b.min[0]), Math.abs(b.max[0]), Math.abs(b.min[1]), Math.abs(b.max[1]));
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const p of pathPts) {
+    minX = Math.min(minX, p[0]);
+    minY = Math.min(minY, p[1]);
+    minZ = Math.min(minZ, p[2]);
+    maxX = Math.max(maxX, p[0]);
+    maxY = Math.max(maxY, p[1]);
+    maxZ = Math.max(maxZ, p[2]);
+  }
+
+  let pathLen = 0;
+  for (let i = 1; i < pathPts.length; i++) {
+    pathLen += vec3Len(vec3Sub(pathPts[i], pathPts[i - 1]));
+  }
+  const span = Math.max(maxX - minX, maxY - minY, maxZ - minZ, pathLen, 1);
+  const requestedEdgeLength = options.edgeLength ?? Math.max(0.3, span / 110);
+  const edgeLength = scaleLevelSetEdgeLength(requestedEdgeLength);
+  const requestedPad = options.boundsPadding ?? Math.max(maxPr + edgeLength * 2, span * 0.04, 2);
+  const pad = scaleLevelSetBoundsPadding(requestedPad);
+
+  const sectionPlans = sortedSections.map((s) => ({
+    t: s.t,
+    profile: getSketchCompileProfilePlan(s.profile),
+  }));
+
+  const plan = buildVariableSweepShapeCompilePlan(
+    sectionPlans,
+    {
+      kind: 'polyline',
+      points: pathPts.map(([x, y, z]) => [x, y, z]),
+    },
+    { edgeLength, boundsPadding: pad, up },
+  );
+  if (!plan) {
+    throw new Error('variableSweep: one or more profiles is missing a compile plan.');
+  }
+  const ownedPlan = createOwnedShapeCompilePlan(plan, 'variableSweep')!;
+  return buildShapeFromCompilePlan(ownedPlan, sortedSections[0].profile.colorHex, {
     fidelity: 'sampled',
-    sources: ['sweep', ...shape.geometryInfo().sources],
+    sources: ['sweep', 'level-set'],
   });
 }

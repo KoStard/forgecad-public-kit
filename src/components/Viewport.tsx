@@ -1,3651 +1,181 @@
-import { useMemo, useCallback, useRef, useEffect, useState, type MutableRefObject } from 'react';
-import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, Lightformer, OrthographicCamera, PerspectiveCamera, Html } from '@react-three/drei';
-import { useForgeStore, type ObjectSettings, type ProjectionMode, type RenderMode, type ViewCommand } from '../store/forgeStore';
-import { DEFAULT_VIEW_CONFIG, intersectWithPlane } from '@forge/index';
-import type {
-  SceneObject,
-  RunResult,
-  ExplodeViewOptions,
-  JointViewDef,
-  JointOverlayViewConfig,
-} from '@forge/index';
-import type { DimensionDef } from '@forge/sketch/dimensions';
-import type { CutPlaneDef } from '@forge/cutPlane';
-import { shapeToGeometry } from '@forge/meshToGeometry';
-import { getSketchWorldMatrix } from '@forge/sketch/placement3d';
-import { findJointAnimationClip, resolveJointAnimation } from '@forge/jointAnimation';
-import { resolveJointViewValues } from '@forge/jointsView';
-import {
-  type ExplodeBounds,
-  computeExplodeMotion,
-  createResolvedExplodeConfig,
-  explodeAdd,
-  explodeBoundsCenter,
-  explodeLeafFanStage,
-  explodeMergeBounds,
-  explodeMul,
-  hasExplodeOverride,
-  resolveExplodeDirective,
-  resolveExplodeLocalFanDirection,
-} from '@forge/explodeCore';
-import {
-  registerOrbitGifExporter,
-  type OrbitGifExportOptions,
-  type OrbitGifMode,
-} from './exportActions';
-import { parseViewportCameraState, type ViewportCameraState } from '../capture/cameraState';
-import { getShortcutKey, hasPrimaryModifier } from '../editorShortcuts';
-import { themes } from '../theme';
+import { formatCoord, formatLength } from '@forge/units';
+import { Grid, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
+import { useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { GIFEncoder, quantize, applyPalette } from 'gifenc';
-
-interface ObjectContextMenuState {
-  objectId: string;
-  x: number;
-  y: number;
-}
-
-const VIEWPORT_CAMERA_STORAGE_KEY = 'fc-viewport-camera-v1';
-const GIF_DEFAULT_SIZE = 720;
-const GIF_DEFAULT_FPS = 18;
-const GIF_DEFAULT_FRAMES_PER_TURN = 54;
-const GIF_DEFAULT_HOLD_FRAMES = 4;
-const GIF_DEFAULT_PITCH_DEG = 18;
-const FOCUS_MODE_DIM_OPACITY = 0.1;
-const PERFORMANCE_SAMPLE_INTERVAL_SEC = 0.25;
-const INTEGER_FORMATTER = new Intl.NumberFormat('en-US');
-const SECTION_HATCH_MIN_SPACING = 1.6;
-const SECTION_HATCH_MAX_SPACING = 8;
-const SECTION_HATCH_SPACING_SCALE = 0.12;
-const SECTION_HATCH_MIN_LINE_WIDTH = 0.18;
-const SECTION_HATCH_MAX_LINE_WIDTH = 0.9;
-const SECTION_SURFACE_LIFT_MIN = 0.0005;
-const SECTION_SURFACE_LIFT_MAX = 0.01;
-const SECTION_SURFACE_LIFT_SCALE = 5e-5;
-const PLANE_TRANSFORM_EPS = 1e-8;
-
-interface ViewportPerformanceInfo {
-  fps: number;
-  frameTimeMs: number;
-  sceneObjects: number;
-  modelTriangles: number;
-  drawCalls: number;
-  renderTriangles: number;
-  renderLines: number;
-  renderPoints: number;
-  memoryGeometries: number;
-  memoryTextures: number;
-  programCount: number;
-}
-const OBJECT_CONTEXT_MENU_WIDTH = 144;
-const OBJECT_CONTEXT_MENU_HEIGHT = 42;
-const OBJECT_CONTEXT_MENU_MARGIN = 8;
-const NON_TEXT_INPUT_TYPES = new Set([
-  'button',
-  'checkbox',
-  'color',
-  'file',
-  'hidden',
-  'image',
-  'radio',
-  'range',
-  'reset',
-  'submit',
-]);
-
-interface PlaneTransform {
-  center: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-}
-
-interface CutSurfaceDef {
-  id: string;
-  geometry: THREE.BufferGeometry;
-  outlineGeometries: THREE.BufferGeometry[];
-  sourcePlaneIndex: number;
-  position: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-  hatchAngleRad: number;
-  hatchSpacing: number;
-  hatchLineWidth: number;
-}
-
-const waitForAnimationFrame = (): Promise<void> => (
-  new Promise((resolve) => {
-    requestAnimationFrame(() => resolve());
-  })
-);
-
-const formatPerformanceCount = (value: number): string => INTEGER_FORMATTER.format(Math.max(0, Math.round(value)));
-
-const getProgramCount = (gl: THREE.WebGLRenderer): number => {
-  const info = gl.info as typeof gl.info & { programs?: unknown[] };
-  return Array.isArray(info.programs) ? info.programs.length : 0;
-};
-
-const applyOrbitPose = (
-  camera: THREE.Camera,
-  target: THREE.Vector3,
-  radius: number,
-  turn: number,
-  pitchDeg: number,
-): void => {
-  const normalizedTurn = ((turn % 1) + 1) % 1;
-  const clampedPitch = THREE.MathUtils.clamp(pitchDeg, -80, 80);
-  const yaw = normalizedTurn * Math.PI * 2;
-  const pitch = THREE.MathUtils.degToRad(clampedPitch);
-  const cosPitch = Math.cos(pitch);
-  const direction = new THREE.Vector3(
-    Math.sin(yaw) * cosPitch,
-    -Math.cos(yaw) * cosPitch,
-    Math.sin(pitch),
-  ).normalize();
-
-  camera.position.copy(target).addScaledVector(direction, radius);
-  camera.up.set(0, 0, 1);
-  camera.lookAt(target);
-  if ('updateProjectionMatrix' in camera && typeof camera.updateProjectionMatrix === 'function') {
-    camera.updateProjectionMatrix();
-  }
-};
-
-interface OrbitGifOverrideSession {
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  center: THREE.Vector3;
-  distance: number;
-  solids: THREE.Object3D[];
-  wires: THREE.Object3D[];
-}
-
-function parseExportColor(input: string | undefined, fallback: number): THREE.Color {
-  if (!input) return new THREE.Color(fallback);
-  try {
-    return new THREE.Color(input);
-  } catch {
-    return new THREE.Color(fallback);
-  }
-}
-
-function addExportLights(scene: THREE.Scene): void {
-  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-
-  const dir1 = new THREE.DirectionalLight(0xffffff, 1.2);
-  dir1.position.set(100, 150, 80);
-  scene.add(dir1);
-
-  const dir2 = new THREE.DirectionalLight(0xffffff, 0.3);
-  dir2.position.set(-60, -40, -80);
-  scene.add(dir2);
-
-  scene.add(new THREE.HemisphereLight(0xb1e1ff, 0x444444, 0.4));
-}
-
-function hashString(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function buildPlaneSpaceRotation(normalLike: [number, number, number]): { normal: THREE.Vector3; rotationToPlane: THREE.Matrix4 } | null {
-  const normal = new THREE.Vector3(normalLike[0], normalLike[1], normalLike[2]);
-  if (normal.lengthSq() < PLANE_TRANSFORM_EPS) return null;
-  normal.normalize();
-
-  const dot = normal.z;
-  if (dot > 1 - PLANE_TRANSFORM_EPS) {
-    return { normal, rotationToPlane: new THREE.Matrix4() };
-  }
-
-  let axis = new THREE.Vector3(1, 0, 0);
-  let angle = Math.PI;
-
-  if (dot >= -1 + PLANE_TRANSFORM_EPS) {
-    axis = new THREE.Vector3(normal.y, -normal.x, 0);
-    const axisLength = axis.length();
-    if (axisLength <= PLANE_TRANSFORM_EPS) {
-      return { normal, rotationToPlane: new THREE.Matrix4() };
-    }
-    axis.multiplyScalar(1 / axisLength);
-    angle = Math.acos(THREE.MathUtils.clamp(dot, -1, 1));
-  }
-
-  return {
-    normal,
-    rotationToPlane: new THREE.Matrix4().makeRotationAxis(axis, angle),
-  };
-}
-
-function resolvePlaneTransform(
-  normalLike: [number, number, number],
-  offset: number,
-  normalDisplacement = 0,
-): PlaneTransform | null {
-  const planeSpace = buildPlaneSpaceRotation(normalLike);
-  if (!planeSpace) return null;
-  const { normal, rotationToPlane } = planeSpace;
-  const center = normal.clone().multiplyScalar(offset + normalDisplacement);
-  const quaternion = new THREE.Quaternion().setFromRotationMatrix(rotationToPlane.clone().invert());
-
-  return { center, quaternion };
-}
-
-function polygonArea2D(points: THREE.Vector2[]): number {
-  let area = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const current = points[i];
-    const next = points[(i + 1) % points.length];
-    area += current.x * next.y - next.x * current.y;
-  }
-  return area * 0.5;
-}
-
-function isTextEntryTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.closest('[data-fc-editor-surface]')) return false;
-  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
-  if (target instanceof HTMLInputElement) {
-    return !NON_TEXT_INPUT_TYPES.has(target.type.toLowerCase());
-  }
-
-  let current: HTMLElement | null = target;
-  while (current) {
-    if (current.isContentEditable) return true;
-    current = current.parentElement;
-  }
-
-  return false;
-}
-
-function computeSceneObjectBounds(
-  obj: SceneObject,
-  objectMatrices: Record<string, THREE.Matrix4>,
-): THREE.Box3 | null {
-  const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
-  if (obj.shape) {
-    try {
-      const { solid } = shapeToGeometry(obj.shape);
-      solid.computeBoundingBox();
-      const bounds = solid.boundingBox ?? null;
-      if (!bounds) return null;
-      const out = new THREE.Box3();
-      expandBoundsByTransformedAabb(
-        out,
-        [bounds.min.x, bounds.min.y, bounds.min.z],
-        [bounds.max.x, bounds.max.y, bounds.max.z],
-        matrix,
-      );
-      return out;
-    } catch {
-      return null;
-    }
-  }
-  if (obj.sketch) {
-    try {
-      const polys = obj.sketch.toPolygons();
-      const box = new THREE.Box3();
-      let hasPoint = false;
-      polys.forEach((contour) => {
-        contour.forEach((p) => {
-          box.expandByPoint(new THREE.Vector3(p[0], p[1], 0));
-          hasPoint = true;
-        });
-      });
-      if (!hasPoint) return null;
-      const out = new THREE.Box3();
-      expandBoundsByTransformedAabb(
-        out,
-        [box.min.x, box.min.y, box.min.z],
-        [box.max.x, box.max.y, box.max.z],
-        matrix,
-      );
-      return out;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function pointInPolygon2D(point: THREE.Vector2, polygon: THREE.Vector2[]): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const xi = polygon[i].x;
-    const yi = polygon[i].y;
-    const xj = polygon[j].x;
-    const yj = polygon[j].y;
-    const intersects = ((yi > point.y) !== (yj > point.y))
-      && (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || 1e-9) + xi);
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
-
-function buildPathFromPoints(points: THREE.Vector2[]): THREE.Path {
-  const path = new THREE.Path();
-  path.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i += 1) {
-    path.lineTo(points[i].x, points[i].y);
-  }
-  path.closePath();
-  return path;
-}
-
-function buildShapeFromPoints(points: THREE.Vector2[]): THREE.Shape {
-  const shape = new THREE.Shape();
-  shape.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i += 1) {
-    shape.lineTo(points[i].x, points[i].y);
-  }
-  shape.closePath();
-  return shape;
-}
-
-function buildFilledGeometryFromPolygons(polygons: number[][][]): THREE.BufferGeometry | null {
-  const loops = polygons
-    .filter((polygon) => polygon.length >= 3)
-    .map((polygon) => {
-      const points = polygon.map((point) => new THREE.Vector2(point[0], point[1]));
-      const area = Math.abs(polygonArea2D(points));
-      return { points, area };
-    })
-    .filter((loop) => loop.area > 1e-8)
-    .sort((a, b) => b.area - a.area);
-
-  if (loops.length === 0) return null;
-
-  const parents = new Array<number>(loops.length).fill(-1);
-  const depths = new Array<number>(loops.length).fill(0);
-
-  for (let i = 0; i < loops.length; i += 1) {
-    const probe = loops[i].points[0];
-    let bestParent = -1;
-    let bestArea = Number.POSITIVE_INFINITY;
-    for (let j = 0; j < i; j += 1) {
-      if (loops[j].area >= bestArea) continue;
-      if (!pointInPolygon2D(probe, loops[j].points)) continue;
-      bestParent = j;
-      bestArea = loops[j].area;
-    }
-    parents[i] = bestParent;
-    depths[i] = bestParent >= 0 ? depths[bestParent] + 1 : 0;
-  }
-
-  const shapesByLoop = new Map<number, THREE.Shape>();
-  const shapes: THREE.Shape[] = [];
-
-  loops.forEach((loop, index) => {
-    if (depths[index] % 2 === 1) return;
-    const shape = buildShapeFromPoints(loop.points);
-    shapesByLoop.set(index, shape);
-    shapes.push(shape);
-  });
-
-  loops.forEach((loop, index) => {
-    if (depths[index] % 2 === 0) return;
-    const parent = parents[index];
-    const outerShape = parent >= 0 ? shapesByLoop.get(parent) : null;
-    if (!outerShape) return;
-    outerShape.holes.push(buildPathFromPoints(loop.points));
-  });
-
-  if (shapes.length === 0) return null;
-  return new THREE.ShapeGeometry(shapes);
-}
-
-function buildOutlineGeometriesFromPolygons(polygons: number[][][]): THREE.BufferGeometry[] {
-  return polygons
-    .filter((polygon) => polygon.length >= 2)
-    .map((polygon) => new THREE.BufferGeometry().setFromPoints(
-      polygon.map((point) => new THREE.Vector3(point[0], point[1], 0)),
-    ));
-}
-
-function resolveSectionSurfaceLift(shape: SceneObject['shape'] | undefined): number {
-  if (!shape) return SECTION_SURFACE_LIFT_MIN;
-  try {
-    const bb = shape.boundingBox();
-    const dx = bb.max[0] - bb.min[0];
-    const dy = bb.max[1] - bb.min[1];
-    const dz = bb.max[2] - bb.min[2];
-    const diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    return THREE.MathUtils.clamp(
-      diagonal * SECTION_SURFACE_LIFT_SCALE,
-      SECTION_SURFACE_LIFT_MIN,
-      SECTION_SURFACE_LIFT_MAX,
-    );
-  } catch {
-    return SECTION_SURFACE_LIFT_MIN;
-  }
-}
-
-function resolveSectionHatchMetrics(geometry: THREE.BufferGeometry): { spacing: number; lineWidth: number } {
-  geometry.computeBoundingBox();
-  const bounds = geometry.boundingBox;
-  if (!bounds) {
-    return {
-      spacing: SECTION_HATCH_MIN_SPACING,
-      lineWidth: SECTION_HATCH_MIN_LINE_WIDTH,
-    };
-  }
-  const size = new THREE.Vector3();
-  bounds.getSize(size);
-  const span = Math.max(1, size.x, size.y);
-  const spacing = THREE.MathUtils.clamp(
-    span * SECTION_HATCH_SPACING_SCALE,
-    SECTION_HATCH_MIN_SPACING,
-    SECTION_HATCH_MAX_SPACING,
-  );
-  return {
-    spacing,
-    lineWidth: THREE.MathUtils.clamp(
-      spacing * 0.18,
-      SECTION_HATCH_MIN_LINE_WIDTH,
-      SECTION_HATCH_MAX_LINE_WIDTH,
-    ),
-  };
-}
-
-function setOverrideSessionMode(session: OrbitGifOverrideSession, mode: OrbitGifMode): void {
-  const showSolid = mode === 'solid';
-  session.solids.forEach((node) => { node.visible = showSolid; });
-  session.wires.forEach((node) => { node.visible = true; });
-}
-
-function setOverrideOrbitCamera(session: OrbitGifOverrideSession, turn: number, pitchDeg: number): void {
-  const normalizedTurn = ((turn % 1) + 1) % 1;
-  const clampedPitch = THREE.MathUtils.clamp(pitchDeg, -80, 80);
-  const yaw = normalizedTurn * Math.PI * 2;
-  const pitch = THREE.MathUtils.degToRad(clampedPitch);
-  const cosPitch = Math.cos(pitch);
-  const direction = new THREE.Vector3(
-    Math.sin(yaw) * cosPitch,
-    -Math.cos(yaw) * cosPitch,
-    Math.sin(pitch),
-  ).normalize();
-
-  session.camera.position.copy(session.center).addScaledVector(direction, session.distance);
-  session.camera.lookAt(session.center);
-  session.camera.updateProjectionMatrix();
-}
-
-function disposeOverrideSession(session: OrbitGifOverrideSession): void {
-  session.scene.traverse((node) => {
-    const mesh = node as THREE.Mesh;
-    if (mesh.geometry) mesh.geometry.dispose();
-    const material = mesh.material;
-    if (Array.isArray(material)) {
-      material.forEach((mat) => mat.dispose());
-    } else if (material) {
-      material.dispose();
-    }
-  });
-}
-
-function createOverrideSessionFromRunResult(
-  runResult: RunResult,
-  objectSettings: Record<string, ObjectSettings> | undefined,
-  background?: string,
-): OrbitGifOverrideSession {
-  const scene = new THREE.Scene();
-  scene.background = parseExportColor(background, 0x252526);
-  addExportLights(scene);
-
-  const solids: THREE.Object3D[] = [];
-  const wires: THREE.Object3D[] = [];
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let minZ = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  let maxZ = -Infinity;
-
-  runResult.objects.forEach((obj) => {
-    if (!obj.shape) return;
-
-    const color = objectSettings?.[obj.id]?.color || obj.color;
-    const geo = shapeToGeometry(obj.shape);
-    const solid = new THREE.Mesh(
-      geo.solid,
-      new THREE.MeshPhysicalMaterial({
-        color: parseExportColor(color, 0x5b9bd5),
-        metalness: 0.05,
-        roughness: 0.35,
-        clearcoat: 0.1,
-        clearcoatRoughness: 0.4,
-        flatShading: true,
-        side: THREE.DoubleSide,
-      }),
-    );
-    scene.add(solid);
-    solids.push(solid);
-
-    const wire = new THREE.LineSegments(
-      geo.edges,
-      new THREE.LineBasicMaterial({
-        color: parseExportColor(color, 0x1a1a2e),
-        transparent: true,
-        opacity: 0.9,
-      }),
-    );
-    scene.add(wire);
-    wires.push(wire);
-
-    try {
-      const bb = obj.shape.boundingBox();
-      minX = Math.min(minX, bb.min[0]);
-      minY = Math.min(minY, bb.min[1]);
-      minZ = Math.min(minZ, bb.min[2]);
-      maxX = Math.max(maxX, bb.max[0]);
-      maxY = Math.max(maxY, bb.max[1]);
-      maxZ = Math.max(maxZ, bb.max[2]);
-    } catch {
-      // Skip invalid bounds; export still works with remaining objects.
-    }
-  });
-
-  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
-    throw new Error('No 3D objects available for GIF export.');
-  }
-
-  const center = new THREE.Vector3(
-    (minX + maxX) * 0.5,
-    (minY + maxY) * 0.5,
-    (minZ + maxZ) * 0.5,
-  );
-  const sizeX = maxX - minX;
-  const sizeY = maxY - minY;
-  const sizeZ = maxZ - minZ;
-  const maxDim = Math.max(1, sizeX, sizeY, sizeZ);
-  const fov = 45;
-  const distance = maxDim / (2 * Math.tan((fov * Math.PI) / 360)) * 1.6;
-  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, Math.max(10, distance * 10));
-  camera.up.set(0, 0, 1);
-  camera.aspect = 1;
-  camera.updateProjectionMatrix();
-
-  const session: OrbitGifOverrideSession = {
-    scene,
-    camera,
-    center,
-    distance,
-    solids,
-    wires,
-  };
-  setOverrideSessionMode(session, 'solid');
-  setOverrideOrbitCamera(session, 0, GIF_DEFAULT_PITCH_DEG);
-  return session;
-}
-
-const readPersistedViewportCameraState = (): ViewportCameraState | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(VIEWPORT_CAMERA_STORAGE_KEY);
-    if (!raw) return null;
-    return parseViewportCameraState(JSON.parse(raw));
-  } catch {
-    return null;
-  }
-};
-
-const writePersistedViewportCameraState = (state: ViewportCameraState): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(VIEWPORT_CAMERA_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Ignore storage failures (private mode, quota, etc.)
-  }
-};
-
-const resolveHoverObjectName = (name: string, knownFileNames: Set<string>): string | null => {
-  const trimmed = name.trim();
-  if (!trimmed) return null;
-  // Unnamed returns fall back to source filenames; skip those in hover tooltips.
-  if (knownFileNames.has(trimmed)) return null;
-  return trimmed;
-};
-
-const isObjectExcludedFromCutPlane = (obj: SceneObject, cutPlane: CutPlaneDef): boolean => {
-  const excludedNames = cutPlane.excludeObjectNames;
-  if (!excludedNames || excludedNames.length === 0) return false;
-  const objectName = obj.name.trim();
-  if (!objectName) return false;
-  return excludedNames.includes(objectName);
-};
-
-const toClippingPlane = (cp: CutPlaneDef): THREE.Plane => {
-  const n = new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).normalize();
-  // THREE.Plane convention: clips geometry on the positive side of the plane.
-  // We negate the normal so that geometry on the normal side is removed.
-  return new THREE.Plane(n.negate(), cp.offset);
-};
-
-const ZERO_OFFSET: [number, number, number] = [0, 0, 0];
-const IDENTITY_MATRIX = new THREE.Matrix4();
-
-interface ExplodeTreeNode {
-  key: string;
-  label: string;
-  path: string[];
-  objectIds: string[];
-  children: ExplodeTreeNode[];
-  bounds: ExplodeBounds | null;
-}
-
-interface MutableExplodeTreeNode {
-  key: string;
-  label: string;
-  path: string[];
-  objectIds: string[];
-  bounds: ExplodeBounds | null;
-  children: MutableExplodeTreeNode[];
-  childrenByLabel: Map<string, MutableExplodeTreeNode>;
-}
-
-const cleanExplodeTreeSegments = (segments: string[] | undefined): string[] => (
-  (segments ?? [])
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0)
-);
-
-const getExplodeTreePath = (object: SceneObject): string[] => {
-  const explicitTreePath = cleanExplodeTreeSegments(object.treePath);
-  if (explicitTreePath.length > 0) return explicitTreePath;
-
-  const name = object.name.trim() || object.id;
-  const groupName = object.groupName?.trim();
-  if (!groupName) return [name];
-
-  const groupPath = groupName
-    .split('.')
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
-  const prefixedLeaf = `${groupName}.`;
-  if (name.startsWith(prefixedLeaf)) {
-    const leafName = name.slice(prefixedLeaf.length).trim();
-    return [...groupPath, leafName || name];
-  }
-  return [...groupPath, name];
-};
-
-const resolveSceneObjectBounds = (object: SceneObject): ExplodeBounds | null => {
-  if (object.shape) {
-    try {
-      const bb = object.shape.boundingBox();
-      return {
-        min: [bb.min[0], bb.min[1], bb.min[2]],
-        max: [bb.max[0], bb.max[1], bb.max[2]],
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  if (object.sketch) {
-    try {
-      const bb = object.sketch.bounds();
-      const matrix = new THREE.Matrix4().fromArray(getSketchWorldMatrix(object.sketch));
-      const corners = [
-        new THREE.Vector3(bb.min[0], bb.min[1], 0),
-        new THREE.Vector3(bb.min[0], bb.max[1], 0),
-        new THREE.Vector3(bb.max[0], bb.min[1], 0),
-        new THREE.Vector3(bb.max[0], bb.max[1], 0),
-      ].map((corner) => corner.applyMatrix4(matrix));
-      const min = [...corners[0].toArray()] as [number, number, number];
-      const max = [...corners[0].toArray()] as [number, number, number];
-      corners.slice(1).forEach((corner) => {
-        min[0] = Math.min(min[0], corner.x);
-        min[1] = Math.min(min[1], corner.y);
-        min[2] = Math.min(min[2], corner.z);
-        max[0] = Math.max(max[0], corner.x);
-        max[1] = Math.max(max[1], corner.y);
-        max[2] = Math.max(max[2], corner.z);
-      });
-      return { min, max };
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-};
-
-const createMutableExplodeTreeNode = (path: string[]): MutableExplodeTreeNode => ({
-  key: path.join('/') || 'root',
-  label: path[path.length - 1] ?? 'root',
-  path,
-  objectIds: [],
-  bounds: null,
-  children: [],
-  childrenByLabel: new Map(),
-});
-
-const finalizeExplodeTree = (node: MutableExplodeTreeNode): ExplodeTreeNode => {
-  const children = node.children.map((child) => finalizeExplodeTree(child));
-  let bounds = node.bounds;
-  children.forEach((child) => {
-    bounds = explodeMergeBounds(bounds, child.bounds);
-  });
-  return {
-    key: node.key,
-    label: node.label,
-    path: node.path,
-    objectIds: [...node.objectIds],
-    children,
-    bounds,
-  };
-};
-
-const buildExplodeTree = (objects: SceneObject[]): ExplodeTreeNode => {
-  const root = createMutableExplodeTreeNode([]);
-
-  objects.forEach((object) => {
-    const path = getExplodeTreePath(object);
-    let node = root;
-    path.forEach((segment, index) => {
-      let child = node.childrenByLabel.get(segment);
-      if (!child) {
-        child = createMutableExplodeTreeNode([...node.path, segment]);
-        node.childrenByLabel.set(segment, child);
-        node.children.push(child);
-      }
-      node = child;
-      if (index === path.length - 1) {
-        node.objectIds.push(object.id);
-        node.bounds = explodeMergeBounds(node.bounds, resolveSceneObjectBounds(object));
-      }
-    });
-  });
-
-  return finalizeExplodeTree(root);
-};
-
-const computeExplodeTreeOffsets = (
-  root: ExplodeTreeNode,
-  explodeAmount: number,
-  explodeConfig: ExplodeViewOptions | null,
-): Record<string, [number, number, number]> => {
-  if (explodeAmount <= 1e-8) return {};
-  const config = createResolvedExplodeConfig({
-    amount: explodeAmount * (explodeConfig?.amountScale ?? 1),
-    stages: explodeConfig?.stages,
-    mode: explodeConfig?.mode,
-    axisLock: explodeConfig?.axisLock,
-    byName: explodeConfig?.byName,
-    byPath: explodeConfig?.byPath,
-  });
-  if (Math.abs(config.amount) <= 1e-8) return {};
-
-  const rootCenter = explodeBoundsCenter(root.bounds) ?? [0, 0, 0];
-  const offsets: Record<string, [number, number, number]> = {};
-
-  const walk = (
-    node: ExplodeTreeNode,
-    depth: number,
-    inherited: [number, number, number],
-    parentCenter: [number, number, number],
-    parentDirection: [number, number, number] | undefined,
-  ) => {
-    const center = explodeBoundsCenter(node.bounds) ?? parentCenter;
-    const directive = resolveExplodeDirective([node.path.join('/')], node.label, undefined, config);
-    const motion = depth > 1 && node.children.length === 0 && !hasExplodeOverride(directive)
-      ? (() => {
-          const direction = resolveExplodeLocalFanDirection(center, parentCenter, parentDirection, node.key);
-          return {
-            direction,
-            branchDirection: parentDirection ?? direction,
-            offset: explodeMul(direction, config.amount * explodeLeafFanStage(config, depth)),
-          };
-        })()
-      : computeExplodeMotion({
-          pathKeys: [node.path.join('/')],
-          seed: node.key,
-          depth,
-          center,
-          originCenter: parentCenter,
-          inheritedDirection: parentDirection,
-          name: node.label,
-          config,
-        });
-    const total = explodeAdd(inherited, motion.offset);
-    node.objectIds.forEach((objectId) => {
-      offsets[objectId] = total;
-    });
-    node.children.forEach((child) => walk(child, depth + 1, total, center, motion.branchDirection));
-  };
-
-  root.children.forEach((child) => walk(child, 1, [0, 0, 0], rootCenter, undefined));
-  return offsets;
-};
-
-const clampJointValue = (joint: JointViewDef, value: number): number => {
-  let clamped = Number.isFinite(value) ? value : joint.defaultValue;
-  if (joint.min !== undefined) clamped = Math.max(joint.min, clamped);
-  if (joint.max !== undefined) clamped = Math.min(joint.max, clamped);
-  return clamped;
-};
-
-const resolveVisualArcAngleDeg = (
-  valueDeg: number,
-  visualLimitDeg: number,
-): number => {
-  if (!Number.isFinite(valueDeg)) return 0;
-  const limit = THREE.MathUtils.clamp(visualLimitDeg, 0, 360);
-  if (limit <= 1e-8) return 0;
-
-  // Preserve exact one-turn visuals; wrap only when value goes beyond +/-360.
-  if (Math.abs(valueDeg) <= 360) {
-    return THREE.MathUtils.clamp(valueDeg, -limit, limit);
-  }
-
-  const wrapped = valueDeg % 360;
-  return THREE.MathUtils.clamp(wrapped, -limit, limit);
-};
-
-const resolveArcReferenceDirection = (axisWorld: THREE.Vector3): THREE.Vector3 => {
-  const candidates = [
-    new THREE.Vector3(0, 0, 1),
-    new THREE.Vector3(0, 1, 0),
-    new THREE.Vector3(1, 0, 0),
-  ];
-  for (const candidate of candidates) {
-    const projected = candidate.clone().addScaledVector(axisWorld, -candidate.dot(axisWorld));
-    if (projected.lengthSq() > 1e-8) return projected.normalize();
-  }
-
-  const fallback = new THREE.Vector3(1, 0, 0).cross(axisWorld);
-  if (fallback.lengthSq() <= 1e-8) fallback.set(0, 1, 0).cross(axisWorld);
-  if (fallback.lengthSq() <= 1e-8) fallback.set(0, 0, 1);
-  return fallback.normalize();
-};
-
-const WORLD_UP = new THREE.Vector3(0, 1, 0);
-
-interface SegmentMeshTransform {
-  midpoint: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-  length: number;
-}
-
-const resolveSegmentMeshTransform = (
-  start: THREE.Vector3,
-  end: THREE.Vector3,
-): SegmentMeshTransform | null => {
-  const direction = end.clone().sub(start);
-  const length = direction.length();
-  if (length <= 1e-6) return null;
-  direction.multiplyScalar(1 / length);
-  return {
-    midpoint: start.clone().add(end).multiplyScalar(0.5),
-    quaternion: new THREE.Quaternion().setFromUnitVectors(WORLD_UP, direction),
-    length,
-  };
-};
-
-const computeJointNodeMatrices = (
-  joints: JointViewDef[],
-  jointValues: Record<string, number>,
-): Map<string, THREE.Matrix4> => {
-  const byChild = new Map<string, JointViewDef>();
-  joints.forEach((joint) => {
-    byChild.set(joint.child, joint);
-  });
-
-  const cache = new Map<string, THREE.Matrix4>();
-  const resolving = new Set<string>();
-
-  const solveNodeMatrix = (nodeName: string): THREE.Matrix4 => {
-    const cached = cache.get(nodeName);
-    if (cached) return cached.clone();
-    if (resolving.has(nodeName)) return new THREE.Matrix4();
-    resolving.add(nodeName);
-
-    const joint = byChild.get(nodeName);
-    if (!joint) {
-      const identity = new THREE.Matrix4();
-      cache.set(nodeName, identity);
-      resolving.delete(nodeName);
-      return identity.clone();
-    }
-
-    let parentMatrix = new THREE.Matrix4();
-    if (joint.parent) {
-      parentMatrix = solveNodeMatrix(joint.parent);
-    }
-
-    const axis = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
-    const axisWorld = axis.clone().transformDirection(parentMatrix);
-    if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axis);
-    axisWorld.normalize();
-
-    const value = clampJointValue(joint, jointValues[joint.name] ?? joint.defaultValue);
-    let motion = new THREE.Matrix4();
-    if (joint.type === 'prismatic') {
-      motion.makeTranslation(axisWorld.x * value, axisWorld.y * value, axisWorld.z * value);
-    } else {
-      const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
-      motion = buildRevoluteMatrix(axisWorld, pivotWorld, value);
-    }
-
-    const solved = motion.multiply(parentMatrix);
-    cache.set(nodeName, solved.clone());
-    resolving.delete(nodeName);
-    return solved;
-  };
-
-  joints.forEach((joint) => {
-    solveNodeMatrix(joint.child);
-  });
-
-  return cache;
-};
-
-const buildRevoluteMatrix = (
-  axisWorld: THREE.Vector3,
-  pivotWorld: THREE.Vector3,
-  angleDeg: number,
-): THREE.Matrix4 => {
-  const rotation = new THREE.Matrix4().makeRotationAxis(axisWorld, THREE.MathUtils.degToRad(angleDeg));
-  const toPivot = new THREE.Matrix4().makeTranslation(pivotWorld.x, pivotWorld.y, pivotWorld.z);
-  const fromPivot = new THREE.Matrix4().makeTranslation(-pivotWorld.x, -pivotWorld.y, -pivotWorld.z);
-  return toPivot.multiply(rotation).multiply(fromPivot);
-};
-
-const expandBoundsByTransformedAabb = (
-  target: THREE.Box3,
-  min: [number, number, number],
-  max: [number, number, number],
-  matrix: THREE.Matrix4,
-): void => {
-  const corners: [number, number, number][] = [
-    [min[0], min[1], min[2]],
-    [min[0], min[1], max[2]],
-    [min[0], max[1], min[2]],
-    [min[0], max[1], max[2]],
-    [max[0], min[1], min[2]],
-    [max[0], min[1], max[2]],
-    [max[0], max[1], min[2]],
-    [max[0], max[1], max[2]],
-  ];
-  corners.forEach((corner) => {
-    target.expandByPoint(new THREE.Vector3(corner[0], corner[1], corner[2]).applyMatrix4(matrix));
-  });
-};
-
-/** Enable local clipping on the WebGL renderer when any cut planes are active */
-function ClippingManager({ active }: { active: boolean }) {
-  const gl = useThree((s) => s.gl);
-  useEffect(() => {
-    gl.localClippingEnabled = active;
-  }, [gl, active]);
-  return null;
-}
-
-/** Labeled axes helper — draws X/Y/Z arrows with text labels */
-function LabeledAxes({ size = 50 }: { size?: number }) {
-  const axesRef = useRef<THREE.AxesHelper>(null);
-
-  useEffect(() => {
-    if (!axesRef.current) return;
-    // Render axes on top of everything so they're always visible at origin
-    axesRef.current.renderOrder = 999;
-    axesRef.current.material = (axesRef.current.material as THREE.Material[]).length
-      ? (axesRef.current.material as THREE.Material[]).map((m) => {
-          m.depthTest = false;
-          return m;
-        })
-      : (() => { (axesRef.current!.material as THREE.Material).depthTest = false; return axesRef.current!.material; })();
-  }, []);
-
-  const labelStyle = (color: string): React.CSSProperties => ({
-    color,
-    fontSize: 13,
-    fontWeight: 700,
-    fontFamily: 'monospace',
-    userSelect: 'none',
-    pointerEvents: 'none',
-    textShadow: '0 0 3px #000, 0 0 6px #000',
-  });
-  return (
-    <group>
-      <axesHelper ref={axesRef} args={[size]} />
-      <Html position={[size + 3, 0, 0]} center style={labelStyle('#ff4444')}>X</Html>
-      <Html position={[0, size + 3, 0]} center style={labelStyle('#44ff44')}>Y</Html>
-      <Html position={[0, 0, size + 3]} center style={labelStyle('#4488ff')}>Z</Html>
-    </group>
-  );
-}
-
-/** Local studio lights for PBR reflections without remote HDR fetches. */
-function LocalStudioEnvironment() {
-  return (
-    <Environment resolution={128}>
-      <Lightformer
-        form="rect"
-        intensity={4}
-        color="#ffffff"
-        rotation-x={Math.PI / 2}
-        position={[0, 40, 0]}
-        scale={[120, 120, 1]}
-      />
-      <Lightformer
-        form="rect"
-        intensity={3}
-        color="#f8fbff"
-        rotation-y={Math.PI / 2}
-        position={[40, 10, 20]}
-        scale={[80, 80, 1]}
-      />
-      <Lightformer
-        form="rect"
-        intensity={2}
-        color="#f4f6ff"
-        rotation-y={-Math.PI / 2}
-        position={[-35, -8, 16]}
-        scale={[70, 60, 1]}
-      />
-      <Lightformer
-        form="ring"
-        intensity={1.25}
-        color="#dbe8ff"
-        rotation-x={Math.PI / 2}
-        position={[0, -20, 0]}
-        scale={[35, 35, 1]}
-      />
-    </Environment>
-  );
-}
-
-function PerformanceInfoSampler({
-  enabled,
-  modelTriangles,
-  sceneObjects,
-  onStatsChange,
-}: {
-  enabled: boolean;
-  modelTriangles: number;
-  sceneObjects: number;
-  onStatsChange: (stats: ViewportPerformanceInfo | null) => void;
-}) {
-  const gl = useThree((s) => s.gl);
-  const sampleRef = useRef({
-    frames: 0,
-    elapsedSec: 0,
-    frameTimeMsTotal: 0,
-    sinceEmitSec: 0,
-  });
-
-  useEffect(() => {
-    sampleRef.current = {
-      frames: 0,
-      elapsedSec: 0,
-      frameTimeMsTotal: 0,
-      sinceEmitSec: 0,
-    };
-    if (!enabled) onStatsChange(null);
-  }, [enabled, modelTriangles, onStatsChange, sceneObjects]);
-
-  useFrame((_state, delta) => {
-    if (!enabled) return;
-
-    const sample = sampleRef.current;
-    sample.frames += 1;
-    sample.elapsedSec += delta;
-    sample.frameTimeMsTotal += delta * 1000;
-    sample.sinceEmitSec += delta;
-
-    if (sample.sinceEmitSec < PERFORMANCE_SAMPLE_INTERVAL_SEC) return;
-
-    const frameCount = Math.max(1, sample.frames);
-    onStatsChange({
-      fps: frameCount / Math.max(sample.elapsedSec, 1e-6),
-      frameTimeMs: sample.frameTimeMsTotal / frameCount,
-      sceneObjects,
-      modelTriangles,
-      drawCalls: gl.info.render.calls,
-      renderTriangles: gl.info.render.triangles,
-      renderLines: gl.info.render.lines,
-      renderPoints: gl.info.render.points,
-      memoryGeometries: gl.info.memory.geometries,
-      memoryTextures: gl.info.memory.textures,
-      programCount: getProgramCount(gl),
-    });
-
-    sample.frames = 0;
-    sample.elapsedSec = 0;
-    sample.frameTimeMsTotal = 0;
-    sample.sinceEmitSec = 0;
-  });
-
-  return null;
-}
-
-function PerformanceInfoPanel({
-  enabled,
-  stats,
-}: {
-  enabled: boolean;
-  stats: ViewportPerformanceInfo | null;
-}) {
-  if (!enabled) return null;
-
-  const rows = stats
-    ? [
-      ['FPS', stats.fps.toFixed(1)],
-      ['Frame ms', stats.frameTimeMs.toFixed(1)],
-      ['Objects', formatPerformanceCount(stats.sceneObjects)],
-      ['Model tris', formatPerformanceCount(stats.modelTriangles)],
-      ['Drawn tris', formatPerformanceCount(stats.renderTriangles)],
-      ['Draw calls', formatPerformanceCount(stats.drawCalls)],
-      ['Lines', formatPerformanceCount(stats.renderLines)],
-      ['Points', formatPerformanceCount(stats.renderPoints)],
-      ['Geometries', formatPerformanceCount(stats.memoryGeometries)],
-      ['Textures', formatPerformanceCount(stats.memoryTextures)],
-      ['Programs', formatPerformanceCount(stats.programCount)],
-    ]
-    : null;
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        minWidth: 180,
-        padding: '10px 12px',
-        borderRadius: 8,
-        border: '1px solid var(--fc-border)',
-        background: 'var(--fc-bgPanel)',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.22)',
-        color: 'var(--fc-text)',
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-        fontSize: 11,
-        lineHeight: 1.45,
-        pointerEvents: 'none',
-      }}
-    >
-      <div
-        style={{
-          marginBottom: 6,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: 0.8,
-          textTransform: 'uppercase',
-          color: 'var(--fc-textDim)',
-        }}
-      >
-        Performance
-      </div>
-      {!rows && (
-        <div style={{ color: 'var(--fc-textDim)' }}>Measuring...</div>
-      )}
-      {rows?.map(([label, value]) => (
-        <div
-          key={label}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
-          <span style={{ color: 'var(--fc-textDim)' }}>{label}</span>
-          <span>{value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Renders the solid body with proper CAD-style shading.
- *
- * The key insight for CAD rendering vs game rendering:
- * - CAD needs FLAT shading on planar faces (each triangle keeps its own normal)
- * - CAD needs visible edges to show topology
- * - Games use smooth shading everywhere — that's what makes a box look "blobby"
- *
- * computeVertexNormals() averages normals at shared vertices, which smooths
- * the box corners. For CAD we need non-indexed geometry so each face has
- * independent flat normals.
- */
-function ForgeObject({
-  obj,
-  settings,
-  renderMode,
-  isInteracting,
-  matrix,
-  isHovered,
-  cutPlanes,
-  clippingPlanes,
-  onPointerEnter,
-  onPointerMove,
-  onPointerLeave,
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-}: {
-  obj: SceneObject;
-  settings: ObjectSettings;
-  renderMode: RenderMode;
-  isInteracting?: boolean;
-  matrix: THREE.Matrix4;
-  isHovered?: boolean;
-  cutPlanes?: CutPlaneDef[];
-  clippingPlanes?: THREE.Plane[];
-  onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
-  onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
-  onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
-  onClick?: (event: ThreeEvent<MouseEvent>) => void;
-  onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
-  onContextMenu?: (event: ThreeEvent<MouseEvent>) => void;
-}) {
-  const hasCutPlanes = (cutPlanes?.length ?? 0) > 0;
-  const clippingTransformKey = hasCutPlanes ? matrix : null;
-  const { solidGeo, edgesGeo, cutSurfaces, useFallbackClipping } = useMemo(() => {
-    if (!obj.shape) {
-      return {
-        solidGeo: null,
-        edgesGeo: null,
-        cutSurfaces: [] as CutSurfaceDef[],
-        useFallbackClipping: false,
-      };
-    }
-    let shapeForRender = obj.shape;
-    const nextCutSurfaces: CutSurfaceDef[] = [];
-    let fallbackToGpuClip = false;
-
-    if (hasCutPlanes) {
-      try {
-        // Cut planes are defined in world space, so convert each plane into this object's
-        // local coordinates before sectioning to keep everything aligned with animated transforms.
-        const inverseMatrix = matrix.clone().invert();
-        const surfaceLift = resolveSectionSurfaceLift(obj.shape);
-        cutPlanes?.forEach((cutPlaneDef, planeIndex) => {
-          const worldNormal = new THREE.Vector3(
-            cutPlaneDef.normal[0],
-            cutPlaneDef.normal[1],
-            cutPlaneDef.normal[2],
-          );
-          if (worldNormal.lengthSq() <= 1e-8) return;
-          worldNormal.normalize();
-
-          const worldPlane = new THREE.Plane(worldNormal, -cutPlaneDef.offset);
-          const localPlane = worldPlane.clone().applyMatrix4(inverseMatrix);
-          const normalLength = localPlane.normal.length();
-          if (!Number.isFinite(normalLength) || normalLength <= 1e-8) return;
-
-          const invNormalLength = 1 / normalLength;
-          const localNormal: [number, number, number] = [
-            localPlane.normal.x * invNormalLength,
-            localPlane.normal.y * invNormalLength,
-            localPlane.normal.z * invNormalLength,
-          ];
-          const localOffset = -localPlane.constant * invNormalLength;
-          const [insideShape, outsideShape] = shapeForRender.splitByPlane(localNormal, localOffset);
-          shapeForRender = insideShape;
-
-          if (!outsideShape.isEmpty()) {
-            try {
-              const sectionSketch = intersectWithPlane(outsideShape, {
-                origin: [
-                  localNormal[0] * localOffset,
-                  localNormal[1] * localOffset,
-                  localNormal[2] * localOffset,
-                ],
-                normal: localNormal,
-              });
-              const polygons = sectionSketch.toPolygons();
-              const geometry = buildFilledGeometryFromPolygons(polygons);
-              const transform = resolvePlaneTransform(localNormal, localOffset, surfaceLift);
-              if (geometry && transform) {
-                const outlineGeometries = buildOutlineGeometriesFromPolygons(polygons);
-                const hatch = resolveSectionHatchMetrics(geometry);
-                const angleSeed = hashString(`${obj.name}:${cutPlaneDef.name}:${planeIndex}`);
-                nextCutSurfaces.push({
-                  id: `${cutPlaneDef.name}:${planeIndex}`,
-                  geometry,
-                  outlineGeometries,
-                  sourcePlaneIndex: planeIndex,
-                  position: transform.center,
-                  quaternion: transform.quaternion,
-                  hatchAngleRad: THREE.MathUtils.degToRad(35 + (angleSeed % 2) * 55),
-                  hatchSpacing: hatch.spacing,
-                  hatchLineWidth: hatch.lineWidth,
-                });
-              } else {
-                geometry?.dispose();
-              }
-            } catch {
-              // Ignore cap-only failures; keep the solid trim result if it succeeded.
-            }
-          }
-        });
-      } catch {
-        // If boolean trimming fails on pathological geometry, fall back to GPU clipping.
-        nextCutSurfaces.forEach((surface) => {
-          surface.geometry.dispose();
-          surface.outlineGeometries.forEach((outline) => outline.dispose());
-        });
-        shapeForRender = obj.shape;
-        fallbackToGpuClip = true;
-      }
-    }
-
-    try {
-      const { solid, edges } = shapeToGeometry(shapeForRender);
-      return {
-        solidGeo: solid,
-        edgesGeo: edges,
-        cutSurfaces: fallbackToGpuClip ? [] : nextCutSurfaces,
-        useFallbackClipping: fallbackToGpuClip,
-      };
-    } catch {
-      if (!fallbackToGpuClip && hasCutPlanes) {
-        try {
-          const { solid, edges } = shapeToGeometry(obj.shape);
-          nextCutSurfaces.forEach((surface) => {
-            surface.geometry.dispose();
-            surface.outlineGeometries.forEach((outline) => outline.dispose());
-          });
-          return {
-            solidGeo: solid,
-            edgesGeo: edges,
-            cutSurfaces: [] as CutSurfaceDef[],
-            useFallbackClipping: true,
-          };
-        } catch {
-          nextCutSurfaces.forEach((surface) => {
-            surface.geometry.dispose();
-            surface.outlineGeometries.forEach((outline) => outline.dispose());
-          });
-          return {
-            solidGeo: null,
-            edgesGeo: null,
-            cutSurfaces: [] as CutSurfaceDef[],
-            useFallbackClipping: false,
-          };
-        }
-      }
-      nextCutSurfaces.forEach((surface) => {
-        surface.geometry.dispose();
-        surface.outlineGeometries.forEach((outline) => outline.dispose());
-      });
-      return {
-        solidGeo: null,
-        edgesGeo: null,
-        cutSurfaces: [] as CutSurfaceDef[],
-        useFallbackClipping: false,
-      };
-    }
-  }, [clippingTransformKey, cutPlanes, hasCutPlanes, obj.name, obj.shape]);
-
-  useEffect(() => {
-    return () => {
-      solidGeo?.dispose();
-      edgesGeo?.dispose();
-      cutSurfaces.forEach((surface) => {
-        surface.geometry.dispose();
-        surface.outlineGeometries.forEach((outline) => outline.dispose());
-      });
-    };
-  }, [cutSurfaces, edgesGeo, solidGeo]);
-
-  if (!solidGeo || !settings.visible) return null;
-
-  const effectiveRenderMode = isInteracting && renderMode === 'overlay' ? 'solid' : renderMode;
-  const meshOpacity = settings.opacity;
-  const showSolid = effectiveRenderMode !== 'wireframe';
-  const showEdges = effectiveRenderMode === 'overlay';
-  const showWire = effectiveRenderMode === 'wireframe';
-  const fallbackSolidClippingPlanes = useFallbackClipping ? (clippingPlanes ?? []) : [];
-
-  return (
-    <group
-      matrixAutoUpdate={false}
-      matrix={matrix}
-      onPointerEnter={onPointerEnter}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
-    >
-      {showSolid && (
-        <mesh geometry={solidGeo}>
-          <meshPhysicalMaterial
-            color={settings.color}
-            metalness={0.05}
-            roughness={0.35}
-            clearcoat={0.1}
-            clearcoatRoughness={0.4}
-            flatShading
-            side={THREE.DoubleSide}
-            transparent={meshOpacity < 1}
-            opacity={meshOpacity}
-            emissive={isHovered ? settings.color : '#000000'}
-            emissiveIntensity={isHovered ? 0.3 : 0}
-            clippingPlanes={fallbackSolidClippingPlanes}
-          />
-        </mesh>
-      )}
-      {showSolid && cutSurfaces.map((surface) => (
-        <SectionCutSurface
-          key={surface.id}
-          surface={surface}
-          color={settings.color}
-          opacity={meshOpacity}
-          clippingPlanes={clippingPlanes ?? []}
-        />
-      ))}
-      {showWire && edgesGeo && (
-        <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color={settings.color} transparent={meshOpacity < 1} opacity={meshOpacity} clippingPlanes={fallbackSolidClippingPlanes} />
-        </lineSegments>
-      )}
-      {showEdges && edgesGeo && (
-        <lineSegments geometry={edgesGeo}>
-          <lineBasicMaterial color="#1a1a2e" linewidth={1} transparent opacity={Math.min(1, meshOpacity + 0.1)} clippingPlanes={fallbackSolidClippingPlanes} />
-        </lineSegments>
-      )}
-    </group>
-  );
-}
-
-interface SectionPlaneGuideStyle {
-  showFill: boolean;
-  fillOpacity: number;
-  showBorder: boolean;
-  showAxis: boolean;
-}
-
-const colorFromName = (name: string): string => {
-  const hue = hashString(name) % 360;
-  return `hsl(${hue}, 72%, 58%)`;
-};
-
-function SectionCutSurface({
-  surface,
-  color,
-  opacity,
-  clippingPlanes,
-}: {
-  surface: CutSurfaceDef;
-  color: string;
-  opacity: number;
-  clippingPlanes: THREE.Plane[];
-}) {
-  const sectionClippingPlanes = useMemo(
-    () => clippingPlanes.filter((_, index) => index !== surface.sourcePlaneIndex),
-    [clippingPlanes, surface.sourcePlaneIndex],
-  );
-  const material = useMemo(() => {
-    const baseColor = parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#ffffff'), 0.2);
-    const lineColor = parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#101010'), 0.55);
-    const direction = new THREE.Vector2(Math.cos(surface.hatchAngleRad), Math.sin(surface.hatchAngleRad));
-    const mat = new THREE.MeshBasicMaterial({
-      color: '#ffffff',
-      side: THREE.DoubleSide,
-      transparent: opacity < 1,
-      opacity,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-      clippingPlanes: sectionClippingPlanes,
-      toneMapped: false,
-    });
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.hatchBaseColor = { value: baseColor };
-      shader.uniforms.hatchLineColor = { value: lineColor };
-      shader.uniforms.hatchDirection = { value: direction };
-      shader.uniforms.hatchSpacing = { value: surface.hatchSpacing };
-      shader.uniforms.hatchLineWidth = { value: surface.hatchLineWidth };
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nvarying vec2 vSectionPlanePosition;',
-        )
-        .replace(
-          '#include <begin_vertex>',
-          '#include <begin_vertex>\nvSectionPlanePosition = position.xy;',
-        );
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <common>',
-          `#include <common>
-varying vec2 vSectionPlanePosition;
-uniform vec3 hatchBaseColor;
-uniform vec3 hatchLineColor;
-uniform vec2 hatchDirection;
-uniform float hatchSpacing;
-uniform float hatchLineWidth;`,
-        )
-        .replace(
-          'vec4 diffuseColor = vec4( diffuse, opacity );',
-          `float planeCoord = dot(vSectionPlanePosition, hatchDirection);
-float stripeDistance = abs(fract(planeCoord / hatchSpacing + 0.5) - 0.5) * hatchSpacing;
-float aa = max(fwidth(planeCoord), 1e-4);
-float lineMask = 1.0 - smoothstep(hatchLineWidth - aa, hatchLineWidth + aa, stripeDistance);
-vec3 sectionColor = mix(hatchBaseColor, hatchLineColor, lineMask);
-vec4 diffuseColor = vec4(sectionColor, opacity);`,
-        );
-    };
-    mat.customProgramCacheKey = () => (
-      `section-hatch:${baseColor.getHexString()}:${lineColor.getHexString()}:`
-      + `${surface.hatchSpacing.toFixed(3)}:${surface.hatchLineWidth.toFixed(3)}:${surface.hatchAngleRad.toFixed(3)}`
-    );
-    return mat;
-  }, [color, opacity, sectionClippingPlanes, surface.hatchAngleRad, surface.hatchLineWidth, surface.hatchSpacing]);
-  const outlineColor = useMemo(
-    () => parseExportColor(color, 0x5b9bd5).lerp(new THREE.Color('#050505'), 0.68),
-    [color],
-  );
-
-  useEffect(() => () => material.dispose(), [material]);
-
-  return (
-    <group
-      position={[surface.position.x, surface.position.y, surface.position.z]}
-      quaternion={surface.quaternion}
-    >
-      <mesh geometry={surface.geometry} renderOrder={24}>
-        <primitive object={material} attach="material" />
-      </mesh>
-      {surface.outlineGeometries.map((geometry, index) => (
-        <lineLoop key={index} geometry={geometry} renderOrder={25}>
-          <lineBasicMaterial
-            color={outlineColor}
-            transparent={opacity < 1}
-            opacity={Math.min(1, opacity + 0.18)}
-            depthWrite={false}
-            clippingPlanes={sectionClippingPlanes}
-            toneMapped={false}
-          />
-        </lineLoop>
-      ))}
-    </group>
-  );
-}
-
-function SectionPlaneGuide({
-  def,
-  sectionSize,
-  style,
-}: {
-  def: CutPlaneDef;
-  sectionSize: number;
-  style: SectionPlaneGuideStyle;
-}) {
-  const transform = useMemo(
-    () => resolvePlaneTransform(def.normal, def.offset),
-    [def.normal, def.offset],
-  );
-
-  const borderGeometry = useMemo(() => {
-    const half = sectionSize / 2;
-    return new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-half, -half, 0),
-      new THREE.Vector3(half, -half, 0),
-      new THREE.Vector3(half, half, 0),
-      new THREE.Vector3(-half, half, 0),
-    ]);
-  }, [sectionSize]);
-
-  const guideColor = useMemo(() => colorFromName(def.name), [def.name]);
-  const axisLength = Math.max(8, sectionSize * 0.2);
-  const axisRadius = Math.max(0.2, sectionSize * 0.0045);
-  const coneRadius = Math.max(0.45, sectionSize * 0.008);
-  const coneHeight = Math.max(1.8, sectionSize * 0.03);
-
-  if (!transform) return null;
-
-  return (
-    <group position={[transform.center.x, transform.center.y, transform.center.z]} quaternion={transform.quaternion}>
-      {style.showFill && (
-        <mesh userData={{ measureHelper: true }} renderOrder={20}>
-          <planeGeometry args={[sectionSize, sectionSize]} />
-          <meshBasicMaterial
-            color={guideColor}
-            transparent
-            opacity={style.fillOpacity}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
-      )}
-      {style.showBorder && (
-        <lineLoop geometry={borderGeometry} renderOrder={21}>
-          <lineBasicMaterial color={guideColor} transparent opacity={0.9} depthTest={false} />
-        </lineLoop>
-      )}
-      {style.showAxis && (
-        <group renderOrder={22}>
-          <mesh userData={{ measureHelper: true }} position={[0, 0, axisLength * 0.5]}>
-            <cylinderGeometry args={[axisRadius, axisRadius, axisLength, 12]} />
-            <meshBasicMaterial color={guideColor} depthTest={false} />
-          </mesh>
-          <mesh userData={{ measureHelper: true }} position={[0, 0, axisLength + coneHeight * 0.5]}>
-            <coneGeometry args={[coneRadius, coneHeight, 14]} />
-            <meshBasicMaterial color={guideColor} depthTest={false} />
-          </mesh>
-        </group>
-      )}
-    </group>
-  );
-}
-
-function SectionPlaneGuides({
-  cutPlanes,
-  sectionSize,
-  style,
-}: {
-  cutPlanes: CutPlaneDef[];
-  sectionSize: number;
-  style: SectionPlaneGuideStyle;
-}) {
-  if (cutPlanes.length === 0 || sectionSize <= 0) return null;
-
-  return (
-    <group>
-      {cutPlanes.map((def) => (
-        <SectionPlaneGuide key={def.name} def={def} sectionSize={sectionSize} style={style} />
-      ))}
-    </group>
-  );
-}
-
-interface HoveredJointOverlayState {
-  joint: JointViewDef;
-  value: number;
-  pivotWorld: THREE.Vector3;
-  axisWorld: THREE.Vector3;
-  axisLength: number;
-}
-
-function HoveredJointOverlay({
-  state,
-  config,
-}: {
-  state: HoveredJointOverlayState;
-  config: JointOverlayViewConfig;
-}) {
-  const axisStart = useMemo(
-    () => state.pivotWorld.clone().addScaledVector(state.axisWorld, -state.axisLength * 0.5),
-    [state.axisLength, state.axisWorld, state.pivotWorld],
-  );
-  const axisEnd = useMemo(
-    () => state.pivotWorld.clone().addScaledVector(state.axisWorld, state.axisLength * 0.5),
-    [state.axisLength, state.axisWorld, state.pivotWorld],
-  );
-  const axisSegment = useMemo(
-    () => resolveSegmentMeshTransform(axisStart, axisEnd),
-    [axisEnd, axisStart],
-  );
-  const isRevolute = state.joint.type === 'revolute';
-  const visualArcAngleDeg = useMemo(
-    () => resolveVisualArcAngleDeg(state.value, config.arcVisualLimitDeg),
-    [config.arcVisualLimitDeg, state.value],
-  );
-  const arcAngleRad = useMemo(() => THREE.MathUtils.degToRad(visualArcAngleDeg), [visualArcAngleDeg]);
-
-  const axisLineRadius = THREE.MathUtils.clamp(
-    state.axisLength * config.axisLineRadiusScale,
-    config.axisLineRadiusMin,
-    config.axisLineRadiusMax,
-  );
-  const spokeLineRadius = THREE.MathUtils.clamp(
-    state.axisLength * config.spokeLineRadiusScale,
-    config.spokeLineRadiusMin,
-    config.spokeLineRadiusMax,
-  );
-  const arcLineRadius = THREE.MathUtils.clamp(
-    state.axisLength * config.arcLineRadiusScale,
-    config.arcLineRadiusMin,
-    config.arcLineRadiusMax,
-  );
-  const axisDotRadius = Math.max(config.axisDotRadiusMin, state.axisLength * config.axisDotRadiusScale);
-  const axisArrowRadius = Math.max(config.axisArrowRadiusMin, state.axisLength * config.axisArrowRadiusScale);
-  const axisArrowLength = Math.max(config.axisArrowLengthMin, state.axisLength * config.axisArrowLengthScale);
-  const arrowPosition = useMemo(
-    () => axisEnd.clone().addScaledVector(state.axisWorld, axisArrowLength * config.axisArrowOffsetFactor),
-    [axisArrowLength, axisEnd, config.axisArrowOffsetFactor, state.axisWorld],
-  );
-  const arrowQuaternion = useMemo(
-    () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), state.axisWorld),
-    [state.axisWorld],
-  );
-
-  const arcRadius = Math.max(config.arcRadiusMin, state.axisLength * config.arcRadiusScale);
-  const arcDotRadius = Math.max(config.arcDotRadiusMin, state.axisLength * config.arcDotRadiusScale);
-  const arcStartDirection = useMemo(
-    () => resolveArcReferenceDirection(state.axisWorld),
-    [state.axisWorld],
-  );
-  const arcStartPoint = useMemo(
-    () => state.pivotWorld.clone().addScaledVector(arcStartDirection, arcRadius),
-    [arcRadius, arcStartDirection, state.pivotWorld],
-  );
-  const arcEndDirection = useMemo(
-    () => arcStartDirection.clone().applyAxisAngle(state.axisWorld, arcAngleRad),
-    [arcAngleRad, arcStartDirection, state.axisWorld],
-  );
-  const arcEndPoint = useMemo(
-    () => state.pivotWorld.clone().addScaledVector(arcEndDirection, arcRadius),
-    [arcEndDirection, arcRadius, state.pivotWorld],
-  );
-  const arcStartArmSegment = useMemo(
-    () => resolveSegmentMeshTransform(state.pivotWorld, arcStartPoint),
-    [arcStartPoint, state.pivotWorld],
-  );
-  const arcCurrentArmSegment = useMemo(
-    () => resolveSegmentMeshTransform(state.pivotWorld, arcEndPoint),
-    [arcEndPoint, state.pivotWorld],
-  );
-  const arcCurvePoints = useMemo(() => {
-    if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
-    const steps = Math.max(config.arcMinSteps, Math.ceil(Math.abs(visualArcAngleDeg) / config.arcStepDeg));
-    const points: THREE.Vector3[] = [];
-    for (let i = 0; i <= steps; i += 1) {
-      const theta = arcAngleRad * (i / steps);
-      const direction = arcStartDirection.clone().applyAxisAngle(state.axisWorld, theta);
-      points.push(state.pivotWorld.clone().addScaledVector(direction, arcRadius));
-    }
-    return points;
-  }, [
-    arcAngleRad,
-    config.arcMinSteps,
-    config.arcStepDeg,
-    arcRadius,
-    arcStartDirection,
-    visualArcAngleDeg,
-    isRevolute,
-    state.axisWorld,
-    state.pivotWorld,
-  ]);
-  const arcTubeGeometry = useMemo(() => {
-    if (!arcCurvePoints || arcCurvePoints.length < 2) return null;
-    const segments = Math.max(config.arcTubeSegmentsMin, Math.ceil(arcCurvePoints.length * config.arcTubeSegmentsFactor));
-    const curve = new THREE.CatmullRomCurve3(arcCurvePoints, false, 'centripetal');
-    return new THREE.TubeGeometry(curve, segments, arcLineRadius, config.arcTubeRadialSegments, false);
-  }, [arcCurvePoints, arcLineRadius, config.arcTubeRadialSegments, config.arcTubeSegmentsFactor, config.arcTubeSegmentsMin]);
-  const arcArrowLength = Math.max(config.arcArrowLengthMin, state.axisLength * config.arcArrowLengthScale);
-  const arcArrowRadius = Math.max(config.arcArrowRadiusMin, state.axisLength * config.arcArrowRadiusScale);
-  const arcTangent = useMemo(() => {
-    if (!isRevolute || Math.abs(arcAngleRad) <= 1e-4) return null;
-    const tangent = state.axisWorld.clone().cross(arcEndDirection);
-    if (tangent.lengthSq() <= 1e-8) return null;
-    tangent.normalize();
-    if (arcAngleRad < 0) tangent.multiplyScalar(-1);
-    return tangent;
-  }, [arcAngleRad, arcEndDirection, isRevolute, state.axisWorld]);
-  const arcArrowPosition = useMemo(() => {
-    if (!arcTangent || !arcCurvePoints) return null;
-    return arcEndPoint.clone().addScaledVector(arcTangent, arcArrowLength * config.arcArrowOffsetFactor);
-  }, [arcArrowLength, arcCurvePoints, arcEndPoint, arcTangent, config.arcArrowOffsetFactor]);
-  const arcArrowQuaternion = useMemo(() => {
-    if (!arcTangent || !arcCurvePoints) return null;
-    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), arcTangent);
-  }, [arcCurvePoints, arcTangent]);
-
-  useEffect(() => () => {
-    arcTubeGeometry?.dispose();
-  }, [arcTubeGeometry]);
-
-  return (
-    <group>
-      {axisSegment && (
-        <mesh
-          position={[axisSegment.midpoint.x, axisSegment.midpoint.y, axisSegment.midpoint.z]}
-          quaternion={axisSegment.quaternion}
-          renderOrder={95}
-          userData={{ measureHelper: true }}
-        >
-          <cylinderGeometry args={[axisLineRadius, axisLineRadius, axisSegment.length, 18]} />
-          <meshBasicMaterial color={config.axisColor} depthTest={false} transparent opacity={0.98} toneMapped={false} />
-        </mesh>
-      )}
-      <mesh
-        position={[state.pivotWorld.x, state.pivotWorld.y, state.pivotWorld.z]}
-        renderOrder={96}
-        userData={{ measureHelper: true }}
-      >
-        <sphereGeometry args={[axisDotRadius, 18, 18]} />
-        <meshBasicMaterial color={config.axisCoreColor} depthTest={false} toneMapped={false} />
-      </mesh>
-      <mesh
-        position={[arrowPosition.x, arrowPosition.y, arrowPosition.z]}
-        quaternion={arrowQuaternion}
-        renderOrder={96}
-        userData={{ measureHelper: true }}
-      >
-        <coneGeometry args={[axisArrowRadius, axisArrowLength, 18]} />
-        <meshBasicMaterial color={config.axisColor} depthTest={false} toneMapped={false} />
-      </mesh>
-      {isRevolute && (
-        <>
-          {arcStartArmSegment && (
-            <mesh
-              position={[arcStartArmSegment.midpoint.x, arcStartArmSegment.midpoint.y, arcStartArmSegment.midpoint.z]}
-              quaternion={arcStartArmSegment.quaternion}
-              renderOrder={97}
-              userData={{ measureHelper: true }}
-            >
-              <cylinderGeometry args={[spokeLineRadius, spokeLineRadius, arcStartArmSegment.length, 14]} />
-              <meshBasicMaterial color={config.zeroColor} depthTest={false} transparent opacity={0.95} toneMapped={false} />
-            </mesh>
-          )}
-          {arcCurrentArmSegment && (
-            <mesh
-              position={[arcCurrentArmSegment.midpoint.x, arcCurrentArmSegment.midpoint.y, arcCurrentArmSegment.midpoint.z]}
-              quaternion={arcCurrentArmSegment.quaternion}
-              renderOrder={97}
-              userData={{ measureHelper: true }}
-            >
-              <cylinderGeometry args={[spokeLineRadius, spokeLineRadius, arcCurrentArmSegment.length, 14]} />
-              <meshBasicMaterial color={config.arcColor} depthTest={false} transparent opacity={0.98} toneMapped={false} />
-            </mesh>
-          )}
-          {arcTubeGeometry && (
-            <mesh geometry={arcTubeGeometry} renderOrder={98} userData={{ measureHelper: true }}>
-              <meshBasicMaterial color={config.arcColor} depthTest={false} transparent opacity={0.98} toneMapped={false} />
-            </mesh>
-          )}
-          <mesh
-            position={[arcStartPoint.x, arcStartPoint.y, arcStartPoint.z]}
-            renderOrder={98}
-            userData={{ measureHelper: true }}
-          >
-            <sphereGeometry args={[arcDotRadius, 14, 14]} />
-            <meshBasicMaterial color={config.zeroColor} depthTest={false} toneMapped={false} />
-          </mesh>
-          <mesh
-            position={[arcEndPoint.x, arcEndPoint.y, arcEndPoint.z]}
-            renderOrder={98}
-            userData={{ measureHelper: true }}
-          >
-            <sphereGeometry args={[arcDotRadius, 14, 14]} />
-            <meshBasicMaterial color={config.arcColor} depthTest={false} toneMapped={false} />
-          </mesh>
-          {arcArrowPosition && arcArrowQuaternion && (
-            <mesh
-              position={[arcArrowPosition.x, arcArrowPosition.y, arcArrowPosition.z]}
-              quaternion={arcArrowQuaternion}
-              renderOrder={99}
-              userData={{ measureHelper: true }}
-            >
-              <coneGeometry args={[arcArrowRadius, arcArrowLength, 14]} />
-              <meshBasicMaterial color={config.arcColor} depthTest={false} toneMapped={false} />
-            </mesh>
-          )}
-        </>
-      )}
-
-    </group>
-  );
-}
-
-/** Renders a 2D sketch as filled shape + outline on the XY plane */
-const formatConstraintValue = (value: number): string => {
-  if (Number.isNaN(value)) return '';
-  const rounded = Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(2);
-  return rounded.replace(/\\.00$/, '');
-};
-
-function SketchObject({
-  obj,
-  settings,
-  renderMode,
-  matrix,
-  onPointerEnter,
-  onPointerMove,
-  onPointerLeave,
-  onClick,
-  onDoubleClick,
-  onContextMenu,
-}: {
-  obj: SceneObject;
-  settings: ObjectSettings;
-  renderMode: RenderMode;
-  matrix: THREE.Matrix4;
-  onPointerEnter?: (event: ThreeEvent<PointerEvent>) => void;
-  onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
-  onPointerLeave?: (event: ThreeEvent<PointerEvent>) => void;
-  onClick?: (event: ThreeEvent<MouseEvent>) => void;
-  onDoubleClick?: (event: ThreeEvent<MouseEvent>) => void;
-  onContextMenu?: (event: ThreeEvent<MouseEvent>) => void;
-}) {
-  const { fillGeo, lineGeos, pointGeos } = useMemo(() => {
-    if (!obj.sketch) return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
-    try {
-      const polys = obj.sketch.toPolygons();
-      const lines: THREE.BufferGeometry[] = [];
-      const points: THREE.BufferGeometry[] = [];
-
-      for (const contour of polys) {
-        if (contour.length === 1) {
-          const pt = new THREE.Vector3(contour[0][0], contour[0][1], 0);
-          points.push(new THREE.BufferGeometry().setFromPoints([pt]));
-        } else if (contour.length >= 2) {
-          const pts = contour.map((p: number[]) => new THREE.Vector3(p[0], p[1], 0));
-          pts.push(pts[0]);
-          lines.push(new THREE.BufferGeometry().setFromPoints(pts));
-        }
-      }
-
-      const shapes: THREE.Shape[] = [];
-      for (const contour of polys) {
-        if (contour.length < 3) continue;
-        const shape = new THREE.Shape();
-        shape.moveTo(contour[0][0], contour[0][1]);
-        for (let i = 1; i < contour.length; i++) {
-          shape.lineTo(contour[i][0], contour[i][1]);
-        }
-        shape.closePath();
-        shapes.push(shape);
-      }
-      const fill = shapes.length > 0 ? new THREE.ShapeGeometry(shapes) : null;
-
-      return { fillGeo: fill, lineGeos: lines, pointGeos: points };
-    } catch {
-      return { fillGeo: null, lineGeos: [] as THREE.BufferGeometry[], pointGeos: [] as THREE.BufferGeometry[] };
-    }
-  }, [obj.sketch]);
-
-  const constraintColor = obj.sketchMeta?.status === 'over'
-    ? '#ff4d4f'
-    : obj.sketchMeta?.status === 'fully'
-      ? '#35c759'
-      : obj.sketchMeta?.status === 'under'
-        ? '#4aa3ff'
-        : settings.color;
-
-  const constraintSprites = useMemo(() => {
-    if (!obj.sketchMeta) return [] as { id: string; texture: THREE.Texture; position: [number, number, number]; scale: [number, number, number]; }[];
-    return obj.sketchMeta.constraints.map((constraint) => {
-      const unit = constraint.type === 'angle' ? 'deg' : 'mm';
-      const label = constraint.isDimension && constraint.value !== undefined
-        ? `${constraint.label} ${formatConstraintValue(constraint.value)}${unit}`
-        : constraint.label;
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 64;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = constraint.isConflicting ? '#5b1d1d' : '#111111cc';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = constraint.isConflicting ? '#ff4d4f' : '#4aa3ff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-        ctx.fillStyle = '#f1f1f1';
-        ctx.font = 'bold 28px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, canvas.width / 2, canvas.height / 2 + 2);
-      }
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
-      return {
-        id: constraint.id,
-        texture,
-        position: [constraint.position[0], constraint.position[1], 0.1] as [number, number, number],
-        scale: [20, 5, 1] as [number, number, number],
-      };
-    });
-  }, [obj.sketchMeta]);
-
-  const constructionLines = useMemo(() => {
-    const meta = obj.sketchMeta?.construction;
-    if (!meta) return [] as THREE.Line[];
-    return meta.lines.map((line) => {
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(line.a[0], line.a[1], 0),
-        new THREE.Vector3(line.b[0], line.b[1], 0),
-      ]);
-      const mat = new THREE.LineDashedMaterial({ color: '#888', dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
-      const dashed = new THREE.Line(geo, mat);
-      dashed.computeLineDistances();
-      return dashed;
-    });
-  }, [obj.sketchMeta]);
-
-  const constructionCircles = useMemo(() => {
-    const meta = obj.sketchMeta?.construction;
-    if (!meta) return [] as THREE.Line[];
-    const segments = 64;
-    return meta.circles.map((circle) => {
-      const pts: THREE.Vector3[] = [];
-      for (let i = 0; i <= segments; i += 1) {
-        const angle = (i / segments) * Math.PI * 2;
-        pts.push(new THREE.Vector3(
-          circle.center[0] + Math.cos(angle) * circle.radius,
-          circle.center[1] + Math.sin(angle) * circle.radius,
-          0,
-        ));
-      }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineDashedMaterial({ color: '#888', dashSize: 2, gapSize: 1, transparent: true, opacity: 0.6 });
-      const dashed = new THREE.Line(geo, mat);
-      dashed.computeLineDistances();
-      return dashed;
-    });
-  }, [obj.sketchMeta]);
-
-  if (!settings.visible) return null;
-
-  const showFill = renderMode !== 'wireframe';
-
-  return (
-    <group
-      matrixAutoUpdate={false}
-      matrix={matrix}
-      onPointerEnter={onPointerEnter}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
-    >
-      {fillGeo && showFill && (
-        <mesh geometry={fillGeo}>
-          <meshBasicMaterial color={constraintColor} transparent opacity={Math.min(0.6, settings.opacity)} side={THREE.DoubleSide} />
-        </mesh>
-      )}
-      {lineGeos.map((geo, i) => (
-        <primitive
-          key={i}
-          object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: constraintColor, linewidth: 1, transparent: true, opacity: settings.opacity }))}
-        />
-      ))}
-      {pointGeos.map((geo, i) => (
-        <primitive
-          key={`pt-${i}`}
-          object={new THREE.Points(geo, new THREE.PointsMaterial({ color: constraintColor, size: 5 }))}
-        />
-      ))}
-      {constructionLines.map((line, i) => (
-        <primitive key={`cl-${i}`} object={line} />
-      ))}
-      {constructionCircles.map((circle, i) => (
-        <primitive key={`cc-${i}`} object={circle} />
-      ))}
-      {constraintSprites.map((sprite) => (
-        <sprite key={sprite.id} position={sprite.position} scale={sprite.scale}>
-          <spriteMaterial map={sprite.texture} transparent />
-        </sprite>
-      ))}
-    </group>
-  );
-}
-
-/** Renders a single dimension annotation — Fusion360-style with extension lines, arrows, and label */
-function DimensionAnnotation({ def }: { def: DimensionDef }) {
-  const from = useMemo(() => new THREE.Vector3(...def.from), [def.from]);
-  const to = useMemo(() => new THREE.Vector3(...def.to), [def.to]);
-  const color = def.color ?? '#e0e0e0';
-  const labelSpriteRef = useRef<THREE.Sprite>(null);
-  const arrowStartRef = useRef<THREE.Mesh>(null);
-  const arrowEndRef = useRef<THREE.Mesh>(null);
-
-  // Stable perpendicular offset (camera-independent).
-  // Convention: positive offset pushes "outward" (−Y for X/Z lines, −X for Y lines).
-  const { dimStart, dimEnd, mid, dist } = useMemo(() => {
-    const dir = to.clone().sub(from);
-    const len = dir.length();
-    if (len < 1e-6) return { dimStart: from, dimEnd: to, mid: from, dist: 0 };
-    const dirN = dir.clone().normalize();
-    const ax = Math.abs(dirN.x), ay = Math.abs(dirN.y), az = Math.abs(dirN.z);
-
-    // Pick a perpendicular axis that pushes "outward" for typical geometry at origin:
-    // X-aligned → −Y, Y-aligned → −X, Z-aligned → −Y, diagonal → cross with Z then fallback
-    let perp: THREE.Vector3;
-    if (az > ax && az > ay) {
-      // Mostly Z-aligned → offset in −Y
-      perp = new THREE.Vector3(0, -1, 0);
-    } else if (ay > ax) {
-      // Mostly Y-aligned → offset in −X
-      perp = new THREE.Vector3(-1, 0, 0);
-    } else {
-      // Mostly X-aligned → offset in −Y
-      perp = new THREE.Vector3(0, -1, 0);
-    }
-    perp.multiplyScalar(def.offset);
-
-    const dS = from.clone().add(perp);
-    const dE = to.clone().add(perp);
-    return { dimStart: dS, dimEnd: dE, mid: dS.clone().add(dE).multiplyScalar(0.5), dist: len };
-  }, [from, to, def.offset]);
-
-  const label = def.label ? `${def.label}: ${dist.toFixed(1)}` : dist.toFixed(1);
-
-  // Extension lines with gap near geometry and overshoot past dimension line
-  const extDir = useMemo(() => dimStart.clone().sub(from).normalize(), [dimStart, from]);
-  const extGap = Math.max(Math.abs(def.offset) * 0.15, 0.8);
-  const extOver = Math.max(Math.abs(def.offset) * 0.15, 0.8);
-  const extAGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-    from.clone().add(extDir.clone().multiplyScalar(extGap)),
-    dimStart.clone().add(extDir.clone().multiplyScalar(extOver)),
-  ]), [from, dimStart, extDir, extGap, extOver]);
-  const extBGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([
-    to.clone().add(extDir.clone().multiplyScalar(extGap)),
-    dimEnd.clone().add(extDir.clone().multiplyScalar(extOver)),
-  ]), [to, dimEnd, extDir, extGap, extOver]);
-  const dimLineGeo = useMemo(() => new THREE.BufferGeometry().setFromPoints([dimStart, dimEnd]), [dimStart, dimEnd]);
-
-  const dimDir = useMemo(() => dimEnd.clone().sub(dimStart).normalize(), [dimStart, dimEnd]);
-  const labelTextureData = useMemo(() => {
-    const fontPx = 36;
-    const padX = 28;
-    const logicalHeight = 80;
-    const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3);
-
-    const measureCanvas = document.createElement('canvas');
-    const measureCtx = measureCanvas.getContext('2d')!;
-    measureCtx.font = `bold ${fontPx}px -apple-system, "Segoe UI", sans-serif`;
-    const textWidth = measureCtx.measureText(label).width;
-    const logicalWidth = THREE.MathUtils.clamp(Math.ceil(textWidth + padX * 2), 220, 720);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(logicalWidth * dpr));
-    canvas.height = Math.max(1, Math.round(logicalHeight * dpr));
-    const ctx = canvas.getContext('2d')!;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
-    ctx.fillStyle = '#1a1a1acc';
-    ctx.beginPath();
-    ctx.roundRect(8, 8, logicalWidth - 16, logicalHeight - 16, 12);
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.font = `bold ${fontPx}px -apple-system, "Segoe UI", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, logicalWidth / 2, logicalHeight / 2);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.needsUpdate = true;
-    return {
-      texture,
-      aspect: logicalWidth / logicalHeight,
-    };
-  }, [label, color]);
-
-  useEffect(() => {
-    return () => {
-      labelTextureData.texture.dispose();
-    };
-  }, [labelTextureData]);
-
-  useFrame(({ camera, size }) => {
-    if (dist < 1e-6 || size.height <= 0) return;
-
-    const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
-    const worldUnitsPerPixel = isOrtho
-      ? (
-          (((camera as THREE.OrthographicCamera).top - (camera as THREE.OrthographicCamera).bottom)
-            / Math.max(1e-6, (camera as THREE.OrthographicCamera).zoom))
-          / size.height
-        )
-      : (
-          (2
-            * Math.tan(THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov * 0.5))
-            * camera.position.distanceTo(mid))
-          / (size.height * Math.max(1e-6, (camera as THREE.PerspectiveCamera).zoom))
-        );
-
-    // Camera-aware on-screen sizing: stable across tiny/huge models and zoom levels.
-    const labelHeightPx = 28;
-    const labelWidthPx = labelHeightPx * labelTextureData.aspect;
-    labelSpriteRef.current?.scale.set(
-      labelWidthPx * worldUnitsPerPixel,
-      labelHeightPx * worldUnitsPerPixel,
-      1,
-    );
-
-    const arrowHeightPx = 12;
-    const desiredArrowHeight = arrowHeightPx * worldUnitsPerPixel;
-    const maxArrowHeight = Math.max(dist * 0.3, worldUnitsPerPixel * 2);
-    const arrowHeight = Math.min(desiredArrowHeight, maxArrowHeight);
-    arrowStartRef.current?.scale.set(arrowHeight, arrowHeight, arrowHeight);
-    arrowEndRef.current?.scale.set(arrowHeight, arrowHeight, arrowHeight);
-  });
-
-  if (dist < 1e-6) return null;
-
-  return (
-    <group>
-      <lineSegments geometry={extAGeo}>
-        <lineBasicMaterial color={color} transparent opacity={0.4} />
-      </lineSegments>
-      <lineSegments geometry={extBGeo}>
-        <lineBasicMaterial color={color} transparent opacity={0.4} />
-      </lineSegments>
-      <lineSegments geometry={dimLineGeo}>
-        <lineBasicMaterial color={color} transparent opacity={0.8} />
-      </lineSegments>
-      <mesh ref={arrowStartRef} position={dimStart} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir)}>
-        <coneGeometry args={[0.5, 1, 8]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-      <mesh ref={arrowEndRef} position={dimEnd} quaternion={new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dimDir.clone().negate())}>
-        <coneGeometry args={[0.5, 1, 8]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-      <sprite ref={labelSpriteRef} position={mid}>
-        <spriteMaterial map={labelTextureData.texture} depthTest={false} transparent />
-      </sprite>
-    </group>
-  );
-}
-
-/** Measurement tool — click two points on the model surface to measure distance */
-type SnapKind = 'vertex' | 'edge' | 'edge-mid' | 'face-center' | 'free';
-
-type SnapResult = {
-  point: THREE.Vector3;
-  type: SnapKind;
-  edge?: [THREE.Vector3, THREE.Vector3];
-};
-
-type DragInfo = {
-  id: string;
-  index: number;
-};
-type PointerLike = { clientX: number; clientY: number };
-
-const SNAP_COLORS: Record<SnapKind, string> = {
-  vertex: '#4a9eff',
-  edge: '#ffcc00',
-  'edge-mid': '#ff8a00',
-  'face-center': '#7bd88f',
-  free: '#ff4444',
-};
-
-const distance2D = (ax: number, ay: number, bx: number, by: number): number => {
-  const dx = ax - bx;
-  const dy = ay - by;
-  return Math.sqrt(dx * dx + dy * dy);
-};
-
-const closestPointOnSegment = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 => {
-  const ab = b.clone().sub(a);
-  const denom = ab.lengthSq();
-  if (denom === 0) return a.clone();
-  const t = THREE.MathUtils.clamp(p.clone().sub(a).dot(ab) / denom, 0, 1);
-  return a.clone().add(ab.multiplyScalar(t));
-};
-
-const distancePointToSegment2D = (
-  px: number,
-  py: number,
-  ax: number,
-  ay: number,
-  bx: number,
-  by: number,
-): number => {
-  const dx = bx - ax;
-  const dy = by - ay;
-  if (dx === 0 && dy === 0) return distance2D(px, py, ax, ay);
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
-  const cx = ax + t * dx;
-  const cy = ay + t * dy;
-  return distance2D(px, py, cx, cy);
-};
-
-function MeasureTool() {
-  const measureMode = useForgeStore((s) => s.measureMode);
-  const measurements = useForgeStore((s) => s.measurements);
-  const addMeasurePoint = useForgeStore((s) => s.addMeasurePoint);
-  const updateMeasurePoint = useForgeStore((s) => s.updateMeasurePoint);
-  const measureSnapPx = useForgeStore((s) => s.measureSnapPx);
-  const { camera, raycaster, scene, gl, controls } = useThree();
-  const [snap, setSnap] = useState<SnapResult | null>(null);
-  const [hoveredMarker, setHoveredMarker] = useState<DragInfo | null>(null);
-  const [draggingMarker, setDraggingMarker] = useState<DragInfo | null>(null);
-  const dragRef = useRef<DragInfo | null>(null);
-  const pointerDownRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const snapEdgeLine = useMemo(() => {
-    if (!snap || snap.type !== 'edge' || !snap.edge) return null;
-    const geo = new THREE.BufferGeometry().setFromPoints([snap.edge[0], snap.edge[1]]);
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: SNAP_COLORS.edge, linewidth: 2 }));
-    line.userData.measureHelper = true;
-    return line;
-  }, [snap]);
-
-  const setCursor = useCallback((value: string) => {
-    gl.domElement.style.cursor = value;
-  }, [gl]);
-
-  useEffect(() => {
-    if (!measureMode) {
-      setCursor('default');
-      return;
-    }
-    if (draggingMarker) {
-      setCursor('grabbing');
-      return;
-    }
-    if (hoveredMarker) {
-      setCursor('grab');
-      return;
-    }
-    setCursor('crosshair');
-  }, [draggingMarker, hoveredMarker, measureMode, setCursor]);
-
-  useEffect(() => {
-    if (!controls) return;
-    const orbit = controls as OrbitControlsImpl;
-    orbit.enabled = !draggingMarker;
-    return () => {
-      orbit.enabled = true;
-    };
-  }, [controls, draggingMarker]);
-
-  const getMeshes = useCallback((): THREE.Mesh[] => {
-    const meshes: THREE.Mesh[] = [];
-    scene.traverse((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (mesh.isMesh && !mesh.userData?.measureHelper) meshes.push(mesh);
-    });
-    return meshes;
-  }, [scene]);
-
-  const getPointerNDC = useCallback((event: PointerLike): { x: number; y: number } => {
-    const rect = gl.domElement.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    return { x, y };
-  }, [gl.domElement]);
-
-  const worldToScreen = useCallback((point: THREE.Vector3): { x: number; y: number } => {
-    const rect = gl.domElement.getBoundingClientRect();
-    const projected = point.clone().project(camera);
-    return {
-      x: (projected.x * 0.5 + 0.5) * rect.width + rect.left,
-      y: (-projected.y * 0.5 + 0.5) * rect.height + rect.top,
-    };
-  }, [camera, gl.domElement]);
-
-  const computeSnap = useCallback((event: PointerLike): SnapResult | null => {
-    if (!measureMode) return null;
-    const pointer = getPointerNDC(event);
-    raycaster.setFromCamera(new THREE.Vector2(pointer.x, pointer.y), camera);
-
-    const meshes = getMeshes();
-    const intersects = raycaster.intersectObjects(meshes, false);
-    if (intersects.length === 0) {
-      return null;
-    }
-
-    const hit = intersects[0];
-    const hitPoint = hit.point.clone();
-    if (!hit.face || !(hit.object as THREE.Mesh).geometry) {
-      return { point: hitPoint, type: 'free' };
-    }
-
-    const mesh = hit.object as THREE.Mesh;
-    const geometry = mesh.geometry as THREE.BufferGeometry;
-    const position = geometry.getAttribute('position');
-    const { a, b, c } = hit.face;
-    if (!position || a == null || b == null || c == null) {
-      return { point: hitPoint, type: 'free' };
-    }
-
-    const vA = new THREE.Vector3().fromBufferAttribute(position, a).applyMatrix4(mesh.matrixWorld);
-    const vB = new THREE.Vector3().fromBufferAttribute(position, b).applyMatrix4(mesh.matrixWorld);
-    const vC = new THREE.Vector3().fromBufferAttribute(position, c).applyMatrix4(mesh.matrixWorld);
-
-    const edgeAB: [THREE.Vector3, THREE.Vector3] = [vA, vB];
-    const edgeBC: [THREE.Vector3, THREE.Vector3] = [vB, vC];
-    const edgeCA: [THREE.Vector3, THREE.Vector3] = [vC, vA];
-    const midAB = vA.clone().add(vB).multiplyScalar(0.5);
-    const midBC = vB.clone().add(vC).multiplyScalar(0.5);
-    const midCA = vC.clone().add(vA).multiplyScalar(0.5);
-    const faceCenter = vA.clone().add(vB).add(vC).multiplyScalar(1 / 3);
-
-    const pointerScreen = { x: event.clientX, y: event.clientY };
-    let best: SnapResult | null = null;
-    let bestDist = Number.POSITIVE_INFINITY;
-
-    const considerPoint = (type: SnapKind, point: THREE.Vector3) => {
-      const screen = worldToScreen(point);
-      const dist = distance2D(pointerScreen.x, pointerScreen.y, screen.x, screen.y);
-      if (dist < bestDist && dist <= measureSnapPx) {
-        bestDist = dist;
-        best = { point, type };
-      }
-    };
-
-    const considerEdge = (edge: [THREE.Vector3, THREE.Vector3]) => {
-      const sA = worldToScreen(edge[0]);
-      const sB = worldToScreen(edge[1]);
-      const dist = distancePointToSegment2D(pointerScreen.x, pointerScreen.y, sA.x, sA.y, sB.x, sB.y);
-      if (dist < bestDist && dist <= measureSnapPx) {
-        bestDist = dist;
-        const point = closestPointOnSegment(hitPoint, edge[0], edge[1]);
-        best = { point, type: 'edge', edge };
-      }
-    };
-
-    considerPoint('vertex', vA);
-    considerPoint('vertex', vB);
-    considerPoint('vertex', vC);
-    considerPoint('edge-mid', midAB);
-    considerPoint('edge-mid', midBC);
-    considerPoint('edge-mid', midCA);
-    considerPoint('face-center', faceCenter);
-    considerEdge(edgeAB);
-    considerEdge(edgeBC);
-    considerEdge(edgeCA);
-
-    return best ?? { point: hitPoint, type: 'free' };
-  }, [camera, getMeshes, getPointerNDC, measureMode, measureSnapPx, raycaster, worldToScreen]);
-
-  const updateSnap = useCallback((event: PointerLike): SnapResult | null => {
-    const next = computeSnap(event);
-    setSnap(next && next.type !== 'free' ? next : null);
-    return next;
-  }, [computeSnap]);
-
-  const handlePointerDown = useCallback((event: ThreeEvent<PointerEvent>) => {
-    if (!measureMode || event.button !== 0) return;
-    pointerDownRef.current = { x: event.clientX, y: event.clientY, moved: false };
-  }, [measureMode]);
-
-  const handlePointerMove = useCallback((event: ThreeEvent<PointerEvent>) => {
-    if (!measureMode) return;
-    if (pointerDownRef.current) {
-      const dx = event.clientX - pointerDownRef.current.x;
-      const dy = event.clientY - pointerDownRef.current.y;
-      if (Math.sqrt(dx * dx + dy * dy) > 4) {
-        pointerDownRef.current.moved = true;
-      }
-    }
-    const nextSnap = updateSnap(event);
-    if (dragRef.current && nextSnap) {
-      updateMeasurePoint(dragRef.current.id, dragRef.current.index, [nextSnap.point.x, nextSnap.point.y, nextSnap.point.z]);
-    }
-  }, [measureMode, updateMeasurePoint, updateSnap]);
-
-  const handlePointerUp = useCallback((event: ThreeEvent<PointerEvent>) => {
-    if (!measureMode || event.button !== 0) return;
-    if (dragRef.current) {
-      dragRef.current = null;
-      setDraggingMarker(null);
-      return;
-    }
-    const down = pointerDownRef.current;
-    pointerDownRef.current = null;
-    if (!down || down.moved) return;
-    const nextSnap = updateSnap(event);
-    if (!nextSnap) return;
-    addMeasurePoint([nextSnap.point.x, nextSnap.point.y, nextSnap.point.z]);
-  }, [addMeasurePoint, measureMode, updateSnap]);
-
-  return (
-    <>
-      {/* Invisible click-catcher plane when in measure mode */}
-      {measureMode && (
-        <mesh
-          visible={false}
-          userData={{ measureHelper: true }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerOut={() => setSnap(null)}
-        >
-          <sphereGeometry args={[10000]} />
-          <meshBasicMaterial side={THREE.DoubleSide} />
-        </mesh>
-      )}
-
-      {/* Render measurement points and lines */}
-      {measurements.flatMap((measurement) => (
-        measurement.points.map((pt, index) => {
-          const isHovered = hoveredMarker?.id === measurement.id && hoveredMarker.index === index;
-          const isDragging = draggingMarker?.id === measurement.id && draggingMarker.index === index;
-          const color = isDragging ? '#ffe38a' : (isHovered ? '#ff8888' : '#ff4444');
-          return (
-            <mesh
-              key={`${measurement.id}-${index}`}
-              position={pt as [number, number, number]}
-              userData={{ measureHelper: true }}
-              onPointerOver={(event) => {
-                event.stopPropagation();
-                if (!dragRef.current) setHoveredMarker({ id: measurement.id, index });
-              }}
-              onPointerOut={(event) => {
-                event.stopPropagation();
-                if (!dragRef.current) setHoveredMarker(null);
-              }}
-              onPointerDown={(event) => {
-                if (!measureMode || event.button !== 0) return;
-                event.stopPropagation();
-                pointerDownRef.current = null;
-                const target = event.target as HTMLElement | null;
-                target?.setPointerCapture?.(event.pointerId);
-                dragRef.current = { id: measurement.id, index };
-                setDraggingMarker({ id: measurement.id, index });
-              }}
-              onPointerMove={(event) => {
-                if (!measureMode || !dragRef.current) return;
-                event.stopPropagation();
-                const nextSnap = updateSnap(event);
-                if (nextSnap) {
-                  updateMeasurePoint(measurement.id, index, [nextSnap.point.x, nextSnap.point.y, nextSnap.point.z]);
-                }
-              }}
-              onPointerUp={(event) => {
-                if (!measureMode || event.button !== 0) return;
-                event.stopPropagation();
-                const target = event.target as HTMLElement | null;
-                target?.releasePointerCapture?.(event.pointerId);
-                dragRef.current = null;
-                setDraggingMarker(null);
-              }}
-            >
-              <sphereGeometry args={[1.2, 16, 16]} />
-              <meshBasicMaterial color={color} />
-            </mesh>
-          );
-        })
-      ))}
-
-      {measurements.filter((m) => m.points.length === 2).map((measurement) => (
-        <MeasureLine key={measurement.id} a={measurement.points[0]} b={measurement.points[1]} />
-      ))}
-
-      {measureMode && snap && snap.type !== 'edge' && (
-        <mesh position={snap.point} userData={{ measureHelper: true }}>
-          <sphereGeometry args={[1.6, 16, 16]} />
-          <meshBasicMaterial color={SNAP_COLORS[snap.type]} />
-        </mesh>
-      )}
-
-      {measureMode && snap && snap.type === 'edge' && snap.edge && snapEdgeLine && (
-        <primitive object={snapEdgeLine} />
-      )}
-    </>
-  );
-}
-
-function MeasureLine({ a, b }: { a: number[]; b: number[] }) {
-  const { camera } = useThree();
-  const points = useMemo(
-    () => [new THREE.Vector3(...a), new THREE.Vector3(...b)],
-    [a, b],
-  );
-  const geo = useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
-  const dist = useMemo(
-    () => Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2),
-    [a, b],
-  );
-  const mid = useMemo(
-    () => new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2),
-    [a, b],
-  );
-  const labelPos = useMemo(() => {
-    const pos = mid.clone();
-    const dir = camera.position.clone().sub(mid);
-    if (dir.lengthSq() > 0) {
-      dir.normalize();
-      pos.add(dir.multiplyScalar(2));
-    }
-    return pos;
-  }, [camera.position, mid]);
-  const labelTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
-    return new THREE.CanvasTexture(canvas);
-  }, []);
-
-  useEffect(() => {
-    const canvas = labelTexture.image as HTMLCanvasElement;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000000cc';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#ffcc00';
-    ctx.font = 'bold 32px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${dist.toFixed(2)} mm`, canvas.width / 2, canvas.height / 2);
-    labelTexture.needsUpdate = true;
-  }, [dist, labelTexture]);
-
-  return (
-    <group>
-      <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#ffcc00' }))} />
-      {/* Distance label as a sprite */}
-      <sprite position={labelPos} scale={[30, 10, 1]}>
-        <spriteMaterial map={labelTexture} depthTest={false} />
-      </sprite>
-    </group>
-  );
-}
-
-function ViewController({
-  controlsRef,
-  command,
-  objects,
-  objectMatrices,
-  settings,
-  focusedObjectIds,
-  clearCommand,
-}: {
-  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
-  command: ViewCommand | null;
-  objects: SceneObject[];
-  objectMatrices: Record<string, THREE.Matrix4>;
-  settings: Record<string, ObjectSettings>;
-  focusedObjectIds: string[];
-  clearCommand: () => void;
-}) {
-  const { camera, size } = useThree();
-
-  useEffect(() => {
-    if (!command) return;
-    const visibleObjects = objects.filter((obj) => settings[obj.id]?.visible);
-    const focusedIdSet = new Set(focusedObjectIds);
-    const focusedVisibleObjects = focusedIdSet.size > 0
-      ? visibleObjects.filter((obj) => focusedIdSet.has(obj.id))
-      : [];
-    const useFocusedScope = !command.targetId && focusedVisibleObjects.length > 0;
-    const targetObjects = command.targetId
-      ? visibleObjects.filter((obj) => obj.id === command.targetId)
-      : (useFocusedScope ? focusedVisibleObjects : visibleObjects);
-
-    const bounds = new THREE.Box3();
-    let hasBounds = false;
-    targetObjects.forEach((obj) => {
-      const box = computeSceneObjectBounds(obj, objectMatrices);
-      if (box) {
-        if (!hasBounds) bounds.copy(box);
-        else bounds.union(box);
-        hasBounds = true;
-      }
-    });
-
-    if (!hasBounds) {
-      clearCommand();
-      return;
-    }
-
-    const center = new THREE.Vector3();
-    bounds.getCenter(center);
-    const sizeVec = new THREE.Vector3();
-    bounds.getSize(sizeVec);
-    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z, 1);
-
-    const snapUsesScopedCenter = command.type === 'snap' && useFocusedScope;
-
-    // "snap" (Home / standard views) targets origin unless focus mode scopes it to a subset.
-    const target = command.type === 'snap' && !snapUsesScopedCenter ? new THREE.Vector3(0, 0, 0) : center;
-    // Distance must cover model extent + offset from target.
-    const maxReach = command.type === 'snap' && !snapUsesScopedCenter
-      ? Math.max(
-          sizeVec.x / 2 + Math.abs(center.x),
-          sizeVec.y / 2 + Math.abs(center.y),
-          sizeVec.z / 2 + Math.abs(center.z),
-        ) * 2
-      : maxDim;
-
-    const controls = controlsRef.current;
-    const camDir = new THREE.Vector3();
-    if (command.type === 'snap') {
-      // Camera position direction (Z-up convention, see coordinate-system.md)
-      const viewMap: Record<string, THREE.Vector3> = {
-        front: new THREE.Vector3(0, -1, 0),
-        back: new THREE.Vector3(0, 1, 0),
-        right: new THREE.Vector3(1, 0, 0),
-        left: new THREE.Vector3(-1, 0, 0),
-        top: new THREE.Vector3(0, 0, 1),
-        bottom: new THREE.Vector3(0, 0, -1),
-        iso: new THREE.Vector3(1, -1, 1),
-      };
-      // Camera up vector — top/bottom views need special up to avoid gimbal lock
-      // Top: up=(0,1,0) so screen-right=X, screen-up=Y
-      // Bottom: up=(0,-1,0) so screen-right=X, screen-up=-Y
-      const upMap: Record<string, THREE.Vector3> = {
-        top: new THREE.Vector3(0, 1, 0),
-        bottom: new THREE.Vector3(0, -1, 0),
-      };
-      camDir.copy(viewMap[command.view ?? 'iso']).normalize();
-      const up = upMap[command.view ?? ''] ?? new THREE.Vector3(0, 0, 1);
-      camera.up.copy(up);
-    } else if (controls) {
-      camDir.subVectors(camera.position, controls.target).normalize();
-      if (camDir.lengthSq() === 0) camDir.set(1, 1, 1).normalize();
-    } else {
-      camDir.set(1, 1, 1).normalize();
-    }
-
-    const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
-    if (isOrtho) {
-      const ortho = camera as THREE.OrthographicCamera;
-      const zoom = Math.min(size.width, size.height) / maxReach / 2.2;
-      ortho.zoom = Math.max(0.1, zoom);
-      ortho.position.copy(target.clone().add(camDir.multiplyScalar(maxReach * 2)));
-      ortho.updateProjectionMatrix();
-    } else {
-      const persp = camera as THREE.PerspectiveCamera;
-      const dist = maxReach / (2 * Math.tan((persp.fov * Math.PI) / 360)) * 1.4;
-      persp.position.copy(target.clone().add(camDir.multiplyScalar(dist)));
-      persp.updateProjectionMatrix();
-    }
-
-    if (controls) {
-      controls.target.copy(target);
-      controls.update();
-    } else {
-      camera.lookAt(target);
-    }
-
-    clearCommand();
-  }, [camera, clearCommand, command, controlsRef, focusedObjectIds, objectMatrices, objects, settings, size.height, size.width]);
-
-  return null;
-}
-
-function ViewManager({
-  isSketchOnly,
-  controlsRef,
-}: {
-  isSketchOnly: boolean;
-  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
-}) {
-  const { camera } = useThree();
-  const projectionMode = useForgeStore((s) => s.projectionMode);
-  const setProjectionMode = useForgeStore((s) => s.setProjectionMode);
-  const wasSketchOnlyRef = useRef(false);
-  const savedProjectionRef = useRef<ProjectionMode>('perspective');
-
-  useEffect(() => {
-    if (isSketchOnly && !wasSketchOnlyRef.current) {
-      savedProjectionRef.current = projectionMode;
-    }
-
-    if (isSketchOnly) {
-      // Switch to straight-on 2D view
-      camera.position.set(0, 0, 200);
-      camera.lookAt(0, 0, 0);
-      camera.up.set(0, 0, 1);
-      if (controlsRef.current) {
-        controlsRef.current.target.set(0, 0, 0);
-        controlsRef.current.update();
-      }
-      if (projectionMode !== 'orthographic') {
-        setProjectionMode('orthographic');
-      }
-    } else if (wasSketchOnlyRef.current) {
-      const restoreMode = savedProjectionRef.current ?? 'perspective';
-      if (projectionMode !== restoreMode) {
-        setProjectionMode(restoreMode);
-      }
-    }
-
-    wasSketchOnlyRef.current = isSketchOnly;
-  }, [camera, controlsRef, isSketchOnly, projectionMode, setProjectionMode]);
-
-  return null;
-}
-
-function ViewPersistence({
-  controlsRef,
-  isSketchOnly,
-  onResolved,
-}: {
-  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
-  isSketchOnly: boolean;
-  onResolved: (restored: boolean) => void;
-}) {
-  const { camera } = useThree();
-  const projectionMode = useForgeStore((s) => s.projectionMode);
-  const setProjectionMode = useForgeStore((s) => s.setProjectionMode);
-  const setViewportCameraState = useForgeStore((s) => s.setViewportCameraState);
-  const restoreStatusRef = useRef<'pending' | 'done'>('pending');
-  const didResolveRef = useRef(false);
-  const savedStateRef = useRef<ViewportCameraState | null>(readPersistedViewportCameraState());
-  const persistTimeoutRef = useRef<number | null>(null);
-
-  const resolve = useCallback((restored: boolean) => {
-    if (didResolveRef.current) return;
-    didResolveRef.current = true;
-    onResolved(restored);
-  }, [onResolved]);
-
-  useEffect(() => {
-    if (isSketchOnly) {
-      restoreStatusRef.current = 'done';
-      resolve(false);
-    }
-  }, [isSketchOnly, resolve]);
-
-  useEffect(() => {
-    if (isSketchOnly) return;
-    if (restoreStatusRef.current === 'done') return;
-
-    const saved = savedStateRef.current;
-    if (!saved) {
-      restoreStatusRef.current = 'done';
-      resolve(false);
-      return;
-    }
-
-    if (saved.projectionMode !== projectionMode) {
-      setProjectionMode(saved.projectionMode);
-      return;
-    }
-
-    const controls = controlsRef.current;
-    if (!controls) return;
-
-    camera.position.set(saved.position[0], saved.position[1], saved.position[2]);
-    camera.up.set(saved.up[0], saved.up[1], saved.up[2]);
-
-    if ((camera as THREE.OrthographicCamera).isOrthographicCamera && saved.orthoZoom !== undefined) {
-      const ortho = camera as THREE.OrthographicCamera;
-      ortho.zoom = Math.max(0.1, saved.orthoZoom);
-      ortho.updateProjectionMatrix();
-    } else {
-      camera.updateProjectionMatrix();
-    }
-
-    controls.target.set(saved.target[0], saved.target[1], saved.target[2]);
-    controls.update();
-
-    restoreStatusRef.current = 'done';
-    resolve(true);
-  }, [camera, controlsRef, isSketchOnly, projectionMode, resolve, setProjectionMode]);
-
-  useEffect(() => {
-    if (restoreStatusRef.current !== 'done') return;
-    if (isSketchOnly) return;
-
-    const controls = controlsRef.current;
-    if (!controls) return;
-
-    const persistCamera = () => {
-      const isOrtho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
-      const nextState: ViewportCameraState = {
-        projectionMode,
-        position: [camera.position.x, camera.position.y, camera.position.z],
-        target: [controls.target.x, controls.target.y, controls.target.z],
-        up: [camera.up.x, camera.up.y, camera.up.z],
-        orthoZoom: isOrtho ? Math.max(0.1, (camera as THREE.OrthographicCamera).zoom) : undefined,
-      };
-      writePersistedViewportCameraState(nextState);
-      setViewportCameraState(nextState);
-    };
-
-    const schedulePersistCamera = () => {
-      if (persistTimeoutRef.current !== null) {
-        window.clearTimeout(persistTimeoutRef.current);
-      }
-      persistTimeoutRef.current = window.setTimeout(() => {
-        persistTimeoutRef.current = null;
-        persistCamera();
-      }, 140);
-    };
-
-    persistCamera();
-    controls.addEventListener('change', schedulePersistCamera);
-    return () => {
-      controls.removeEventListener('change', schedulePersistCamera);
-      if (persistTimeoutRef.current !== null) {
-        window.clearTimeout(persistTimeoutRef.current);
-        persistTimeoutRef.current = null;
-        persistCamera();
-      }
-    };
-  }, [camera, controlsRef, isSketchOnly, projectionMode, setViewportCameraState]);
-
-  return null;
-}
-
-function ControlsInteractionBridge({
-  controlsRef,
-  onInteractionChange,
-}: {
-  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
-  onInteractionChange: (active: boolean) => void;
-}) {
-  const idleTimeoutRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const controls = controlsRef.current;
-    if (!controls) return;
-
-    const markActive = () => {
-      onInteractionChange(true);
-      if (idleTimeoutRef.current !== null) {
-        window.clearTimeout(idleTimeoutRef.current);
-      }
-      idleTimeoutRef.current = window.setTimeout(() => {
-        idleTimeoutRef.current = null;
-        onInteractionChange(false);
-      }, 140);
-    };
-
-    controls.addEventListener('start', markActive);
-    controls.addEventListener('change', markActive);
-    controls.addEventListener('end', markActive);
-
-    return () => {
-      controls.removeEventListener('start', markActive);
-      controls.removeEventListener('change', markActive);
-      controls.removeEventListener('end', markActive);
-      if (idleTimeoutRef.current !== null) {
-        window.clearTimeout(idleTimeoutRef.current);
-        idleTimeoutRef.current = null;
-      }
-      onInteractionChange(false);
-    };
-  }, [controlsRef, onInteractionChange]);
-
-  return null;
-}
-
-function OrbitGifExporterBridge({
-  controlsRef,
-}: {
-  controlsRef: MutableRefObject<OrbitControlsImpl | null>;
-}) {
-  const { camera, gl, scene } = useThree();
-  const setRenderMode = useForgeStore((s) => s.setRenderMode);
-
-  const exportOrbitGif = useCallback(async (options?: OrbitGifExportOptions): Promise<Blob> => {
-    const size = Math.max(64, Math.min(2048, Math.round(options?.size ?? GIF_DEFAULT_SIZE)));
-    const fps = Math.max(1, Math.round(options?.fps ?? GIF_DEFAULT_FPS));
-    const framesPerTurn = Math.max(1, Math.round(options?.framesPerTurn ?? GIF_DEFAULT_FRAMES_PER_TURN));
-    const holdFrames = Math.max(0, Math.round(options?.holdFrames ?? GIF_DEFAULT_HOLD_FRAMES));
-    const pitchDeg = options?.pitchDeg ?? GIF_DEFAULT_PITCH_DEG;
-    const includeWireframePass = options?.includeWireframePass ?? true;
-    const delayMs = Math.max(20, Math.round(1000 / fps));
-    const modePlan: OrbitGifMode[] = includeWireframePass ? ['solid', 'wireframe'] : ['solid'];
-    const encoder = GIFEncoder();
-
-    const captureCanvas = document.createElement('canvas');
-    captureCanvas.width = size;
-    captureCanvas.height = size;
-    const captureCtx = captureCanvas.getContext('2d', { willReadFrequently: true });
-    if (!captureCtx) {
-      throw new Error('Could not create GIF capture context.');
-    }
-
-    const overrideSession = options?.runResult
-      ? createOverrideSessionFromRunResult(options.runResult, options.objectSettings, options.background)
-      : null;
-
-    const controls = controlsRef.current;
-    const orbitTarget = overrideSession
-      ? overrideSession.center.clone()
-      : (controls?.target.clone() ?? new THREE.Vector3(0, 0, 0));
-    let orbitRadius = overrideSession
-      ? overrideSession.distance
-      : camera.position.distanceTo(orbitTarget);
-    if (!Number.isFinite(orbitRadius) || orbitRadius <= 1e-3) orbitRadius = 160;
-
-    const prevCameraPos = camera.position.clone();
-    const prevCameraQuat = camera.quaternion.clone();
-    const prevCameraUp = camera.up.clone();
-    const prevRenderMode = useForgeStore.getState().renderMode;
-    const prevControlsTarget = controls?.target.clone() ?? null;
-    const prevDamping = controls?.enableDamping ?? null;
-    const prevSize = gl.getSize(new THREE.Vector2());
-    const prevPixelRatio = gl.getPixelRatio();
-
-    let frameIndex = 0;
-    const writeFrame = async (mode: OrbitGifMode, turn: number): Promise<void> => {
-      await waitForAnimationFrame();
-
-      if (overrideSession) {
-        setOverrideSessionMode(overrideSession, mode);
-        setOverrideOrbitCamera(overrideSession, turn, pitchDeg);
-        gl.render(overrideSession.scene, overrideSession.camera);
-      } else {
-        setRenderMode(mode);
-        applyOrbitPose(camera, orbitTarget, orbitRadius, turn, pitchDeg);
-        if (controls) {
-          controls.target.copy(orbitTarget);
-          controls.update();
-        }
-        gl.render(scene, camera);
-      }
-
-      captureCtx.clearRect(0, 0, size, size);
-      captureCtx.drawImage(gl.domElement, 0, 0, size, size);
-      const image = captureCtx.getImageData(0, 0, size, size);
-      const palette = quantize(image.data, 256);
-      const indexed = applyPalette(image.data, palette);
-
-      if (frameIndex === 0) {
-        encoder.writeFrame(indexed, size, size, {
-          palette,
-          delay: delayMs,
-          repeat: 0,
-        });
-      } else {
-        encoder.writeFrame(indexed, size, size, {
-          palette,
-          delay: delayMs,
-        });
-      }
-
-      frameIndex += 1;
-    };
-
-    try {
-      if (controls && !overrideSession) controls.enableDamping = false;
-      gl.setPixelRatio(1);
-      gl.setSize(size, size, false);
-
-      for (const mode of modePlan) {
-        for (let i = 0; i < holdFrames; i += 1) {
-          await writeFrame(mode, 0);
-        }
-        for (let i = 0; i < framesPerTurn; i += 1) {
-          await writeFrame(mode, i / framesPerTurn);
-        }
-      }
-
-      encoder.finish();
-      const bytes = new Uint8Array(encoder.bytes());
-      return new Blob([bytes], { type: 'image/gif' });
-    } finally {
-      if (overrideSession) {
-        disposeOverrideSession(overrideSession);
-      } else {
-        setRenderMode(prevRenderMode);
-        await waitForAnimationFrame();
-
-        camera.position.copy(prevCameraPos);
-        camera.quaternion.copy(prevCameraQuat);
-        camera.up.copy(prevCameraUp);
-        if (controls && prevControlsTarget) {
-          controls.target.copy(prevControlsTarget);
-        }
-        if (controls && prevDamping !== null) {
-          controls.enableDamping = prevDamping;
-          controls.update();
-        } else if (!controls && prevControlsTarget) {
-          camera.lookAt(prevControlsTarget);
-        }
-      }
-
-      gl.setPixelRatio(prevPixelRatio);
-      gl.setSize(prevSize.x, prevSize.y, false);
-      gl.render(scene, camera);
-    }
-  }, [camera, controlsRef, gl, scene, setRenderMode]);
-
-  useEffect(() => {
-    registerOrbitGifExporter(exportOrbitGif);
-    return () => {
-      registerOrbitGifExporter(null);
-    };
-  }, [exportOrbitGif]);
-
-  return null;
-}
+import { LocalStudioEnvironment } from './viewport/LocalStudioEnvironment';
+import {
+  MOUSE_BUTTONS_3D,
+  MOUSE_BUTTONS_DRAW,
+  MOUSE_BUTTONS_SKETCH,
+  TOUCH_GESTURES_3D,
+  TOUCH_GESTURES_SKETCH,
+} from '../capture/controlsConfig';
+import { themes } from '../theme';
+import { useForgeStore } from '../store/forgeStore';
+import { DrawCanvas } from './DrawCanvas';
+import { DrawToolbar } from './DrawToolbar';
+import { SceneConfigurator } from './SceneConfigurator';
+import { ClippingManager } from './viewport/ClippingManager';
+import { ConstructionGhostOverlay } from './viewport/ConstructionGhostOverlay';
+import { ControlsInteractionBridge, OrbitGifExporterBridge } from './viewport/ControlsBridge';
+import { DebugHighlightsOverlay } from './viewport/DebugHighlights';
+import { DimensionAnnotation } from './viewport/DimensionAnnotation';
+import { EvaluationIndicator } from './viewport/EvaluationIndicator';
+import { ForgeObject } from './viewport/ForgeObject';
+import { HoveredJointOverlay } from './viewport/HoveredJointOverlay';
+import { LabeledAxes } from './viewport/LabeledAxes';
+import { MeasureInfoPanel, MeasureTool } from './viewport/MeasureTool';
+import { PerformanceInfoPanel, PerformanceInfoSampler } from './viewport/PerformanceInfo';
+import { SectionExplorerGizmo } from './viewport/SectionExplorerGizmo';
+import { SectionPlaneGuides } from './viewport/SectionPlane';
+import { SketchObject } from './viewport/SketchObject';
+import { ToolpathObject } from './viewport/ToolpathObject';
+import { ZoomIndicatorPanel, ZoomSampler } from './viewport/ZoomIndicator';
+import { FOCUS_MODE_DIM_OPACITY, OBJECT_CONTEXT_MENU_MARGIN, OBJECT_CONTEXT_MENU_WIDTH } from './viewport/types';
+import { ViewController, ViewManager, ViewPersistence } from './viewport/ViewController';
+import { useViewportState } from './viewport/useViewportState';
+import { useViewportHandlers } from './viewport/useViewportHandlers';
+import { SvgPreview } from './SvgPreview';
 
 export function Viewport() {
-  const measureMode = useForgeStore((s) => s.measureMode);
-  const result = useForgeStore((s) => s.result);
-  const files = useForgeStore((s) => s.files);
-  const renderMode = useForgeStore((s) => s.renderMode);
-  const projectionMode = useForgeStore((s) => s.projectionMode);
-  const gridEnabled = useForgeStore((s) => s.gridEnabled);
-  const gridSize = useForgeStore((s) => s.gridSize);
-  const showPerformanceInfo = useForgeStore((s) => s.showPerformanceInfo);
-  const objectSettings = useForgeStore((s) => s.objectSettings);
-  const setObjectVisibility = useForgeStore((s) => s.setObjectVisibility);
-  const hoveredObjectId = useForgeStore((s) => s.hoveredObjectId);
-  const setHoveredObjectId = useForgeStore((s) => s.setHoveredObjectId);
-  const selectObject = useForgeStore((s) => s.selectObject);
-  const focusedObjectIds = useForgeStore((s) => s.focusedObjectIds);
-  const focusObject = useForgeStore((s) => s.focusObject);
-  const clearFocusedObject = useForgeStore((s) => s.clearFocusedObject);
-  const objectPickSyncEnabled = useForgeStore((s) => s.objectPickSyncEnabled);
-  const explodeAmount = useForgeStore((s) => s.explodeAmount);
-  const viewCommand = useForgeStore((s) => s.viewCommand);
-  const requestViewCommand = useForgeStore((s) => s.requestViewCommand);
-  const clearViewCommand = useForgeStore((s) => s.clearViewCommand);
-  const jointValues = useForgeStore((s) => s.jointValues);
-  const jointAnimationClip = useForgeStore((s) => s.jointAnimationClip);
-  const jointAnimationProgress = useForgeStore((s) => s.jointAnimationProgress);
-  const jointAnimationPlaying = useForgeStore((s) => s.jointAnimationPlaying);
-  const jointAnimationSpeed = useForgeStore((s) => s.jointAnimationSpeed);
-  const hoveredJointName = useForgeStore((s) => s.hoveredJointName);
-  const setJointAnimationProgress = useForgeStore((s) => s.setJointAnimationProgress);
-  const setJointAnimationPlaying = useForgeStore((s) => s.setJointAnimationPlaying);
-  const objects = result?.objects ?? [];
-  const dimensions = result?.dimensions ?? [];
-  const dimensionsVisible = useForgeStore((s) => s.dimensionsVisible);
-  const cutPlaneEnabled = useForgeStore((s) => s.cutPlaneEnabled);
-  const sectionPlaneGuidesEnabled = useForgeStore((s) => s.sectionPlaneGuidesEnabled);
-  const sectionPlaneFillEnabled = useForgeStore((s) => s.sectionPlaneFillEnabled);
-  const sectionPlaneFillOpacity = useForgeStore((s) => s.sectionPlaneFillOpacity);
-  const sectionPlaneBorderEnabled = useForgeStore((s) => s.sectionPlaneBorderEnabled);
-  const sectionPlaneAxisEnabled = useForgeStore((s) => s.sectionPlaneAxisEnabled);
-  const [performanceInfo, setPerformanceInfo] = useState<ViewportPerformanceInfo | null>(null);
-  const cutPlaneDefs: CutPlaneDef[] = result?.cutPlanes ?? [];
-  const explodeConfig: ExplodeViewOptions | null = result?.explodeView ?? null;
-  const jointsConfig = result?.jointsView ?? null;
-  const jointOverlayConfig = result?.viewConfig?.jointOverlay ?? DEFAULT_VIEW_CONFIG.jointOverlay;
-  const joints = jointsConfig?.enabled === false ? [] : (jointsConfig?.joints ?? []);
-  const jointCouplings = jointsConfig?.enabled === false ? [] : (jointsConfig?.couplings ?? []);
-  const jointAnimations = jointsConfig?.enabled === false ? [] : (jointsConfig?.animations ?? []);
-  const activeJointAnimation = useMemo(
-    () => findJointAnimationClip(jointAnimations, jointAnimationClip),
-    [jointAnimationClip, jointAnimations],
-  );
-  const animatedJointValues = useMemo(
-    () => resolveJointAnimation(activeJointAnimation, jointAnimationProgress, jointValues),
-    [activeJointAnimation, jointAnimationProgress, jointValues],
-  );
-  const effectiveJointValues = useMemo(
-    () => resolveJointViewValues(
-      joints,
-      jointCouplings,
-      animatedJointValues,
-      { clamp: !(activeJointAnimation?.continuous ?? false) },
-    ),
-    [activeJointAnimation?.continuous, animatedJointValues, jointCouplings, joints],
-  );
-
-  const activeCutPlaneDefs = useMemo(() => {
-    return cutPlaneDefs
-      .filter((cp) => cutPlaneEnabled[cp.name])
-      .filter((cp) => new THREE.Vector3(cp.normal[0], cp.normal[1], cp.normal[2]).lengthSq() > 1e-8);
-  }, [cutPlaneDefs, cutPlaneEnabled]);
+  const activeFile = useForgeStore((s) => s.activeFile);
+  const isSvgActive = !!activeFile && activeFile.toLowerCase().endsWith('.svg');
+  const state = useViewportState();
 
   const {
+    measureMode,
+    isEvaluating,
+    evaluationPhase,
+    renderMode,
+    projectionMode,
+    gridEnabled,
+    gridSize,
+    showPerformanceInfo,
+    objectSettings,
+    setObjectVisibility,
+    hoveredObjectId,
+    setHoveredObjectId,
+    selectObject,
+    focusedObjectIds,
+    focusObject,
+    clearFocusedObject,
+    objectPickSyncEnabled,
+    viewCommand,
+    requestViewCommand,
+    clearViewCommand,
+    lengthUnit,
+    constructionGhost,
+    objects,
+    dimensions,
+    debugHighlights3D,
+    dimensionsVisible,
+    sectionPlaneGuidesEnabled,
+    sectionPlaneFillEnabled,
+    sectionPlaneFillOpacity,
+    sectionPlaneBorderEnabled,
+    sectionPlaneAxisEnabled,
+    sectionExplorerEnabled,
+    drawFlagEnabled,
+    drawModeActive,
+    shapeHighlightByIndex,
+    activeCutPlaneDefs,
+    scriptCutPlaneDefs,
     objectCutPlanesById,
     objectClippingPlanesById,
     hasAnyObjectCutPlanes,
-  } = useMemo(() => {
-    const cutPlanesById: Record<string, CutPlaneDef[]> = {};
-    const clippingPlanesById: Record<string, THREE.Plane[]> = {};
-    let hasAnyCutPlanes = false;
-
-    objects.forEach((obj) => {
-      const applicable = activeCutPlaneDefs.filter((cp) => !isObjectExcludedFromCutPlane(obj, cp));
-      cutPlanesById[obj.id] = applicable;
-      clippingPlanesById[obj.id] = applicable.map(toClippingPlane);
-      if (applicable.length > 0) hasAnyCutPlanes = true;
-    });
-
-    return {
-      objectCutPlanesById: cutPlanesById,
-      objectClippingPlanesById: clippingPlanesById,
-      hasAnyObjectCutPlanes: hasAnyCutPlanes,
-    };
-  }, [activeCutPlaneDefs, objects]);
-
-  const explodeOffsets = useMemo(() => {
-    if (explodeAmount <= 1e-8) return {} as Record<string, [number, number, number]>;
-    if (explodeConfig?.enabled === false) return {} as Record<string, [number, number, number]>;
-    if (objects.length === 0) return {} as Record<string, [number, number, number]>;
-    return computeExplodeTreeOffsets(buildExplodeTree(objects), explodeAmount, explodeConfig);
-  }, [explodeAmount, explodeConfig, objects]);
-
-  const jointNodeMatrices = useMemo(
-    () => computeJointNodeMatrices(joints, effectiveJointValues),
-    [effectiveJointValues, joints],
-  );
-
-  const jointMatrices = useMemo(() => {
-    const out: Record<string, THREE.Matrix4> = {};
-    objects.forEach((obj) => {
-      out[obj.id] = new THREE.Matrix4();
-    });
-
-    if (joints.length === 0 || objects.length === 0) return out;
-
-    const jointByChild = new Map<string, JointViewDef>();
-    joints.forEach((joint) => {
-      jointByChild.set(joint.child, joint);
-    });
-
-    objects.forEach((obj) => {
-      let nodeName: string | null = null;
-      if (jointByChild.has(obj.name)) {
-        nodeName = obj.name;
-      } else if (obj.groupName && jointByChild.has(obj.groupName)) {
-        // ShapeGroup returns are flattened as "Group.Lid" or the fallback "Group.1".
-        // Resolve joints against the parent group name when exact object name is absent.
-        nodeName = obj.groupName;
-      }
-      if (!nodeName) return;
-      out[obj.id] = jointNodeMatrices.get(nodeName)?.clone() ?? new THREE.Matrix4();
-    });
-
-    return out;
-  }, [jointNodeMatrices, joints, objects]);
-
-  const objectMatrices = useMemo(() => {
-    const out: Record<string, THREE.Matrix4> = {};
-    objects.forEach((obj) => {
-      const baseMatrix = obj.sketch
-        ? new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch))
-        : new THREE.Matrix4();
-      const jointMatrix = jointMatrices[obj.id] ?? new THREE.Matrix4();
-      const offset = explodeOffsets[obj.id] ?? ZERO_OFFSET;
-      const explodeMatrix = new THREE.Matrix4().makeTranslation(offset[0], offset[1], offset[2]);
-      out[obj.id] = explodeMatrix.multiply(jointMatrix).multiply(baseMatrix);
-    });
-    return out;
-  }, [explodeOffsets, jointMatrices, objects]);
-
-  useEffect(() => {
-    if (!jointAnimationPlaying || !activeJointAnimation) return;
-
-    let raf = 0;
-    let lastTs = performance.now();
-    let cancelled = false;
-
-    const tick = (now: number) => {
-      if (cancelled) return;
-      const dtSec = Math.max(0, (now - lastTs) / 1000);
-      lastTs = now;
-
-      const step = (dtSec * jointAnimationSpeed) / Math.max(1e-6, activeJointAnimation.duration);
-      let next = useForgeStore.getState().jointAnimationProgress + step;
-      if (next >= 1) {
-        if (!activeJointAnimation.loop) {
-          next = 1;
-          setJointAnimationPlaying(false);
-        } else if (!activeJointAnimation.continuous) {
-          next = next % 1;
-        }
-      }
-      setJointAnimationProgress(next);
-
-      if (useForgeStore.getState().jointAnimationPlaying) {
-        raf = requestAnimationFrame(tick);
-      }
-    };
-
-    raf = requestAnimationFrame(tick);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-    };
-  }, [activeJointAnimation, jointAnimationPlaying, jointAnimationSpeed, setJointAnimationPlaying, setJointAnimationProgress]);
-
-  const sectionGuideBoundsKey = sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0
-    ? objectMatrices
-    : null;
-
-  const sectionGuideSize = useMemo(() => {
-    if (!sectionPlaneGuidesEnabled || activeCutPlaneDefs.length === 0) {
-      return Math.max(60, gridSize * 8);
-    }
-
-    const bounds = new THREE.Box3();
-    let hasBounds = false;
-
-    objects.forEach((obj) => {
-      const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
-      if (obj.shape) {
-        try {
-          const bb = obj.shape.boundingBox();
-          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, matrix);
-          hasBounds = true;
-        } catch {
-          // Ignore bad shape bounds from partial execution failures.
-        }
-        return;
-      }
-      if (obj.sketch) {
-        try {
-          const bb = obj.sketch.bounds();
-          expandBoundsByTransformedAabb(
-            bounds,
-            [bb.min[0], bb.min[1], 0],
-            [bb.max[0], bb.max[1], 0],
-            matrix,
-          );
-          hasBounds = true;
-        } catch {
-          // Ignore bad sketch bounds from partial execution failures.
-        }
-      }
-    });
-
-    if (!hasBounds) return Math.max(60, gridSize * 8);
-
-    const size = new THREE.Vector3();
-    bounds.getSize(size);
-    const diagonal = Math.max(1, size.length());
-    return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [activeCutPlaneDefs.length, gridSize, objects, sectionGuideBoundsKey, sectionPlaneGuidesEnabled]);
-
-  const jointOverlayBaseSize = useMemo(() => {
-    const bounds = new THREE.Box3();
-    let hasBounds = false;
-
-    objects.forEach((obj) => {
-      if (obj.shape) {
-        try {
-          const bb = obj.shape.boundingBox();
-          expandBoundsByTransformedAabb(bounds, bb.min, bb.max, IDENTITY_MATRIX);
-          hasBounds = true;
-        } catch {
-          // Ignore bad shape bounds from partial execution failures.
-        }
-        return;
-      }
-      if (obj.sketch) {
-        try {
-          const bb = obj.sketch.bounds();
-          expandBoundsByTransformedAabb(
-            bounds,
-            [bb.min[0], bb.min[1], 0],
-            [bb.max[0], bb.max[1], 0],
-            new THREE.Matrix4().fromArray(getSketchWorldMatrix(obj.sketch)),
-          );
-          hasBounds = true;
-        } catch {
-          // Ignore bad sketch bounds from partial execution failures.
-        }
-      }
-    });
-
-    if (!hasBounds) return Math.max(60, gridSize * 8);
-
-    const size = new THREE.Vector3();
-    bounds.getSize(size);
-    const diagonal = Math.max(1, size.length());
-    return Math.max(60, diagonal * 1.35, gridSize * 6);
-  }, [gridSize, objects]);
-
-  const hoveredJointOverlay = useMemo((): HoveredJointOverlayState | null => {
-    if (!jointOverlayConfig.enabled) return null;
-    if (!hoveredJointName) return null;
-    const joint = joints.find((entry) => entry.name === hoveredJointName);
-    if (!joint) return null;
-
-    const parentMatrix = joint.parent
-      ? (jointNodeMatrices.get(joint.parent)?.clone() ?? new THREE.Matrix4())
-      : new THREE.Matrix4();
-    const axisLocal = new THREE.Vector3(joint.axis[0], joint.axis[1], joint.axis[2]).normalize();
-    const axisWorld = axisLocal.clone().transformDirection(parentMatrix);
-    if (axisWorld.lengthSq() <= 1e-8) axisWorld.copy(axisLocal);
-    axisWorld.normalize();
-
-    const pivotWorld = new THREE.Vector3(joint.pivot[0], joint.pivot[1], joint.pivot[2]).applyMatrix4(parentMatrix);
-    const childObject = objects.find((obj) => obj.name === joint.child || obj.groupName === joint.child);
-    if (childObject) {
-      const offset = explodeOffsets[childObject.id] ?? ZERO_OFFSET;
-      pivotWorld.add(new THREE.Vector3(offset[0], offset[1], offset[2]));
-    }
-
-    const value = clampJointValue(joint, effectiveJointValues[joint.name] ?? joint.defaultValue);
-    const axisLength = Math.max(jointOverlayConfig.axisLengthMin, jointOverlayBaseSize * jointOverlayConfig.axisLengthScale);
-    return {
-      joint,
-      value,
-      pivotWorld,
-      axisWorld,
-      axisLength,
-    };
-  }, [
-    effectiveJointValues,
-    explodeOffsets,
-    hoveredJointName,
-    jointNodeMatrices,
-    jointOverlayConfig,
-    jointOverlayBaseSize,
+    objectMatrices,
+    constructionGhostMatrix,
     joints,
-    objects,
-  ]);
+    activeJointAnimation,
+    effectiveJointValues,
+    sectionGuideSize,
+    hoveredJointOverlay,
+    jointOverlayConfig,
+    isSketchOnly,
+    sceneConfig,
+    modelBoundsMinZ,
+    focusedObjectIdSet,
+    visibleSceneObjectCount,
+    visibleModelTriangles,
+    toolpathProgress,
+    setToolpathProgress,
+    performanceInfo,
+    setPerformanceInfo,
+    reactRenderCountRef,
+    defaultLightsOverridden,
+    defaultEnvironmentOverridden,
+    handleDefaultLightsOverridden,
+    handleDefaultEnvironmentOverridden,
+    themeName,
+    previewFile,
+    knownFileNames,
+  } = state;
 
-  const hasShape = objects.some((obj) => obj.shape);
-  const isSketchOnly = !hasShape && objects.some((obj) => obj.sketch);
-  const knownFileNames = useMemo(() => new Set(Object.keys(files)), [files]);
-  const controlsRef = useRef<OrbitControlsImpl | null>(null);
-  const initialFitRequestedRef = useRef(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const hoverTooltipRef = useRef<HTMLDivElement | null>(null);
-  const hoverTooltipIdRef = useRef<string | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement | null>(null);
   const [viewPersistenceResolved, setViewPersistenceResolved] = useState(false);
   const [isViewportInteracting, setIsViewportInteracting] = useState(false);
-  const [objectContextMenu, setObjectContextMenu] = useState<ObjectContextMenuState | null>(null);
-  const themeName = useForgeStore((s) => s.theme);
+  const [zoomMmPerPx, setZoomMmPerPx] = useState<number | null>(null);
+  const [hoverLabel, setHoverLabel] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const initialFitRequestedRef = useRef(false);
+  const prevPreviewFileRef = useRef<string | null | undefined>(undefined);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+
   const t = themes[themeName];
-  const focusedObjectIdSet = useMemo(() => new Set(focusedObjectIds), [focusedObjectIds]);
   const canvasDpr: number | [number, number] = isViewportInteracting ? 1 : [1, 2];
-  const { visibleSceneObjectCount, visibleModelTriangles } = useMemo(() => {
-    let nextVisibleSceneObjectCount = 0;
-    let nextVisibleModelTriangles = 0;
 
-    objects.forEach((obj) => {
-      if (objectSettings[obj.id]?.visible === false) return;
-      nextVisibleSceneObjectCount += 1;
-      if (!obj.shape) return;
-      try {
-        nextVisibleModelTriangles += obj.shape.numTri();
-      } catch {
-        // Ignore broken triangle counts from partial/invalid geometry.
-      }
-    });
-
-    return {
-      visibleSceneObjectCount: nextVisibleSceneObjectCount,
-      visibleModelTriangles: nextVisibleModelTriangles,
-    };
-  }, [objectSettings, objects]);
-
-  const closeObjectContextMenu = useCallback(() => {
-    setObjectContextMenu(null);
-  }, []);
-
-  const hideHoverTooltip = useCallback((id?: string | null) => {
-    if (id !== undefined && hoverTooltipIdRef.current !== id) return;
-    hoverTooltipIdRef.current = null;
-    const tooltip = hoverTooltipRef.current;
-    if (!tooltip) return;
-    tooltip.style.visibility = 'hidden';
-    tooltip.style.opacity = '0';
-  }, []);
-
-  const showHoverTooltip = useCallback((label: { id: string; name: string; x: number; y: number }) => {
-    hoverTooltipIdRef.current = label.id;
-    const tooltip = hoverTooltipRef.current;
-    if (!tooltip) return;
-    if (tooltip.textContent !== label.name) tooltip.textContent = label.name;
-    tooltip.style.left = `${label.x}px`;
-    tooltip.style.top = `${label.y}px`;
-    tooltip.style.visibility = 'visible';
-    tooltip.style.opacity = '1';
-  }, []);
-
-  const handleViewPersistenceResolved = useCallback((restored: boolean) => {
-    if (restored) {
-      initialFitRequestedRef.current = true;
-    }
-    setViewPersistenceResolved(true);
-  }, []);
-
-  useEffect(() => {
-    if (!viewPersistenceResolved) return;
-    if (initialFitRequestedRef.current) return;
-    if (viewCommand) return;
-    if (objects.length === 0) return;
-    initialFitRequestedRef.current = true;
-    requestViewCommand({ type: 'fit' });
-  }, [objects.length, requestViewCommand, viewCommand, viewPersistenceResolved]);
-
-  useEffect(() => {
-    if (objectPickSyncEnabled) return;
-    hideHoverTooltip();
-    setHoveredObjectId(null);
-  }, [hideHoverTooltip, objectPickSyncEnabled, setHoveredObjectId]);
-
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (objectContextMenu) {
-        closeObjectContextMenu();
-        return;
-      }
-      if (useForgeStore.getState().focusedObjectIds.length === 0) return;
-      clearFocusedObject();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [clearFocusedObject, closeObjectContextMenu, objectContextMenu]);
-
-  useEffect(() => {
-    const handleViewShortcut = (event: KeyboardEvent) => {
-      if (event.isComposing || event.repeat) return;
-      if (event.altKey || !event.shiftKey || !hasPrimaryModifier(event)) return;
-      if (isTextEntryTarget(event.target)) return;
-
-      const key = getShortcutKey(event);
-      if (key === 'f') {
-        event.preventDefault();
-        requestViewCommand({ type: 'fit' });
-        return;
-      }
-      if (key === 'h') {
-        event.preventDefault();
-        requestViewCommand({ type: 'snap', view: 'iso' });
-      }
-    };
-
-    window.addEventListener('keydown', handleViewShortcut, true);
-    return () => window.removeEventListener('keydown', handleViewShortcut, true);
-  }, [requestViewCommand]);
-
-  useEffect(() => {
-    if (!objectContextMenu) return;
-
-    const handleWindowPointerDown = (event: PointerEvent) => {
-      const menu = contextMenuRef.current;
-      if (menu && event.target instanceof Node && menu.contains(event.target)) return;
-      closeObjectContextMenu();
-    };
-    const handleWindowResize = () => closeObjectContextMenu();
-
-    window.addEventListener('pointerdown', handleWindowPointerDown);
-    window.addEventListener('resize', handleWindowResize);
-    return () => {
-      window.removeEventListener('pointerdown', handleWindowPointerDown);
-      window.removeEventListener('resize', handleWindowResize);
-    };
-  }, [closeObjectContextMenu, objectContextMenu]);
-
-  useEffect(() => {
-    if (!objectContextMenu) return;
-    if (measureMode || isViewportInteracting) {
-      closeObjectContextMenu();
-      return;
-    }
-    if (!objects.some((obj) => obj.id === objectContextMenu.objectId)) {
-      closeObjectContextMenu();
-    }
-  }, [closeObjectContextMenu, isViewportInteracting, measureMode, objectContextMenu, objects]);
-
-  const updateHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-    if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
-    event.stopPropagation();
-    setHoveredObjectId(obj.id);
-    const hoverName = resolveHoverObjectName(obj.name, knownFileNames);
-    if (!hoverName) {
-      hideHoverTooltip(obj.id);
-      return;
-    }
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    showHoverTooltip({
-      id: obj.id,
-      name: hoverName,
-      x: event.clientX - rect.left + 10,
-      y: event.clientY - rect.top + 12,
-    });
-  }, [
-    hideHoverTooltip,
-    isViewportInteracting,
-    knownFileNames,
+  const handlers = useViewportHandlers({
+    containerRef,
+    contextMenuRef,
     measureMode,
+    isViewportInteracting,
     objectPickSyncEnabled,
-    setHoveredObjectId,
-    showHoverTooltip,
-  ]);
-
-  const clearHoverLabel = useCallback((obj: SceneObject, event: ThreeEvent<PointerEvent>) => {
-    if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
-    event.stopPropagation();
-    if (hoveredObjectId === obj.id) setHoveredObjectId(null);
-    hideHoverTooltip(obj.id);
-  }, [
-    hideHoverTooltip,
     hoveredObjectId,
-    isViewportInteracting,
-    measureMode,
-    objectPickSyncEnabled,
+    knownFileNames,
+    objects,
+    selectObject,
+    focusObject,
+    clearFocusedObject,
     setHoveredObjectId,
-  ]);
+    setHoverLabel,
+    setObjectVisibility,
+    requestViewCommand,
+    viewPersistenceResolved,
+    viewCommand,
+    previewFile,
+    initialFitRequestedRef,
+    prevPreviewFileRef,
+    setPerformanceInfo,
+  });
 
-  const handleObjectClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-    if (!objectPickSyncEnabled || measureMode || isViewportInteracting) return;
-    event.stopPropagation();
-    selectObject(obj.id);
-  }, [isViewportInteracting, measureMode, objectPickSyncEnabled, selectObject]);
+  const {
+    objectContextMenu,
+    closeObjectContextMenu,
+    faceInfoPanel,
+    setFaceInfoPanel,
+    faceInfoData,
+    faceInfoLoading,
+    sketchEntityInfo,
+    setSketchEntityInfo,
+    updateHoverLabel,
+    clearHoverLabel,
+    handleObjectClick,
+    handleObjectDoubleClick,
+    handleObjectContextMenu,
+    handleHideObject,
+    handleGetFaceInfo,
+    handleSketchEntityClick,
+    handleViewportPointerMissed,
+    handlePerformanceInfoChange,
+    handleViewPersistenceResolved: handleViewPersistenceResolvedFromHandlers,
+  } = handlers;
 
-  const handleObjectDoubleClick = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-    if (measureMode || isViewportInteracting) return;
-    event.stopPropagation();
-    const additive = event.shiftKey || event.metaKey || event.ctrlKey;
-    focusObject(obj.id, { additive });
-  }, [focusObject, isViewportInteracting, measureMode]);
-
-  const handleObjectContextMenu = useCallback((obj: SceneObject, event: ThreeEvent<MouseEvent>) => {
-    if (measureMode || isViewportInteracting) return;
-    event.stopPropagation();
-    event.nativeEvent.preventDefault();
-    selectObject(obj.id);
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = Math.min(
-      Math.max(event.clientX - rect.left, OBJECT_CONTEXT_MENU_MARGIN),
-      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.width - OBJECT_CONTEXT_MENU_WIDTH - OBJECT_CONTEXT_MENU_MARGIN),
-    );
-    const y = Math.min(
-      Math.max(event.clientY - rect.top, OBJECT_CONTEXT_MENU_MARGIN),
-      Math.max(OBJECT_CONTEXT_MENU_MARGIN, rect.height - OBJECT_CONTEXT_MENU_HEIGHT - OBJECT_CONTEXT_MENU_MARGIN),
-    );
-    setObjectContextMenu({ objectId: obj.id, x, y });
-  }, [isViewportInteracting, measureMode, selectObject]);
-
-  const handleHideObject = useCallback(() => {
-    if (!objectContextMenu) return;
-    setObjectVisibility(objectContextMenu.objectId, false);
-    closeObjectContextMenu();
-  }, [closeObjectContextMenu, objectContextMenu, setObjectVisibility]);
-
-  const handleViewportPointerMissed = useCallback((event: MouseEvent) => {
-    if (event.detail !== 2) return;
-    if (measureMode) return;
-    clearFocusedObject();
-  }, [clearFocusedObject, measureMode]);
-
-  const handlePerformanceInfoChange = useCallback((stats: ViewportPerformanceInfo | null) => {
-    setPerformanceInfo(stats);
-  }, []);
+  const handleViewPersistenceResolved = (restored: boolean) => {
+    handleViewPersistenceResolvedFromHandlers(restored);
+    setViewPersistenceResolved(true);
+  };
 
   return (
     <div
@@ -3653,6 +183,7 @@ export function Viewport() {
       style={{ width: '100%', height: '100%', position: 'relative' }}
       onContextMenu={(event) => event.preventDefault()}
     >
+      {isSvgActive && <SvgPreview />}
       <Canvas
         style={{ background: t.viewportBg, cursor: measureMode ? 'crosshair' : 'default' }}
         dpr={canvasDpr}
@@ -3672,17 +203,33 @@ export function Viewport() {
           <PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={100000} up={[0, 0, 1]} />
         )}
 
-        {/* Local environment map (offline-safe) */}
-        <LocalStudioEnvironment />
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[100, 150, 80]} intensity={1.2} castShadow />
-        <directionalLight position={[-60, -40, -80]} intensity={0.3} />
-        <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
+        {/* Scene configurator — applies script scene() settings */}
+        {sceneConfig && (
+          <SceneConfigurator
+            config={sceneConfig}
+            modelBoundsMinZ={modelBoundsMinZ}
+            onDefaultLightsOverridden={handleDefaultLightsOverridden}
+            onDefaultEnvironmentOverridden={handleDefaultEnvironmentOverridden}
+          />
+        )}
+
+        {/* Default environment map (offline-safe) — hidden when script overrides */}
+        {!defaultEnvironmentOverridden && <LocalStudioEnvironment />}
+        {/* Default lights — hidden when script provides custom lights */}
+        {!defaultLightsOverridden && (
+          <>
+            <ambientLight intensity={0.3} />
+            <directionalLight position={[100, 150, 80]} intensity={1.2} castShadow />
+            <directionalLight position={[-60, -40, -80]} intensity={0.3} />
+            <hemisphereLight args={['#b1e1ff', '#444444', 0.4]} />
+          </>
+        )}
 
         <ClippingManager active={hasAnyObjectCutPlanes} />
+        {sectionExplorerEnabled && <SectionExplorerGizmo size={sectionGuideSize} />}
         {sectionPlaneGuidesEnabled && activeCutPlaneDefs.length > 0 && (
           <SectionPlaneGuides
-            cutPlanes={activeCutPlaneDefs}
+            cutPlanes={scriptCutPlaneDefs}
             sectionSize={sectionGuideSize}
             style={{
               showFill: sectionPlaneFillEnabled,
@@ -3693,16 +240,17 @@ export function Viewport() {
           />
         )}
 
-        {objects.map((obj) => {
+        {objects.map((obj, objIndex) => {
           const settings = objectSettings[obj.id] ?? { visible: true, opacity: 1, color: '#5b9bd5' };
           const isDimmedByFocus = focusedObjectIdSet.size > 0 && !focusedObjectIdSet.has(obj.id);
-          const effectiveSettings = isDimmedByFocus
-            ? { ...settings, opacity: Math.min(settings.opacity, FOCUS_MODE_DIM_OPACITY) }
-            : settings;
+          const isDimmedByGhost = constructionGhost !== null && obj.id !== constructionGhost.objectId;
+          const effectiveSettings =
+            isDimmedByFocus || isDimmedByGhost ? { ...settings, opacity: Math.min(settings.opacity, FOCUS_MODE_DIM_OPACITY) } : settings;
           const isHovered = hoveredObjectId === obj.id;
           const matrix = objectMatrices[obj.id] ?? new THREE.Matrix4();
           const objectCutPlanes = objectCutPlanesById[obj.id] ?? [];
           const objectClippingPlanes = objectClippingPlanesById[obj.id] ?? [];
+          const shapeHl = shapeHighlightByIndex.get(objIndex);
           if (obj.shape) {
             return (
               <ForgeObject
@@ -3715,6 +263,8 @@ export function Viewport() {
                 isHovered={isHovered}
                 cutPlanes={objectCutPlanes}
                 clippingPlanes={objectClippingPlanes}
+                debugHighlightColor={shapeHl?.color}
+                debugHighlightPulse={shapeHl?.pulse}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
@@ -3732,28 +282,55 @@ export function Viewport() {
                 settings={effectiveSettings}
                 renderMode={renderMode}
                 matrix={matrix}
+                isSketchMode={isSketchOnly}
                 onPointerEnter={(event) => updateHoverLabel(obj, event)}
                 onPointerMove={(event) => updateHoverLabel(obj, event)}
                 onPointerLeave={(event) => clearHoverLabel(obj, event)}
                 onClick={(event) => handleObjectClick(obj, event)}
                 onDoubleClick={(event) => handleObjectDoubleClick(obj, event)}
                 onContextMenu={(event) => handleObjectContextMenu(obj, event)}
+                onEntityClick={handleSketchEntityClick}
+                onVertexHover={(pointId, event) => {
+                  if (!objectPickSyncEnabled || measureMode || isViewportInteracting || event.buttons !== 0) return;
+                  const rect = containerRef.current?.getBoundingClientRect();
+                  if (!rect) return;
+                  setHoverLabel({
+                    id: `${obj.id}:${pointId}`,
+                    name: pointId,
+                    x: event.clientX - rect.left + 10,
+                    y: event.clientY - rect.top + 12,
+                  });
+                }}
+              />
+            );
+          }
+          if (obj.toolpath) {
+            return (
+              <ToolpathObject
+                key={obj.id}
+                obj={obj}
+                settings={effectiveSettings}
+                matrix={matrix}
+                maxSegmentIndex={Math.round(toolpathProgress * obj.toolpath.segments.length)}
               />
             );
           }
           return null;
         })}
+        {constructionGhost && <ConstructionGhostOverlay matrix={constructionGhostMatrix} />}
         {hoveredJointOverlay && <HoveredJointOverlay state={hoveredJointOverlay} config={jointOverlayConfig} />}
-        {dimensionsVisible && dimensions.map((d) => (
-          <DimensionAnnotation key={d.id} def={d} />
-        ))}
+        {dimensionsVisible && dimensions.map((d) => <DimensionAnnotation key={d.id} def={d} lengthUnit={lengthUnit} />)}
         <MeasureTool />
+        {debugHighlights3D.length > 0 && <DebugHighlightsOverlay highlights={debugHighlights3D} />}
+        {drawFlagEnabled && <DrawCanvas />}
         <PerformanceInfoSampler
           enabled={showPerformanceInfo}
           sceneObjects={visibleSceneObjectCount}
           modelTriangles={visibleModelTriangles}
+          reactRenderCountRef={reactRenderCountRef}
           onStatsChange={handlePerformanceInfoChange}
         />
+        <ZoomSampler onZoomChange={setZoomMmPerPx} />
 
         {gridEnabled && !isSketchOnly && (
           <Grid
@@ -3794,25 +371,15 @@ export function Viewport() {
           minPolarAngle={0}
           maxPolarAngle={Math.PI}
           enableRotate={!isSketchOnly}
-          mouseButtons={isSketchOnly ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : undefined}
-          touches={isSketchOnly ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
+          mouseButtons={drawModeActive ? MOUSE_BUTTONS_DRAW : isSketchOnly ? MOUSE_BUTTONS_SKETCH : MOUSE_BUTTONS_3D}
+          touches={isSketchOnly ? TOUCH_GESTURES_SKETCH : TOUCH_GESTURES_3D}
         />
 
-        <ControlsInteractionBridge
-          controlsRef={controlsRef}
-          onInteractionChange={setIsViewportInteracting}
-        />
+        <ControlsInteractionBridge controlsRef={controlsRef} onInteractionChange={setIsViewportInteracting} />
 
-        <ViewManager
-          isSketchOnly={isSketchOnly}
-          controlsRef={controlsRef}
-        />
+        <ViewManager isSketchOnly={isSketchOnly} controlsRef={controlsRef} />
 
-        <ViewPersistence
-          controlsRef={controlsRef}
-          isSketchOnly={isSketchOnly}
-          onResolved={handleViewPersistenceResolved}
-        />
+        <ViewPersistence controlsRef={controlsRef} isSketchOnly={isSketchOnly} onResolved={handleViewPersistenceResolved} />
 
         <OrbitGifExporterBridge controlsRef={controlsRef} />
 
@@ -3827,10 +394,61 @@ export function Viewport() {
         />
       </Canvas>
 
-      <PerformanceInfoPanel
-        enabled={showPerformanceInfo}
-        stats={performanceInfo}
-      />
+      {/* Toolpath timeline slider */}
+      {(() => {
+        const toolpathObj = objects.find((o) => o.toolpath && o.toolpath.segments.length > 0);
+        if (!toolpathObj?.toolpath) return null;
+        const tp = toolpathObj.toolpath;
+        const totalSegs = tp.segments.length;
+        const elapsed = tp.estimatedTimeSeconds * toolpathProgress;
+        const fmtTime = (s: number) => {
+          const m = Math.floor(s / 60);
+          const sec = Math.floor(s % 60);
+          return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+        };
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'var(--fc-bgPanel)',
+              border: '1px solid var(--fc-border)',
+              borderRadius: 8,
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              minWidth: 340,
+              maxWidth: 520,
+              pointerEvents: 'auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              zIndex: 10,
+            }}
+          >
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', whiteSpace: 'nowrap' }}>{fmtTime(elapsed)}</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={1 / Math.max(1, totalSegs)}
+              value={toolpathProgress}
+              onChange={(e) => setToolpathProgress(parseFloat(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--fc-accent)' }}
+            />
+            <span style={{ fontSize: 11, color: 'var(--fc-textDim)', whiteSpace: 'nowrap' }}>{fmtTime(tp.estimatedTimeSeconds)}</span>
+            <span style={{ fontSize: 10, color: 'var(--fc-textMuted)', whiteSpace: 'nowrap', minWidth: 36, textAlign: 'right' }}>
+              {Math.round(toolpathProgress * 100)}%
+            </span>
+          </div>
+        );
+      })()}
+
+      <PerformanceInfoPanel enabled={showPerformanceInfo} stats={performanceInfo} />
+      <ZoomIndicatorPanel mmPerPx={zoomMmPerPx} />
+
+      {drawFlagEnabled && <DrawToolbar />}
 
       {/* Measure mode indicator */}
       {measureMode && (
@@ -3848,17 +466,22 @@ export function Viewport() {
             fontWeight: 600,
           }}
         >
-          📏 Click to place points, drag markers to adjust
+          Click surfaces, edges, or vertices to measure
         </div>
       )}
 
-      {objectPickSyncEnabled && !measureMode && (
+      {/* Measure info panel */}
+      {measureMode && <MeasureInfoPanel />}
+
+      {(isEvaluating || evaluationPhase === 'exporting') && <EvaluationIndicator phase={evaluationPhase} />}
+
+      {objectPickSyncEnabled && !measureMode && hoverLabel && (
         <div
-          ref={hoverTooltipRef}
           style={{
             position: 'absolute',
-            left: 0,
-            top: 0,
+            left: hoverLabel.x,
+            top: hoverLabel.y,
+            zIndex: 15,
             background: '#111111d9',
             color: '#f2f2f2',
             padding: '3px 7px',
@@ -3869,10 +492,9 @@ export function Viewport() {
             pointerEvents: 'none',
             whiteSpace: 'nowrap',
             transform: 'translate(0, -100%)',
-            visibility: 'hidden',
-            opacity: 0,
           }}
         >
+          {hoverLabel.name}
         </div>
       )}
 
@@ -3896,6 +518,23 @@ export function Viewport() {
         >
           <button
             type="button"
+            onClick={handleGetFaceInfo}
+            style={{
+              width: '100%',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 10px',
+              background: 'transparent',
+              color: 'var(--fc-text)',
+              textAlign: 'left',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            Get Info
+          </button>
+          <button
+            type="button"
             onClick={handleHideObject}
             style={{
               width: '100%',
@@ -3913,6 +552,282 @@ export function Viewport() {
           </button>
         </div>
       )}
+
+      {faceInfoPanel &&
+        (() => {
+          const obj = objects.find((o) => o.id === faceInfoPanel.objectId);
+          if (!obj) return null;
+          const activeFaceName = faceInfoPanel.faceName;
+          const history = activeFaceName ? (faceInfoData?.faceHistories[activeFaceName] ?? null) : null;
+          const faceNames = faceInfoData?.faceNames ?? [];
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                left: Math.min(faceInfoPanel.x, (containerRef.current?.clientWidth ?? 600) - 280 - OBJECT_CONTEXT_MENU_MARGIN),
+                top: faceInfoPanel.y,
+                width: 272,
+                background: 'var(--fc-bgPanel)',
+                border: '1px solid var(--fc-border)',
+                borderRadius: 8,
+                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+                padding: 12,
+                zIndex: 20,
+                fontSize: 12,
+                color: 'var(--fc-text)',
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>Surface History</span>
+                <button
+                  type="button"
+                  onClick={() => setFaceInfoPanel(null)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--fc-textMuted)',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Object name / breadcrumb */}
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--fc-textMuted)',
+                  marginBottom: 10,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {obj.treePath && obj.treePath.length > 0 ? obj.treePath.join(' / ') : obj.name}
+              </div>
+
+              {faceInfoLoading ? (
+                <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>Loading...</div>
+              ) : (
+                <>
+                  {/* Face selector */}
+                  {faceNames.length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 11, color: 'var(--fc-textMuted)', display: 'block', marginBottom: 3 }}>Face</label>
+                      <select
+                        value={activeFaceName ?? ''}
+                        onChange={(e) => setFaceInfoPanel({ ...faceInfoPanel, faceName: e.target.value })}
+                        style={{
+                          width: '100%',
+                          background: 'var(--fc-bgInput)',
+                          border: '1px solid var(--fc-border)',
+                          borderRadius: 4,
+                          color: 'var(--fc-text)',
+                          fontSize: 12,
+                          padding: '4px 6px',
+                        }}
+                      >
+                        {faceNames.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {history && history.timeline.length > 0 ? (
+                    <div>
+                      {history.timeline.map((entry, i) => {
+                        const isFirst = i === 0;
+                        const isLast = i === history.timeline.length - 1;
+                        const color =
+                          entry.category === 'primitive'
+                            ? '#4ade80'
+                            : entry.category === 'sketch'
+                              ? '#60a5fa'
+                              : entry.category === 'modifier'
+                                ? '#fb923c'
+                                : entry.category === 'boolean'
+                                  ? '#c084fc'
+                                  : 'var(--fc-textMuted)';
+                        return (
+                          <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: isLast ? 0 : 6 }}>
+                            {/* Timeline spine */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 14 }}>
+                              <div
+                                style={{
+                                  width: isFirst ? 10 : 8,
+                                  height: isFirst ? 10 : 8,
+                                  borderRadius: '50%',
+                                  background: color,
+                                  flexShrink: 0,
+                                  marginTop: isFirst ? 1 : 2,
+                                  boxShadow: isFirst ? `0 0 0 2px color-mix(in srgb, ${color} 30%, transparent)` : undefined,
+                                }}
+                              />
+                              {!isLast && <div style={{ width: 2, flex: 1, background: 'var(--fc-border)', marginTop: 3 }} />}
+                            </div>
+                            {/* Entry content */}
+                            <div style={{ paddingBottom: isLast ? 0 : 4, minWidth: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fc-text)', lineHeight: 1.3 }}>
+                                {entry.label}
+                                <span
+                                  style={{
+                                    marginLeft: 5,
+                                    fontSize: 9,
+                                    fontWeight: 500,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em',
+                                    color,
+                                    opacity: 0.85,
+                                  }}
+                                >
+                                  {entry.category}
+                                </span>
+                              </div>
+                              {entry.summary && (
+                                <div
+                                  style={{
+                                    fontSize: 10,
+                                    color: 'var(--fc-textMuted)',
+                                    marginTop: 1,
+                                    fontFamily: 'monospace',
+                                    wordBreak: 'break-all',
+                                  }}
+                                >
+                                  {entry.summary}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: 'var(--fc-textMuted)' }}>No history available for this face</div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+      {sketchEntityInfo &&
+        (() => {
+          const ent = sketchEntityInfo.entity;
+          let title = '';
+          let rows: [string, string][] = [];
+          if (ent.kind === 'line') {
+            const len = Math.hypot(ent.b[0] - ent.a[0], ent.b[1] - ent.a[1]);
+            title = `Line — ${ent.id}`;
+            rows = [
+              ['Length', formatLength(len, lengthUnit, 3)],
+              ['Start', formatCoord(ent.a, lengthUnit)],
+              ['End', formatCoord(ent.b, lengthUnit)],
+            ];
+          } else if (ent.kind === 'circle') {
+            title = `Circle — ${ent.id}`;
+            rows = [
+              ['Radius', formatLength(ent.radius, lengthUnit, 3)],
+              ['Diameter', formatLength(ent.radius * 2, lengthUnit, 3)],
+              ['Center', formatCoord(ent.center, lengthUnit)],
+            ];
+          } else if (ent.kind === 'arc') {
+            const sa = Math.atan2(ent.start[1] - ent.center[1], ent.start[0] - ent.center[0]);
+            const ea = Math.atan2(ent.end[1] - ent.center[1], ent.end[0] - ent.center[0]);
+            let span = ea - sa;
+            if (ent.clockwise && span > 0) span -= Math.PI * 2;
+            if (!ent.clockwise && span < 0) span += Math.PI * 2;
+            title = `Arc — ${ent.id}`;
+            rows = [
+              ['Radius', formatLength(ent.radius, lengthUnit, 3)],
+              ['Span', `${(Math.abs(span) * (180 / Math.PI)).toFixed(2)}\u00B0`],
+              ['Length', formatLength(Math.abs(span) * ent.radius, lengthUnit, 3)],
+            ];
+          } else {
+            title = `Point — ${ent.id}`;
+            rows = [
+              ['X', formatLength(ent.position[0], lengthUnit, 3)],
+              ['Y', formatLength(ent.position[1], lengthUnit, 3)],
+            ];
+          }
+          // Find constraints referencing this entity
+          const sketchObj = objects.find((o) => o.sketchMeta);
+          const relatedConstraints = sketchObj?.sketchMeta?.constraints.filter((c) => c.entityIds.includes(ent.id)) ?? [];
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                left: sketchEntityInfo.x,
+                top: sketchEntityInfo.y,
+                width: 248,
+                background: 'var(--fc-bgPanel)',
+                border: '1px solid var(--fc-border)',
+                borderRadius: 8,
+                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.28)',
+                padding: 12,
+                zIndex: 20,
+                fontSize: 12,
+                color: 'var(--fc-text)',
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{title}</span>
+                <button
+                  type="button"
+                  onClick={() => setSketchEntityInfo(null)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--fc-textMuted)',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              {rows.map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+                  <span style={{ color: 'var(--fc-textMuted)', fontSize: 11 }}>{label}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{value}</span>
+                </div>
+              ))}
+              {relatedConstraints.length > 0 && (
+                <div style={{ marginTop: 6, borderTop: '1px solid var(--fc-border)', paddingTop: 6 }}>
+                  <div style={{ fontSize: 10, color: 'var(--fc-textMuted)', marginBottom: 4 }}>
+                    Constraints ({relatedConstraints.length})
+                  </div>
+                  {relatedConstraints.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => useForgeStore.getState().setSelectedConstraintId(c.id)}
+                      style={{
+                        fontSize: 10,
+                        padding: '2px 4px',
+                        borderRadius: 3,
+                        cursor: 'pointer',
+                        color: c.isConflicting ? '#ff6b6b' : c.isRedundant ? '#faad14' : 'var(--fc-text)',
+                      }}
+                    >
+                      {c.label} {c.isDimension && c.value !== undefined ? `= ${c.value}` : c.type}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
     </div>
   );
 }

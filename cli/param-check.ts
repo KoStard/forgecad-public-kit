@@ -12,19 +12,10 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
-import { setParamOverrides } from '../src/forge/params';
-import { collectProjectFiles } from './collect-files';
-import type { RunResult, SceneObject } from '../src/forge/runner';
 import type { Shape } from '../src/forge/kernel';
-
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error('Usage: npx tsx cli/param-check.ts <script.forge.js> [--samples N]');
-  process.exit(1);
-}
-
-const samplesArg = process.argv.indexOf('--samples');
-const NUM_SAMPLES = samplesArg >= 0 ? parseInt(process.argv[samplesArg + 1], 10) : 8;
+import { setParamOverrides } from '../src/forge/params';
+import type { RunResult, SceneObject } from '../src/forge/runner';
+import { collectProjectFiles } from './collect-files';
 
 interface Issue {
   param: string;
@@ -45,7 +36,7 @@ function getShapeEntries(result: RunResult): ShapeEntry[] {
 }
 
 function bboxOverlap(a: ShapeEntry, b: ShapeEntry): boolean {
-  return [0, 1, 2].every(k => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
+  return [0, 1, 2].every((k) => a.min[k] < b.max[k] + 0.1 && a.max[k] > b.min[k] - 0.1);
 }
 
 /** Find collision pairs → set of "nameA|nameB" strings, skipping intra-group */
@@ -53,7 +44,8 @@ function findCollisions(entries: ShapeEntry[]): Map<string, number> {
   const collisions = new Map<string, number>();
   for (let i = 0; i < entries.length; i++) {
     for (let j = i + 1; j < entries.length; j++) {
-      const a = entries[i], b = entries[j];
+      const a = entries[i],
+        b = entries[j];
       if (a.groupName && a.groupName === b.groupName) continue; // same group — skip
       if (!bboxOverlap(a, b)) continue;
       try {
@@ -65,13 +57,25 @@ function findCollisions(entries: ShapeEntry[]): Map<string, number> {
             collisions.set(key, vol);
           }
         }
-      } catch { /* skip degenerate intersection */ }
+      } catch {
+        /* skip degenerate intersection */
+      }
     }
   }
   return collisions;
 }
 
-async function main() {
+function usage(): never {
+  console.error('Usage: forgecad check params <script.forge.js> [--samples N]');
+  process.exit(1);
+}
+
+export async function runParamCheckCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const scriptPath = argv[0];
+  if (!scriptPath) usage();
+
+  const samplesArg = argv.indexOf('--samples');
+  const numSamples = samplesArg >= 0 ? parseInt(argv[samplesArg + 1], 10) : 8;
   const code = readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(scriptPath);
 
@@ -92,7 +96,7 @@ async function main() {
   }
 
   console.log(`✓ Baseline: ${baseline.objects.length} objects, ${params.length} params`);
-  console.log(`  Params: ${params.map(p => `${p.name}=${p.value} [${p.min}..${p.max}]`).join(', ')}`);
+  console.log(`  Params: ${params.map((p) => `${p.name}=${p.value} [${p.min}..${p.max}]`).join(', ')}`);
 
   // Baseline collisions (these are "expected" — don't report them again)
   const baselineEntries = getShapeEntries(baseline);
@@ -112,15 +116,15 @@ async function main() {
 
   // 2. For each param, sample across its range
   const issues: Issue[] = [];
-  const totalRuns = params.length * NUM_SAMPLES;
+  const _totalRuns = params.length * numSamples;
   let runCount = 0;
 
   for (const p of params) {
     const range = p.max - p.min;
     if (range <= 0) continue;
 
-    for (let s = 0; s < NUM_SAMPLES; s++) {
-      const t = s / (NUM_SAMPLES - 1); // 0..1
+    for (let s = 0; s < numSamples; s++) {
+      const t = s / (numSamples - 1); // 0..1
       let value = p.min + t * range;
       if (p.integer) value = Math.round(value);
       if (Math.abs(value - p.value) < (p.step || 0.01)) continue; // skip default
@@ -187,7 +191,7 @@ async function main() {
   setParamOverrides({});
 
   // 3. Report
-  console.log(`\n✓ Checked ${runCount} parameter samples (${NUM_SAMPLES} per param)`);
+  console.log(`\n✓ Checked ${runCount} parameter samples (${numSamples} per param)`);
 
   if (issues.length === 0) {
     console.log('✓ No issues found — all parameter values produce valid geometry.');
@@ -208,31 +212,31 @@ async function main() {
     console.log(`  Parameter "${paramName}":`);
 
     // Group by type and find ranges
-    const errors = paramIssues.filter(i => i.type === 'error');
-    const degenerates = paramIssues.filter(i => i.type === 'degenerate');
-    const collisions = paramIssues.filter(i => i.type === 'collision');
+    const errors = paramIssues.filter((i) => i.type === 'error');
+    const degenerates = paramIssues.filter((i) => i.type === 'degenerate');
+    const collisions = paramIssues.filter((i) => i.type === 'collision');
 
     if (errors.length > 0) {
-      const vals = errors.map(e => e.value).sort((a, b) => a - b);
-      console.log(`    ❌ Runtime error at values: ${vals.map(v => v.toFixed(1)).join(', ')}`);
+      const vals = errors.map((e) => e.value).sort((a, b) => a - b);
+      console.log(`    ❌ Runtime error at values: ${vals.map((v) => v.toFixed(1)).join(', ')}`);
       // Show first unique error
-      const uniqueErrors = [...new Set(errors.map(e => e.detail))];
+      const uniqueErrors = [...new Set(errors.map((e) => e.detail))];
       for (const err of uniqueErrors.slice(0, 2)) {
         console.log(`       ${err}`);
       }
     }
 
     if (degenerates.length > 0) {
-      const vals = degenerates.map(e => e.value).sort((a, b) => a - b);
-      console.log(`    ⚠ Degenerate geometry at values: ${vals.map(v => v.toFixed(1)).join(', ')}`);
+      const vals = degenerates.map((e) => e.value).sort((a, b) => a - b);
+      console.log(`    ⚠ Degenerate geometry at values: ${vals.map((v) => v.toFixed(1)).join(', ')}`);
       for (const d of degenerates.slice(0, 2)) {
         console.log(`       ${d.detail}`);
       }
     }
 
     if (collisions.length > 0) {
-      const vals = collisions.map(e => e.value).sort((a, b) => a - b);
-      console.log(`    💥 New collision at values: ${vals.map(v => v.toFixed(1)).join(', ')}`);
+      const vals = collisions.map((e) => e.value).sort((a, b) => a - b);
+      console.log(`    💥 New collision at values: ${vals.map((v) => v.toFixed(1)).join(', ')}`);
       // Deduplicate collision pairs
       const seen = new Set<string>();
       for (const c of collisions) {
@@ -246,8 +250,3 @@ async function main() {
     console.log('');
   }
 }
-
-main().catch(e => {
-  console.error(e);
-  process.exit(1);
-});

@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { applyTheme, type ThemeName } from './theme';
+import './ui-polish.css';
 
 // Apply saved theme (or default dark) before first render
 applyTheme((localStorage.getItem('fc-theme') as ThemeName) || 'dark');

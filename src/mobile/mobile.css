@@ -1,0 +1,744 @@
+/* ─── ForgeCAD Mobile ─── */
+
+.fc-mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh; /* dynamic viewport height — excludes mobile browser chrome */
+  width: 100vw;
+  overflow: hidden;
+  background: var(--fc-bg);
+  color: var(--fc-text);
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ─── Top bar ─── */
+
+.fc-mobile-topbar {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  background: var(--fc-bgPanel);
+  border-bottom: 1px solid var(--fc-border);
+  gap: 8px;
+  z-index: 10;
+}
+
+.fc-mobile-topbar-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fc-text);
+}
+
+.fc-mobile-topbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  background: none;
+  border: none;
+  color: var(--fc-text);
+  font-size: 13px;
+  padding: 0 8px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.fc-mobile-topbar-btn:active {
+  background: var(--fc-bgHover);
+}
+
+/* ─── Content area ─── */
+
+.fc-mobile-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.fc-mobile-tab-panel {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.fc-mobile-tab-panel[data-active="true"] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Bottom bar ─── */
+
+.fc-mobile-bottombar {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 4px;
+  background: var(--fc-bgPanel);
+  border-top: 1px solid var(--fc-border);
+  gap: 0;
+  z-index: 10;
+}
+
+.fc-mobile-tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 52px;
+  background: none;
+  border: none;
+  color: var(--fc-textMuted);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 0;
+}
+
+.fc-mobile-tab-btn[data-active="true"] {
+  color: var(--fc-accent);
+}
+
+.fc-mobile-tab-btn:active {
+  background: var(--fc-bgHover);
+}
+
+.fc-mobile-tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.fc-mobile-run-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  height: 40px;
+  margin: 0 4px;
+  background: var(--fc-accent);
+  color: var(--fc-accentText, #fff);
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  gap: 6px;
+  padding: 0 16px;
+}
+
+.fc-mobile-run-btn:active {
+  opacity: 0.8;
+}
+
+.fc-mobile-run-btn:disabled {
+  opacity: 0.5;
+}
+
+/* ─── Code editor (overlay pattern: highlighted pre + transparent textarea) ─── */
+
+.fc-mobile-editor-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.fc-mobile-editor-highlight,
+.fc-mobile-editor {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 12px;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  border: none;
+  -webkit-text-size-adjust: none;
+  tab-size: 2;
+  word-wrap: normal;
+}
+
+.fc-mobile-editor-highlight {
+  background: var(--fc-bgInput, var(--fc-bg));
+  color: var(--fc-text);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fc-mobile-editor {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--fc-text);
+  z-index: 1;
+  resize: none;
+  outline: none;
+}
+
+/* ─── highlight.js token colours (tuned for dark themes) ─── */
+.fc-mobile-editor-highlight .hljs-keyword {
+  color: #c586c0;
+}
+.fc-mobile-editor-highlight .hljs-string {
+  color: #ce9178;
+}
+.fc-mobile-editor-highlight .hljs-number {
+  color: #b5cea8;
+}
+.fc-mobile-editor-highlight .hljs-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+.fc-mobile-editor-highlight .hljs-function {
+  color: #dcdcaa;
+}
+.fc-mobile-editor-highlight .hljs-title {
+  color: #dcdcaa;
+}
+.fc-mobile-editor-highlight .hljs-params {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-built_in {
+  color: #4ec9b0;
+}
+.fc-mobile-editor-highlight .hljs-literal {
+  color: #569cd6;
+}
+.fc-mobile-editor-highlight .hljs-attr {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-property {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-variable {
+  color: #9cdcfe;
+}
+.fc-mobile-editor-highlight .hljs-regexp {
+  color: #d16969;
+}
+.fc-mobile-editor-highlight .hljs-operator {
+  color: #d4d4d4;
+}
+.fc-mobile-editor-highlight .hljs-punctuation {
+  color: #d4d4d4;
+}
+
+/* ─── Viewport ─── */
+
+.fc-mobile-viewport {
+  flex: 1;
+  width: 100%;
+  position: relative;
+}
+
+.fc-mobile-viewport-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fc-textDim);
+  font-size: 13px;
+  background: var(--fc-bg);
+  z-index: 5;
+}
+
+/* ─── File picker overlay ─── */
+
+.fc-mobile-filepicker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.fc-mobile-filepicker-sheet {
+  width: 100%;
+  max-height: 60vh;
+  background: var(--fc-bgPanel);
+  border-radius: 12px 12px 0 0;
+  overflow-y: auto;
+  padding: 8px 0;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+
+.fc-mobile-filepicker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--fc-border);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fc-mobile-filepicker-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  background: none;
+  border: none;
+  color: var(--fc-text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  gap: 10px;
+}
+
+.fc-mobile-filepicker-item:active {
+  background: var(--fc-bgHover);
+}
+
+.fc-mobile-filepicker-item[data-active="true"] {
+  color: var(--fc-accent);
+  font-weight: 600;
+}
+
+/* ─── Export sheet ─── */
+
+.fc-mobile-export-sheet {
+  width: 100%;
+  background: var(--fc-bgPanel);
+  border-radius: 12px 12px 0 0;
+  padding: 8px 0;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}
+
+.fc-mobile-export-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 52px;
+  padding: 0 16px;
+  background: none;
+  border: none;
+  color: var(--fc-text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  gap: 12px;
+}
+
+.fc-mobile-export-item:active {
+  background: var(--fc-bgHover);
+}
+
+/* ─── Params panel (inline in code tab) ─── */
+
+.fc-mobile-params {
+  border-top: 1px solid var(--fc-border);
+  padding: 8px 12px;
+  background: var(--fc-bgPanel);
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.fc-mobile-param-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+}
+
+.fc-mobile-param-label {
+  font-size: 12px;
+  color: var(--fc-textMuted);
+  min-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-mobile-param-slider {
+  flex: 1;
+  height: 32px;
+  accent-color: var(--fc-accent);
+}
+
+.fc-mobile-param-value {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fc-text);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ─── Joint / Animation controls ─── */
+
+.fc-mobile-joints {
+  border-top: 1px solid var(--fc-border);
+  background: var(--fc-bgPanel);
+  max-height: 40vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fc-mobile-joints-section {
+  padding: 8px 12px;
+}
+
+.fc-mobile-joints-section + .fc-mobile-joints-section {
+  border-top: 1px solid var(--fc-borderLight, var(--fc-border));
+}
+
+.fc-mobile-joints-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fc-textDim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.fc-mobile-joints-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.fc-mobile-joints-select {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--fc-bgInput, var(--fc-bg));
+  border: 1px solid var(--fc-border);
+  border-radius: 6px;
+  color: var(--fc-text);
+  font-size: 13px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.fc-mobile-joints-playbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--fc-bgInput, var(--fc-bg));
+  border: 1px solid var(--fc-border);
+  border-radius: 6px;
+  color: var(--fc-text);
+  cursor: pointer;
+}
+
+.fc-mobile-joints-playbtn.active {
+  background: var(--fc-accent);
+  border-color: var(--fc-accent);
+  color: var(--fc-accentText, #fff);
+}
+
+.fc-mobile-joints-playbtn:disabled {
+  opacity: 0.4;
+}
+
+.fc-mobile-joints-slider {
+  flex: 1;
+  height: 36px;
+  accent-color: var(--fc-accent);
+}
+
+.fc-mobile-joints-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fc-textDim);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.fc-mobile-joints-info {
+  font-size: 11px;
+  color: var(--fc-textDim);
+  margin-top: 4px;
+}
+
+.fc-mobile-joint-item {
+  margin-bottom: 6px;
+}
+
+.fc-mobile-joint-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.fc-mobile-joint-name {
+  font-size: 12px;
+  color: var(--fc-text);
+}
+
+.fc-mobile-joint-value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  color: var(--fc-accent);
+}
+
+/* ─── Status indicator ─── */
+
+.fc-mobile-status {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fc-bgOverlay, rgba(0, 0, 0, 0.7));
+  color: var(--fc-text);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  z-index: 20;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* ─── Error display ─── */
+
+.fc-mobile-error {
+  padding: 8px 12px;
+  background: var(--fc-errorBg);
+  color: var(--fc-error);
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
+  border-top: 1px solid var(--fc-error);
+}
+
+/* ─── Safe area insets ─── */
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .fc-mobile-bottombar {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(52px + env(safe-area-inset-bottom));
+    min-height: calc(52px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ─── Command Palette ─── */
+
+.fc-mobile-cmdpal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  animation: fc-mobile-fade-in 0.15s ease-out;
+}
+
+@keyframes fc-mobile-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fc-mobile-cmdpal-sheet {
+  width: 100%;
+  max-height: 70vh;
+  background: var(--fc-bgPanel);
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+  animation: fc-mobile-slide-up 0.2s ease-out;
+}
+
+@keyframes fc-mobile-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.fc-mobile-cmdpal-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 8px;
+  gap: 8px;
+}
+
+.fc-mobile-cmdpal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fc-text);
+}
+
+.fc-mobile-cmdpal-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  color: var(--fc-accent);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.fc-mobile-cmdpal-back:active {
+  background: var(--fc-bgHover);
+}
+
+.fc-mobile-cmdpal-close {
+  background: none;
+  border: none;
+  color: var(--fc-accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.fc-mobile-cmdpal-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  background: var(--fc-bgInput, var(--fc-bg));
+  border: 1px solid var(--fc-border);
+  border-radius: 8px;
+}
+
+.fc-mobile-cmdpal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--fc-text);
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+  padding: 0;
+  min-width: 0;
+}
+
+.fc-mobile-cmdpal-input::placeholder {
+  color: var(--fc-textDim);
+}
+
+.fc-mobile-cmdpal-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  color: var(--fc-textMuted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.fc-mobile-cmdpal-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 8px;
+}
+
+.fc-mobile-cmdpal-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: var(--fc-text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  gap: 12px;
+  font-family: inherit;
+}
+
+.fc-mobile-cmdpal-item:active {
+  background: var(--fc-bgHover);
+}
+
+.fc-mobile-cmdpal-item-icon {
+  font-size: 18px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.fc-mobile-cmdpal-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fc-mobile-cmdpal-empty {
+  padding: 20px 16px;
+  text-align: center;
+  color: var(--fc-textDim);
+  font-size: 14px;
+}
+
+/* ── Topbar title as command trigger ── */
+
+.fc-mobile-topbar-title[data-tappable="true"] {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin: 0 -8px;
+}
+
+.fc-mobile-topbar-title[data-tappable="true"]:active {
+  background: var(--fc-bgHover);
+}
+
+/* ─── Spinner ─── */
+
+@keyframes fc-mobile-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fc-mobile-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--fc-textDim);
+  border-top-color: var(--fc-accent);
+  border-radius: 50%;
+  animation: fc-mobile-spin 0.6s linear infinite;
+}

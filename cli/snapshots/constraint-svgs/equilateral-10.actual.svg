@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2.0001 14.0001 12.6605">
+  <g transform="translate(0, 8.6602) scale(1, -1)">
+    <line x1="0" y1="0" x2="10.0001" y2="-0.0001" stroke="black" stroke-width="0.5"/>
+    <line x1="10.0001" y1="-0.0001" x2="5" y2="8.6603" stroke="black" stroke-width="0.5"/>
+    <line x1="5" y1="8.6603" x2="0" y2="0" stroke="black" stroke-width="0.5"/>
+  </g>
+</svg>

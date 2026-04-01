@@ -1,6 +1,6 @@
 // SDF export demo: four-wheel differential-drive rover with a demo world.
 // Run:
-//   npm run sdf -- examples/api/sdf-rover-demo.forge.js
+//   forgecad export sdf examples/api/sdf-rover-demo.forge.js
 //
 // Then launch Gazebo against the generated package:
 //   export GZ_SIM_RESOURCE_PATH="examples/api/sdf-rover-demo.forge.sdfpkg/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
@@ -32,7 +32,7 @@ const baseDeck = box(chassisLength, chassisWidth, chassisHeight, true)
 const roofPod = box(roofLength, roofWidth, roofHeight, true)
   .translate(20, 0, bodyZ + 40);
 
-const bumper = hull3d(
+const bumper = union(
   box(54, bumperWidth, bumperDepth, true).translate(chassisLength * 0.5 - 18, 0, wheelRadius + 6),
   box(bumperLength, bumperWidth - 42, bumperDepth * 0.7, true).translate(chassisLength * 0.5 + 46, 0, wheelRadius - 10),
 ).color('#c8742b');
@@ -156,4 +156,4 @@ robotExport({
   },
 });
 
-return rover.solve().toScene();
+return rover.solve();

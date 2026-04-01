@@ -6,17 +6,21 @@
  * raw coordinate-based primitives and the constraint system.
  */
 
-import { Sketch } from './core';
-import { polygon } from './primitives';
+import type { ProfileCompilePlan } from '../compilePlan';
+import { createCircleProfile } from '../profileOps';
+import { ConstrainedSketchBuilder, type LineId, type PointId } from './constraints';
+import { Sketch, setSketchCompileProfilePlan } from './core';
 import { sketchExtrude } from './extrude';
-import { ConstrainedSketchBuilder, type PointId, type LineId } from './constraints';
-import { TrackedShape, buildRectExtrusionTopology, buildCircleExtrusionTopology } from './topology';
-import { getWasm } from '../kernel';
+import { polygon } from './primitives';
+import { buildCircleExtrusionTopology, buildRectExtrusionTopology, TrackedShape } from './topology';
 
 // ─── Point ───────────────────────────────────────────────────────
 
 export class Point2D {
-  constructor(public readonly x: number, public readonly y: number) {}
+  constructor(
+    public readonly x: number,
+    public readonly y: number,
+  ) {}
 
   distanceTo(other: Point2D): number {
     const dx = other.x - this.x;
@@ -37,6 +41,7 @@ export class Point2D {
   }
 }
 
+/** Create an analytic 2D point for measurement and construction geometry. */
 export function point(x: number, y: number): Point2D {
   return new Point2D(x, y);
 }
@@ -71,10 +76,7 @@ export class Line2D {
     const [dx, dy] = this.direction;
     const nx = -dy * distance;
     const ny = dx * distance;
-    return new Line2D(
-      this.start.translate(nx, ny),
-      this.end.translate(nx, ny),
-    );
+    return new Line2D(this.start.translate(nx, ny), this.end.translate(nx, ny));
   }
 
   /**
@@ -82,10 +84,14 @@ export class Line2D {
    * Returns null if lines are parallel.
    */
   intersect(other: Line2D): Point2D | null {
-    const x1 = this.start.x, y1 = this.start.y;
-    const x2 = this.end.x, y2 = this.end.y;
-    const x3 = other.start.x, y3 = other.start.y;
-    const x4 = other.end.x, y4 = other.end.y;
+    const x1 = this.start.x,
+      y1 = this.start.y;
+    const x2 = this.end.x,
+      y2 = this.end.y;
+    const x3 = other.start.x,
+      y3 = other.start.y;
+    const x4 = other.end.x,
+      y4 = other.end.y;
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if (Math.abs(denom) < 1e-12) return null; // parallel
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
@@ -97,10 +103,14 @@ export class Line2D {
    * Returns null if segments don't cross.
    */
   intersectSegment(other: Line2D): Point2D | null {
-    const x1 = this.start.x, y1 = this.start.y;
-    const x2 = this.end.x, y2 = this.end.y;
-    const x3 = other.start.x, y3 = other.start.y;
-    const x4 = other.end.x, y4 = other.end.y;
+    const x1 = this.start.x,
+      y1 = this.start.y;
+    const x2 = this.end.x,
+      y2 = this.end.y;
+    const x3 = other.start.x,
+      y3 = other.start.y;
+    const x4 = other.end.x,
+      y4 = other.end.y;
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
     if (Math.abs(denom) < 1e-12) return null;
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
@@ -115,21 +125,16 @@ export class Line2D {
 
   static fromPointAndAngle(origin: Point2D, angleDeg: number, length: number): Line2D {
     const rad = angleDeg * (Math.PI / 180);
-    return new Line2D(origin, new Point2D(
-      origin.x + Math.cos(rad) * length,
-      origin.y + Math.sin(rad) * length,
-    ));
+    return new Line2D(origin, new Point2D(origin.x + Math.cos(rad) * length, origin.y + Math.sin(rad) * length));
   }
 
   static fromPointAndDirection(origin: Point2D, dir: [number, number], length: number): Line2D {
     const len = Math.sqrt(dir[0] * dir[0] + dir[1] * dir[1]) || 1;
-    return new Line2D(origin, new Point2D(
-      origin.x + (dir[0] / len) * length,
-      origin.y + (dir[1] / len) * length,
-    ));
+    return new Line2D(origin, new Point2D(origin.x + (dir[0] / len) * length, origin.y + (dir[1] / len) * length));
   }
 }
 
+/** Create an analytic 2D line segment between two points. Provides length, midpoint, angle, intersection, and parallel helpers. */
 export function line(x1: number, y1: number, x2: number, y2: number): Line2D {
   return Line2D.fromCoordinates(x1, y1, x2, y2);
 }
@@ -142,17 +147,20 @@ export class Circle2D {
     public readonly radius: number,
   ) {}
 
-  get diameter(): number { return this.radius * 2; }
-  get circumference(): number { return 2 * Math.PI * this.radius; }
-  get area(): number { return Math.PI * this.radius * this.radius; }
+  get diameter(): number {
+    return this.radius * 2;
+  }
+  get circumference(): number {
+    return 2 * Math.PI * this.radius;
+  }
+  get area(): number {
+    return Math.PI * this.radius * this.radius;
+  }
 
   /** Point on the circle at given angle (degrees, 0=right, CCW) */
   pointAtAngle(angleDeg: number): Point2D {
-    const rad = angleDeg * Math.PI / 180;
-    return new Point2D(
-      this.center.x + Math.cos(rad) * this.radius,
-      this.center.y + Math.sin(rad) * this.radius,
-    );
+    const rad = (angleDeg * Math.PI) / 180;
+    return new Point2D(this.center.x + Math.cos(rad) * this.radius, this.center.y + Math.sin(rad) * this.radius);
   }
 
   translate(dx: number, dy: number): Circle2D {
@@ -160,10 +168,14 @@ export class Circle2D {
   }
 
   toSketch(segments?: number): Sketch {
-    const wasm = getWasm();
-    const cross = wasm.CrossSection.circle(this.radius, segments ?? 0)
-      .translate([this.center.x, this.center.y]);
-    return new Sketch(cross);
+    const cross = createCircleProfile(this.radius, segments ?? 0).translate(this.center.x, this.center.y);
+    const plan: ProfileCompilePlan = {
+      kind: 'circle',
+      radius: this.radius,
+      segments: segments != null && segments > 0 ? segments : undefined,
+      transforms: [{ kind: 'translate', x: this.center.x, y: this.center.y }],
+    };
+    return setSketchCompileProfilePlan(new Sketch(cross), plan);
   }
 
   /** Extrude to TrackedShape with top/bottom/side faces */
@@ -183,6 +195,7 @@ export class Circle2D {
   }
 }
 
+/** Create an analytic 2D circle for measurement, construction, and extrusion. Provides diameter, circumference, area, and toSketch(). */
 export function circle(cx: number, cy: number, radius: number): Circle2D {
   return new Circle2D(new Point2D(cx, cy), radius);
 }
@@ -220,10 +233,14 @@ export class Rectangle2D {
   side(name: RectSide): Line2D {
     const [bl, br, tr, tl] = this.vertices;
     switch (name) {
-      case 'bottom': return new Line2D(bl, br);
-      case 'right': return new Line2D(br, tr);
-      case 'top': return new Line2D(tr, tl);
-      case 'left': return new Line2D(tl, bl);
+      case 'bottom':
+        return new Line2D(bl, br);
+      case 'right':
+        return new Line2D(br, tr);
+      case 'top':
+        return new Line2D(tr, tl);
+      case 'left':
+        return new Line2D(tl, bl);
     }
   }
 
@@ -236,10 +253,14 @@ export class Rectangle2D {
   vertex(name: RectVertex): Point2D {
     const [bl, br, tr, tl] = this.vertices;
     switch (name) {
-      case 'bottom-left': return bl;
-      case 'bottom-right': return br;
-      case 'top-right': return tr;
-      case 'top-left': return tl;
+      case 'bottom-left':
+        return bl;
+      case 'bottom-right':
+        return br;
+      case 'top-right':
+        return tr;
+      case 'top-left':
+        return tl;
     }
   }
 
@@ -250,23 +271,16 @@ export class Rectangle2D {
   }
 
   toSketch(): Sketch {
-    return polygon(this.vertices.map(v => v.toTuple()));
+    return polygon(this.vertices.map((v) => v.toTuple()));
   }
 
   translate(dx: number, dy: number): Rectangle2D {
-    return new Rectangle2D(
-      this.vertices.map(v => v.translate(dx, dy)) as [Point2D, Point2D, Point2D, Point2D],
-    );
+    return new Rectangle2D(this.vertices.map((v) => v.translate(dx, dy)) as [Point2D, Point2D, Point2D, Point2D]);
   }
 
   /** Create from origin corner + width/height (axis-aligned) */
   static fromDimensions(x: number, y: number, width: number, height: number): Rectangle2D {
-    return new Rectangle2D([
-      new Point2D(x, y),
-      new Point2D(x + width, y),
-      new Point2D(x + width, y + height),
-      new Point2D(x, y + height),
-    ]);
+    return new Rectangle2D([new Point2D(x, y), new Point2D(x + width, y), new Point2D(x + width, y + height), new Point2D(x, y + height)]);
   }
 
   /** Create centered at a point */
@@ -287,12 +301,7 @@ export class Rectangle2D {
     const maxX = Math.max(p1.x, p2.x);
     const minY = Math.min(p1.y, p2.y);
     const maxY = Math.max(p1.y, p2.y);
-    return new Rectangle2D([
-      new Point2D(minX, minY),
-      new Point2D(maxX, minY),
-      new Point2D(maxX, maxY),
-      new Point2D(minX, maxY),
-    ]);
+    return new Rectangle2D([new Point2D(minX, minY), new Point2D(maxX, minY), new Point2D(maxX, maxY), new Point2D(minX, maxY)]);
   }
 
   /** Create from three points (free angle). p1-p2 defines one side, p3 gives the height direction. */
@@ -306,12 +315,7 @@ export class Rectangle2D {
     const nx = -uy;
     const ny = ux;
     const proj = (p3.x - p1.x) * nx + (p3.y - p1.y) * ny;
-    return new Rectangle2D([
-      p1,
-      p2,
-      new Point2D(p2.x + nx * proj, p2.y + ny * proj),
-      new Point2D(p1.x + nx * proj, p1.y + ny * proj),
-    ]);
+    return new Rectangle2D([p1, p2, new Point2D(p2.x + nx * proj, p2.y + ny * proj), new Point2D(p1.x + nx * proj, p1.y + ny * proj)]);
   }
 
   /** Extrude this rectangle into a 3D TrackedShape with named faces and edges */
@@ -325,6 +329,7 @@ export class Rectangle2D {
   }
 }
 
+/** Create an analytic 2D rectangle with named sides and vertices. Provides side(), vertex(), contains(), toSketch(), and extrude(). */
 export function rectangle(x: number, y: number, width: number, height: number): Rectangle2D {
   return Rectangle2D.fromDimensions(x, y, width, height);
 }
@@ -337,6 +342,23 @@ export function degrees(deg: number): number {
 /** Convert radians to degrees */
 export function radians(rad: number): number {
   return rad * (180 / Math.PI);
+}
+
+/**
+ * Compute a point by moving a given distance at a given angle from a start point.
+ * Angle is in degrees, measured CCW from the +X axis (standard math convention).
+ * Returns `[x, y]`.
+ *
+ * ```js
+ * polar(10, 45)            // [7.07, 7.07] — from origin
+ * polar(10, 45, [5, 5])    // [12.07, 12.07] — from (5,5)
+ * ```
+ */
+export function polar(length: number, angleDeg: number, from?: [number, number]): [number, number] {
+  const rad = (angleDeg * Math.PI) / 180;
+  const x = (from?.[0] ?? 0) + length * Math.cos(rad);
+  const y = (from?.[1] ?? 0) + length * Math.sin(rad);
+  return [x, y];
 }
 
 // ─── Constraint helpers (global functions) ───────────────────────

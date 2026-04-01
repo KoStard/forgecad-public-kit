@@ -1,24 +1,27 @@
-import type { CrossSection } from 'manifold-3d';
+import type { ProfileCompilePlan } from '../compilePlan';
+import { cloneProfileCompilePlan, profilePlanFromCrossSection } from '../compilePlan';
 import { Shape } from '../kernel';
-import type { BrepProfilePlan } from '../brepPlan';
-import { cloneBrepProfilePlan } from '../brepPlan';
+import type { ProfileBackend } from '../profileBackend';
+import { lowerProfileCompilePlan } from '../profileOps';
+import { faceQueryRefsEqual } from '../queryModel';
 import type { Mat4 } from '../transform';
 import type { FaceRef } from './topology';
+import { type Anchor, cloneSketchPlacementModel, type SketchPlacementModel, type SketchWorkplane } from './workplaneModel';
 
-type Anchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'bottom' | 'left' | 'right';
 type SketchPlacement3D = Mat4;
 export type SketchOperandInput = Sketch | readonly Sketch[];
 
-const _sketchBrepProfilePlans = new WeakMap<Sketch, BrepProfilePlan | null>();
+const _sketchCompileProfilePlans = new WeakMap<Sketch, ProfileCompilePlan>();
 const _sketchPlacement3D = new WeakMap<Sketch, SketchPlacement3D | null>();
+const _sketchPlacementModels = new WeakMap<Sketch, SketchPlacementModel | null>();
 
-function setSketchBrepProfilePlanInternal(sketch: Sketch, plan: BrepProfilePlan | null): Sketch {
-  _sketchBrepProfilePlans.set(sketch, cloneBrepProfilePlan(plan));
+function setSketchCompileProfilePlanInternal(sketch: Sketch, plan: ProfileCompilePlan): Sketch {
+  _sketchCompileProfilePlans.set(sketch, cloneProfileCompilePlan(plan)!);
   return sketch;
 }
 
 function cloneSketchPlacement3D(placement: SketchPlacement3D | null): SketchPlacement3D | null {
-  return placement ? [...placement] as SketchPlacement3D : null;
+  return placement ? ([...placement] as SketchPlacement3D) : null;
 }
 
 function setSketchPlacement3DInternal(sketch: Sketch, placement: SketchPlacement3D | null): Sketch {
@@ -26,28 +29,50 @@ function setSketchPlacement3DInternal(sketch: Sketch, placement: SketchPlacement
   return sketch;
 }
 
+function setSketchPlacementModelInternal(sketch: Sketch, model: SketchPlacementModel | null): Sketch {
+  _sketchPlacementModels.set(sketch, cloneSketchPlacementModel(model));
+  return sketch;
+}
+
+/**
+ * 2D profile for extrusion, revolve, and other operations.
+ *
+ * Supports transforms (translate, rotate, scale, mirror), booleans (add, subtract, intersect),
+ * offset, simplify, warp, extrude, revolve, and queries (area, bounds, isEmpty, numVert).
+ * All operations are immutable and return new sketches.
+ */
 export class Sketch {
   public colorHex: string | undefined;
 
-  constructor(public readonly cross: CrossSection, color?: string) {
+  constructor(
+    public readonly cross: ProfileBackend,
+    color?: string,
+  ) {
     this.colorHex = color;
-    setSketchBrepProfilePlanInternal(this, null);
+    setSketchCompileProfilePlanInternal(this, profilePlanFromCrossSection(cross));
     setSketchPlacement3DInternal(this, null);
+    setSketchPlacementModelInternal(this, null);
   }
 
   /** Set the color of this sketch (hex string, e.g. "#ff0000") */
   color(value: string | undefined): Sketch {
-    return setSketchPlacement3DInternal(
-      setSketchBrepProfilePlanInternal(new Sketch(this.cross, value), getSketchBrepProfilePlan(this)),
-      getSketchPlacement3D(this),
+    return setSketchPlacementModelInternal(
+      setSketchPlacement3DInternal(
+        setSketchCompileProfilePlanInternal(new Sketch(this.cross, value), getSketchCompileProfilePlan(this)),
+        getSketchPlacement3D(this),
+      ),
+      getSketchPlacementModel(this),
     );
   }
 
   /** Return a new Sketch wrapper for explicit duplication in scripts. */
   clone(): Sketch {
-    return setSketchPlacement3DInternal(
-      setSketchBrepProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchBrepProfilePlan(this)),
-      getSketchPlacement3D(this),
+    return setSketchPlacementModelInternal(
+      setSketchPlacement3DInternal(
+        setSketchCompileProfilePlanInternal(new Sketch(this.cross, this.colorHex), getSketchCompileProfilePlan(this)),
+        getSketchPlacement3D(this),
+      ),
+      getSketchPlacementModel(this),
     );
   }
 
@@ -56,52 +81,130 @@ export class Sketch {
     return this.clone();
   }
 
-  area(): number { return this.cross.area(); }
-  bounds() { return this.cross.bounds(); }
-  isEmpty(): boolean { return this.cross.isEmpty(); }
-  numVert(): number { return this.cross.numVert(); }
-  toPolygons() { return this.cross.toPolygons(); }
+  /** Area in mm squared. */
+  area(): number {
+    return this.cross.area();
+  }
+  /** Bounding box as { min: [x,y], max: [x,y] }. */
+  bounds() {
+    return this.cross.bounds();
+  }
+  /** True if the sketch contains no area. */
+  isEmpty(): boolean {
+    return this.cross.isEmpty();
+  }
+  /** Vertex count of the polygon representation. */
+  numVert(): number {
+    return this.cross.numVert();
+  }
+  toPolygons() {
+    return this.cross.toPolygons();
+  }
 
   // Method declarations (implementations added by feature modules)
-  translate(x: number, y?: number): Sketch { throw new Error('Not implemented'); }
-  rotate(degrees: number): Sketch { throw new Error('Not implemented'); }
-  rotateAround(degrees: number, pivot: [number, number]): Sketch { throw new Error('Not implemented'); }
-  scale(v: number | [number, number]): Sketch { throw new Error('Not implemented'); }
-  mirror(ax: [number, number]): Sketch { throw new Error('Not implemented'); }
-  add(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  subtract(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  intersect(...others: SketchOperandInput[]): Sketch { throw new Error('Not implemented'); }
-  offset(delta: number, join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.offset(delta, join), this.colorHex));
+  translate(_x: number, _y?: number): Sketch {
+    throw new Error('Not implemented');
   }
-  hull(): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.hull(), this.colorHex));
+  rotate(_degrees: number): Sketch {
+    throw new Error('Not implemented');
   }
-  simplify(epsilon = 1e-6): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.simplify(epsilon), this.colorHex));
+  rotateAround(_degrees: number, _pivot: [number, number]): Sketch {
+    throw new Error('Not implemented');
   }
-  warp(fn: (vert: [number, number]) => void): Sketch {
-    return copySketchPlacement3D(this, new Sketch(this.cross.warp(fn as any), this.colorHex));
+  scale(_v: number | [number, number]): Sketch {
+    throw new Error('Not implemented');
   }
-  extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean; }): Shape | any { throw new Error('Not implemented'); }
-  revolve(degrees?: number, segments?: number): Shape { throw new Error('Not implemented'); }
-  attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [number, number]): Sketch { throw new Error('Not implemented'); }
+  mirror(_ax: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
+  add(..._others: SketchOperandInput[]): Sketch {
+    throw new Error('Not implemented');
+  }
+  subtract(..._others: SketchOperandInput[]): Sketch {
+    throw new Error('Not implemented');
+  }
+  intersect(..._others: SketchOperandInput[]): Sketch {
+    throw new Error('Not implemented');
+  }
+  offset(_delta: number, _join: 'Square' | 'Round' | 'Miter' = 'Round'): Sketch {
+    throw new Error('Not implemented');
+  }
+  /**
+   * Decompose this sketch into its distinct filled regions. See `sketchRegions()`.
+   * Regions are returned largest-first by area.
+   */
+  regions(): Sketch[] {
+    throw new Error('Not implemented');
+  }
+
+  /**
+   * Select the single filled region that contains the given 2D seed point.
+   * Throws if the seed is outside all regions. See `sketchRegion()`.
+   */
+  region(_seed: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
+
+  /** Extrude this 2D sketch along Z to create a 3D solid. Supports twist, scale tapering, and centering. */
+  extrude(
+    _height: number,
+    _opts?: { twist?: number; divisions?: number; scaleTop?: number | [number, number]; center?: boolean },
+  ): Shape | any {
+    throw new Error('Not implemented');
+  }
+  /** Revolve this 2D sketch around the Y axis to create a 3D solid of revolution. */
+  revolve(_degrees?: number, _segments?: number): Shape {
+    throw new Error('Not implemented');
+  }
+  attachTo(_target: Sketch, _targetAnchor: Anchor, _selfAnchor?: Anchor, _offset?: [number, number]): Sketch {
+    throw new Error('Not implemented');
+  }
   onFace(
-    parentOrFace: Shape | { toShape(): Shape } | { _bbox(): { min: number[]; max: number[] } } | FaceRef,
-    faceOrOpts?: 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom' | string | FaceRef | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
-    opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
-  ): Sketch { throw new Error('Not implemented'); }
+    _parentOrFace: Shape | { toShape(): Shape } | { _bbox(): { min: number[]; max: number[] } } | FaceRef,
+    _faceOrOpts?:
+      | 'front'
+      | 'back'
+      | 'left'
+      | 'right'
+      | 'top'
+      | 'bottom'
+      | string
+      | FaceRef
+      | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
+    _opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor },
+  ): Sketch {
+    throw new Error('Not implemented');
+  }
 }
 
-export type { Anchor };
+export type {
+  Anchor,
+  SketchFace3D,
+  SketchPlacementModel,
+  SketchWorkplane,
+} from './workplaneModel';
 
-export function getSketchBrepProfilePlan(sketch: Sketch): BrepProfilePlan | null {
-  return cloneBrepProfilePlan(_sketchBrepProfilePlans.get(sketch) ?? null);
+export function getSketchCompileProfilePlan(sketch: Sketch): ProfileCompilePlan {
+  const stored = _sketchCompileProfilePlans.get(sketch);
+  if (!stored) {
+    // Fallback: snapshot the cross-section geometry as polygon plan.
+    const fallback = profilePlanFromCrossSection(sketch.cross);
+    _sketchCompileProfilePlans.set(sketch, fallback);
+    return cloneProfileCompilePlan(fallback)!;
+  }
+  return cloneProfileCompilePlan(stored)!;
 }
 
-export function setSketchBrepProfilePlan(sketch: Sketch, plan: BrepProfilePlan | null): Sketch {
-  return setSketchBrepProfilePlanInternal(sketch, plan);
+export function setSketchCompileProfilePlan(sketch: Sketch, plan: ProfileCompilePlan): Sketch {
+  return setSketchCompileProfilePlanInternal(sketch, plan);
 }
+
+export function buildSketchFromCompileProfilePlan(plan: ProfileCompilePlan, color?: string): Sketch {
+  return setSketchCompileProfilePlan(new Sketch(lowerProfileCompilePlan(plan), color), plan);
+}
+
+export const getSketchBrepProfilePlan = getSketchCompileProfilePlan;
+export const setSketchBrepProfilePlan = setSketchCompileProfilePlan;
 
 export function getSketchPlacement3D(sketch: Sketch): SketchPlacement3D | null {
   return cloneSketchPlacement3D(_sketchPlacement3D.get(sketch) ?? null);
@@ -111,8 +214,23 @@ export function setSketchPlacement3D(sketch: Sketch, placement: SketchPlacement3
   return setSketchPlacement3DInternal(sketch, placement);
 }
 
+export function getSketchPlacementModel(sketch: Sketch): SketchPlacementModel | null {
+  return cloneSketchPlacementModel(_sketchPlacementModels.get(sketch) ?? null);
+}
+
+export function setSketchPlacementModel(sketch: Sketch, model: SketchPlacementModel | null): Sketch {
+  return setSketchPlacementModelInternal(sketch, model);
+}
+
+export function getSketchWorkplane(sketch: Sketch): SketchWorkplane | null {
+  return cloneSketchPlacementModel(_sketchPlacementModels.get(sketch) ?? null)?.workplane ?? null;
+}
+
 export function copySketchPlacement3D(source: Sketch, target: Sketch): Sketch {
-  return setSketchPlacement3DInternal(target, getSketchPlacement3D(source));
+  return setSketchPlacementModelInternal(
+    setSketchPlacement3DInternal(target, getSketchPlacement3D(source)),
+    getSketchPlacementModel(source),
+  );
 }
 
 function matricesNearlyEqual(a: SketchPlacement3D | null, b: SketchPlacement3D | null, eps = 1e-8): boolean {
@@ -123,11 +241,49 @@ function matricesNearlyEqual(a: SketchPlacement3D | null, b: SketchPlacement3D |
   return true;
 }
 
+function workplanesNearlyEqual(a: SketchWorkplane | null, b: SketchWorkplane | null, eps = 1e-8): boolean {
+  if (a == null || b == null) return a == null && b == null;
+  if (!faceQueryRefsEqual(a.source, b.source)) return false;
+
+  const vectors = [
+    [a.origin, b.origin],
+    [a.u, b.u],
+    [a.v, b.v],
+    [a.normal, b.normal],
+  ] as const;
+  for (const [lhs, rhs] of vectors) {
+    for (let index = 0; index < lhs.length; index += 1) {
+      if (Math.abs(lhs[index] - rhs[index]) > eps) return false;
+    }
+  }
+  return true;
+}
+
+function placementModelsNearlyEqual(a: SketchPlacementModel | null, b: SketchPlacementModel | null, eps = 1e-8): boolean {
+  if (a == null || b == null) return a == null && b == null;
+  return (
+    workplanesNearlyEqual(a.workplane, b.workplane, eps) &&
+    Math.abs(a.u - b.u) <= eps &&
+    Math.abs(a.v - b.v) <= eps &&
+    Math.abs(a.protrude - b.protrude) <= eps &&
+    a.selfAnchor === b.selfAnchor
+  );
+}
+
 export function mergeSketchPlacement3D(sketches: Sketch[]): SketchPlacement3D | null {
   if (sketches.length === 0) return null;
   const first = getSketchPlacement3D(sketches[0]);
   for (let i = 1; i < sketches.length; i += 1) {
     if (!matricesNearlyEqual(first, getSketchPlacement3D(sketches[i]))) return null;
+  }
+  return first;
+}
+
+export function mergeSketchPlacementModel(sketches: Sketch[]): SketchPlacementModel | null {
+  if (sketches.length === 0) return null;
+  const first = getSketchPlacementModel(sketches[0]);
+  for (let i = 1; i < sketches.length; i += 1) {
+    if (!placementModelsNearlyEqual(first, getSketchPlacementModel(sketches[i]))) return null;
   }
   return first;
 }

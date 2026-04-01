@@ -8,21 +8,10 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { init, runScript } from '../src/forge/headless';
-import { collectProjectFiles } from './collect-files';
+import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
 import type { SceneObject } from '../src/forge/runner';
 import type { DimensionDef } from '../src/forge/sketch/dimensions';
-import { mapDimensionsToOwnerIds } from '../src/forge/reportDimensionOwnership';
-
-const scriptPath = process.argv[2];
-if (!scriptPath) {
-  console.error('Usage: npx tsx cli/debug-dimensions.ts <script.forge.js> [--all] [--dim-angle-tol 12]');
-  process.exit(1);
-}
-
-const showAll = process.argv.includes('--all');
-const tolFlagIndex = process.argv.indexOf('--dim-angle-tol');
-const tolValue = tolFlagIndex >= 0 ? Number(process.argv[tolFlagIndex + 1]) : NaN;
-const dimAngleTolDeg = Number.isFinite(tolValue) ? Math.max(0, tolValue) : 12;
+import { collectProjectFiles } from './collect-files';
 
 type Vec3 = [number, number, number];
 type ReportViewId = 'front' | 'right' | 'top' | 'iso';
@@ -37,9 +26,14 @@ type DimensionOwnership = {
 const VIEW_IDS: ReportViewId[] = ['front', 'right', 'top', 'iso'];
 
 function inBounds(p: Vec3, min: number[], max: number[], pad = 1e-4): boolean {
-  return p[0] >= min[0] - pad && p[0] <= max[0] + pad
-    && p[1] >= min[1] - pad && p[1] <= max[1] + pad
-    && p[2] >= min[2] - pad && p[2] <= max[2] + pad;
+  return (
+    p[0] >= min[0] - pad &&
+    p[0] <= max[0] + pad &&
+    p[1] >= min[1] - pad &&
+    p[1] <= max[1] + pad &&
+    p[2] >= min[2] - pad &&
+    p[2] <= max[2] + pad
+  );
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -51,11 +45,7 @@ function dot(a: Vec3, b: Vec3): number {
 }
 
 function cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function norm(v: Vec3): Vec3 {
@@ -93,16 +83,13 @@ function isDimensionVisibleInView(dim: DimensionDef, frame: ViewFrame, tolerance
   const d: Vec3 = [dir[0] / len, dir[1] / len, dir[2] / len];
   const alignRight = clamp(Math.abs(dot(d, frame.right)), 0, 1);
   const alignUp = clamp(Math.abs(dot(d, frame.up)), 0, 1);
-  const angleRight = Math.acos(alignRight) * 180 / Math.PI;
-  const angleUp = Math.acos(alignUp) * 180 / Math.PI;
+  const angleRight = (Math.acos(alignRight) * 180) / Math.PI;
+  const angleUp = (Math.acos(alignUp) * 180) / Math.PI;
   const minAngle = Math.min(angleRight, angleUp);
   return minAngle <= toleranceDeg;
 }
 
-function mapDimensionsToOwners(
-  dimensions: DimensionDef[],
-  objects: ShapeObjectWithBounds[],
-): DimensionOwnership {
+function mapDimensionsToOwners(dimensions: DimensionDef[], objects: ShapeObjectWithBounds[]): DimensionOwnership {
   const byDimensionId = mapDimensionsToOwnerIds(
     dimensions,
     objects.map((obj) => ({ id: obj.id, name: obj.name, bbox: obj.bb as { min: Vec3; max: Vec3 } })),
@@ -116,7 +103,20 @@ function mapDimensionsToOwners(
   return { combinedCount, byDimensionId };
 }
 
-async function main() {
+function usage(): never {
+  console.error('Usage: forgecad debug dimensions <script.forge.js> [--all] [--dim-angle-tol 12]');
+  process.exit(1);
+}
+
+export async function runDebugDimensionsCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const scriptPath = argv[0];
+  if (!scriptPath) usage();
+
+  const showAll = argv.includes('--all');
+  const tolFlagIndex = argv.indexOf('--dim-angle-tol');
+  const tolValue = tolFlagIndex >= 0 ? Number(argv[tolFlagIndex + 1]) : NaN;
+  const dimAngleTolDeg = Number.isFinite(tolValue) ? Math.max(0, tolValue) : 12;
+
   const abs = resolve(scriptPath);
   const code = readFileSync(abs, 'utf-8');
   const { allFiles, fileName } = collectProjectFiles(abs);
@@ -129,7 +129,10 @@ async function main() {
   }
 
   const objects = result.objects.filter((o): o is ShapeObject => !!o.shape);
-  const objectBounds: ShapeObjectWithBounds[] = objects.map((obj) => ({ ...obj, bb: obj.shape.boundingBox() as { min: number[]; max: number[] } }));
+  const objectBounds: ShapeObjectWithBounds[] = objects.map((obj) => ({
+    ...obj,
+    bb: obj.shape.boundingBox() as { min: number[]; max: number[] },
+  }));
   const dims = result.dimensions;
   const viewFrames = new Map<ReportViewId, ViewFrame>(VIEW_IDS.map((id) => [id, makeViewFrame(id)]));
   const ownership = mapDimensionsToOwners(dims, objectBounds);
@@ -174,9 +177,7 @@ async function main() {
         return !!frame && isDimensionVisibleInView(d, frame, dimAngleTolDeg);
       });
       const ownerIds = ownership.byDimensionId.get(d.id) || [];
-      const ownershipLabel = ownerIds.length === 1
-        ? `component:${idToName.get(ownerIds[0]) || ownerIds[0]}`
-        : 'combined';
+      const ownershipLabel = ownerIds.length === 1 ? `component:${idToName.get(ownerIds[0]) || ownerIds[0]}` : 'combined';
       const explicit = d.components && d.components.length > 0 ? ` explicit=[${d.components.join(', ')}]` : '';
       console.log(
         `  ${label}: [${d.from.join(', ')}] -> [${d.to.join(', ')}], offset=${d.offset}, views=[${visibleViews.join(', ')}], report=${ownershipLabel}${explicit}`,
@@ -184,8 +185,3 @@ async function main() {
     }
   }
 }
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

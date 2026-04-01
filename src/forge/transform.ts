@@ -1,9 +1,21 @@
 export type Vec3 = [number, number, number];
 export type Mat4 = [
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
 ];
 
 export type TransformInput = Transform | Mat4;
@@ -28,11 +40,7 @@ function dotVec3(a: Vec3, b: Vec3): number {
 }
 
 function crossVec3(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function lengthVec3(v: Vec3): number {
@@ -55,7 +63,7 @@ function signedAngleAroundAxis(from: Vec3, to: Vec3, axis: Vec3): number {
   const tn = scaleVec3(to, 1 / toLen);
   const sin = dotVec3(axis, crossVec3(fn, tn));
   const cos = dotVec3(fn, tn);
-  return Math.atan2(sin, cos) * 180 / Math.PI;
+  return (Math.atan2(sin, cos) * 180) / Math.PI;
 }
 
 function shortestAlignedAngle(from: Vec3, target: Vec3, axis: Vec3): number {
@@ -120,12 +128,7 @@ export function solveRotateAroundAngle(
 }
 
 function identityMatrix(): Mat4 {
-  return [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1,
-  ];
+  return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 }
 
 function toMat4(input: TransformInput): Mat4 {
@@ -153,7 +156,9 @@ function normalizeVec3(v: Vec3): Vec3 {
 }
 
 function transformPoint(m: Mat4, p: Vec3, w: 0 | 1): Vec3 {
-  const x = p[0], y = p[1], z = p[2];
+  const x = p[0],
+    y = p[1],
+    z = p[2];
   return [
     m[0] * x + m[4] * y + m[8] * z + m[12] * w,
     m[1] * x + m[5] * y + m[9] * z + m[13] * w,
@@ -164,10 +169,22 @@ function transformPoint(m: Mat4, p: Vec3, w: 0 | 1): Vec3 {
 function invertMat4(m: Mat4): Mat4 {
   const out = new Array<number>(16);
 
-  const a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3];
-  const a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7];
-  const a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11];
-  const a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15];
+  const a00 = m[0],
+    a01 = m[1],
+    a02 = m[2],
+    a03 = m[3];
+  const a10 = m[4],
+    a11 = m[5],
+    a12 = m[6],
+    a13 = m[7];
+  const a20 = m[8],
+    a21 = m[9],
+    a22 = m[10],
+    a23 = m[11];
+  const a30 = m[12],
+    a31 = m[13],
+    a32 = m[14],
+    a33 = m[15];
 
   const b00 = a00 * a11 - a01 * a10;
   const b01 = a00 * a12 - a02 * a10;
@@ -222,29 +239,19 @@ export class Transform {
   }
 
   static translation(x: number, y: number, z: number): Transform {
-    return new Transform([
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      x, y, z, 1,
-    ]);
+    return new Transform([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
   }
 
   static scale(v: number | Vec3): Transform {
     const sx = typeof v === 'number' ? v : v[0];
     const sy = typeof v === 'number' ? v : v[1];
     const sz = typeof v === 'number' ? v : v[2];
-    return new Transform([
-      sx, 0, 0, 0,
-      0, sy, 0, 0,
-      0, 0, sz, 0,
-      0, 0, 0, 1,
-    ]);
+    return new Transform([sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1]);
   }
 
   static rotationAxis(axis: Vec3, angleDeg: number, pivot: Vec3 = [0, 0, 0]): Transform {
     const [ux, uy, uz] = normalizeVec3(axis);
-    const rad = angleDeg * Math.PI / 180;
+    const rad = (angleDeg * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
@@ -263,21 +270,10 @@ export class Transform {
     const ty = py - (m10 * px + m11 * py + m12 * pz);
     const tz = pz - (m20 * px + m21 * py + m22 * pz);
 
-    return new Transform([
-      m00, m10, m20, 0,
-      m01, m11, m21, 0,
-      m02, m12, m22, 0,
-      tx, ty, tz, 1,
-    ]);
+    return new Transform([m00, m10, m20, 0, m01, m11, m21, 0, m02, m12, m22, 0, tx, ty, tz, 1]);
   }
 
-  static rotateAroundTo(
-    axis: Vec3,
-    pivot: Vec3,
-    movingPoint: Vec3,
-    targetPoint: Vec3,
-    options: RotateAroundToOptions = {},
-  ): Transform {
+  static rotateAroundTo(axis: Vec3, pivot: Vec3, movingPoint: Vec3, targetPoint: Vec3, options: RotateAroundToOptions = {}): Transform {
     const angleDeg = solveRotateAroundAngle(axis, pivot, movingPoint, targetPoint, options);
     return Transform.rotationAxis(axis, angleDeg, pivot);
   }

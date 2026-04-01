@@ -1,0 +1,176 @@
+# Post-MLP Example Phase
+
+Date: 2026-03-12
+
+## Why This Gate Exists
+
+Task 230 closed the MLP truthfulness lane for the defended compiler-owned subset,
+but that still left a repo-wide question unanswered:
+
+- what does it mean for the broader `examples/` surface to "work with the new setup"?
+
+The answer now lives in one checked manifest plus one CLI gate:
+
+- manifest: `cli/example-manifest/`
+- gate command: `forgecad check examples`
+
+This is the shared phase-entry contract for all example migration work that
+lands after MLP.
+
+## Gate Definition
+
+`forgecad check examples` now does four things together:
+
+1. inventories every `.forge.js` and `.forge-notebook.json` under `examples/`
+2. fails if any example artifact is unclassified or if a manifest entry points at a missing file
+3. runs the validation path assigned to each example class
+4. enforces declared compiler-route expectations for part examples that are inside the active architecture gate
+
+The command fails when:
+
+- a new example file appears without a manifest entry
+- a checked manifest path no longer exists
+- an example's assigned validation path fails
+- a `part` example declared as `exact` no longer stays on the exact route for its selected primary shapes
+- a `part` example declared as `faceted` no longer blocks exact export or no longer succeeds on the allow-faceted route
+
+## Manifest Structure
+
+The manifest is intentionally split so later tasks do not all edit one file:
+
+- `cli/example-manifest/api-and-corpus.ts`
+  API part examples plus the compiler corpus
+- `cli/example-manifest/product-demos.ts`
+  top-level product/demo parts plus `examples/shelf/`
+- `cli/example-manifest/non-part.ts`
+  assemblies, runtime-scene examples, sketches, and notebooks
+- `cli/example-manifest/experimental.ts`
+  temporary fenced examples outside the active architecture claim
+- `cli/example-manifest/types.ts`
+  shared class, route, and helper definitions
+
+That split lines up with the next migration waves:
+
+- task 250 owns API parts plus compiler corpus routes
+- task 260 owns product/demo part routes
+- task 270 owns assembly/runtime/sketch/notebook validation behavior
+- task 280 owns the temporary fence and remaining holdouts
+
+## Example Classes
+
+- `part`
+  Runtime execution is always required. Route assertions apply only when the
+  manifest declares `exact` or `faceted`; `holdout` still has to run but stays
+  outside the exact-route claim for now.
+- `assembly`
+  The example must execute successfully and still emit an assembly-style solved
+  scene. It is not judged by exact part-lowering parity.
+- `runtime-scene`
+  The example must execute successfully as a viewport/report/runtime scene.
+  These are active examples, but they are not evidence of exact part export.
+- `sketch`
+  The example validates through the sketch path: it must produce at least one
+  real sketch payload that can be turned into polygons.
+- `notebook`
+  The example validates through its preview-cell path, matching the CLI
+  behavior for notebook execution.
+- `experimental`
+  The example still has to run, but it is explicitly fenced away from the
+  architecture-phase claim until follow-up work decides whether it remains part
+  of the maintained example surface.
+
+## Non-Part Boundary
+
+The non-part families are inside the architecture-phase gate, but they do not
+all claim exact part-lowering parity.
+
+The manifest now makes that boundary explicit through four dedicated validation
+paths:
+
+- `assembly-runtime`
+  Executes the example, requires an assembly-style solved scene, and can assert
+  assembly-owned runtime surfaces such as grouped scene emission, `jointsView()`
+  controls, or collected `robotExport(...)` data.
+- `runtime-scene`
+  Executes the example as an active viewport/report/runtime scene without
+  treating it as evidence of exact part export. When the example is about a
+  specific runtime surface, the manifest can assert that surface directly
+  through counts such as BOM entries, cut planes, runtime joints, animations,
+  or grouped scene structure.
+- `sketch-svg`
+  Validates sketch-only examples through the sketch export path by rendering
+  their returned sketch payloads to SVG, rather than by asking the part gate to
+  pretend they are solids.
+- `notebook-preview`
+  Materializes and executes the notebook preview cell, so notebook examples are
+  judged through the same preview contract used by the CLI entrypoints.
+
+This keeps assemblies, runtime demos, sketch-only files, and notebooks visible
+to repo checks without falsely implying that every example is part of the exact
+part-lowering scorecard.
+
+## Part Route Semantics
+
+Part entries can currently declare three intentional route states:
+
+- `exact`
+  The selected primary shape objects must stay on the exact compiler route.
+- `faceted`
+  Exact export must remain blocked for the selected primary shapes, and the
+  allow-faceted route must succeed with explicit diagnostics.
+- `holdout`
+  The example is inventory-covered and still runtime-checked, but it is
+  temporarily outside the architecture gate until its migration task commits an
+  honest route expectation.
+
+When an example mixes helper solids with one primary blocker, the manifest can
+name `primaryShapes` explicitly so the route contract applies to the intended
+shape objects instead of every returned solid.
+
+## Current State After Tasks 250, 260, And 280
+
+The landed starting inventory is:
+
+- 96 example artifacts total
+- 31 API part examples
+- 8 compiler-corpus parts
+- 34 product/demo part examples
+- 21 non-part artifacts
+- 2 experimental fences
+
+Current part-route counts:
+
+- 63 `exact`
+- 10 `faceted`
+- 0 `holdout`
+
+The migrated example families now contribute:
+
+- 24 API part examples on `exact`
+- 7 API part examples on `faceted`
+- all 8 compiler-corpus parts on `exact`
+- 31 product/demo part examples on `exact`
+- 3 product/demo part examples on `faceted`
+
+Task 280 closed the ambiguous mixed-route holdout lane by scoping route
+contracts onto the blocked primary shapes inside those galleries:
+
+- `examples/api/extrude-options.forge.js`
+  - `Twisted` and `Twist + Taper` now carry the faceted contract.
+  - The plain, tapered, and centered variants remain exact companions in the same gallery.
+- `examples/api/gears-tier1.forge.js`
+  - `Spur Pinion`, `Spur Gear`, and `Ring Gear` now carry the faceted contract.
+  - `Rack Gear` remains an exact companion in the same gallery.
+- `examples/chess-set.forge.js`
+  - The four knight bodies now carry the faceted contract because they still rely on `hull3d()`.
+  - The board and all non-knight pieces remain exact companions in the same scene.
+
+The only examples still outside the active architecture phase are now the two
+temporary experimental fences:
+
+- `examples/sandbox.forge.js`
+- `examples/test-colors.forge.js`
+
+Task 290 closes this gate review in:
+
+- `architecture-phase-entry-review.md`

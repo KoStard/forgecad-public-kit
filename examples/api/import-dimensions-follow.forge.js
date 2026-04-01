@@ -1,11 +1,11 @@
-const left = importPart("api/dimensioned-bracket.forge.js", {
+const left = require("api/dimensioned-bracket.forge.js", {
   "Width": 55,
   "Height": 45,
   "Depth": 28,
   "Thickness": 4,
 }).translate(-80, 0, 0);
 
-const right = importPart("api/dimensioned-bracket.forge.js", {
+const right = require("api/dimensioned-bracket.forge.js", {
   "Width": 55,
   "Height": 45,
   "Depth": 28,

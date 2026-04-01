@@ -214,8 +214,11 @@ const spoolRod = cylinder(spoolW + 20, 3).pointAlong([1, 0, 0])
   .translate(-(spoolW + 20) / 2, spoolY, spoolZ);
 add("Spool Rod", spoolRod, C.lead);
 
-add("Spool Shell", lib.pipe(spoolW, spoolR, 4).pointAlong([1, 0, 0])
-  .translate(-spoolW / 2, spoolY, spoolZ), C.spool);
+const spoolShell = cylinder(spoolW, spoolR)
+  .subtract(cylinder(spoolW + 2, spoolR - 4).translate(0, 0, -1))
+  .pointAlong([1, 0, 0])
+  .translate(-spoolW / 2, spoolY, spoolZ);
+add("Spool Shell", spoolShell, C.spool);
 add("Filament Roll", cylinder(spoolW - 4, spoolR - 6).pointAlong([1, 0, 0])
   .translate(-spoolW / 2 + 2, spoolY, spoolZ), C.filament);
 add("Spool Hub", cylinder(spoolW, 8).pointAlong([1, 0, 0])

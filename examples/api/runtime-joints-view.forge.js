@@ -102,15 +102,15 @@ jointsView({
       duration: 1.8,
       loop: true,
       keyframes: [
-        { at: 0.0, values: { Hip: 18, Knee: 42 } },
-        { at: 0.25, values: { Hip: -20, Knee: 22 } },
-        { at: 0.5, values: { Hip: 8, Knee: 86 } },
-        { at: 0.75, values: { Hip: 24, Knee: 34 } },
-        { at: 1.0, values: { Hip: 18, Knee: 42 } },
+        { values: { Hip: 18, Knee: 42 } },
+        { values: { Hip: -20, Knee: 22 } },
+        { values: { Hip: 8, Knee: 86 } },
+        { values: { Hip: 24, Knee: 34 } },
+        { values: { Hip: 18, Knee: 42 } },
       ],
     },
   ],
   defaultAnimation: 'Step',
 });
 
-return solved.toScene();
+return solved;

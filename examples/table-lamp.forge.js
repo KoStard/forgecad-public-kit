@@ -16,7 +16,7 @@ const base = cylinder(baseH, baseR);
 const stem = cylinder(stemH, stemR).translate(0, 0, baseH);
 
 // --- Shade: revolve the imported profile ---
-const shadeProfile = importSketch("lamp-shade.sketch.js", {
+const shadeProfile = require("lamp-shade.forge.js", {
   "Top Radius": shadeTopR,
   "Bottom Radius": shadeBottomR,
   "Shade Height": shadeH,

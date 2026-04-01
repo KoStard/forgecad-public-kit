@@ -8,18 +8,32 @@ ForgeCAD is a multi-backend CAD system with a JavaScript/TypeScript modeling API
 
 TypeScript is the file format. The browser is the CAD system.
 
-[API Reference](docs/permanent/API/README.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
+[**Try it in your browser →**](https://kostard.github.io/ForgeCAD) • [API Reference](docs/permanent/API/README.md) • [CLI Docs](docs/permanent/CLI.md) • [Vision](docs/permanent/VISION.md) • [Examples](examples)
 
-## Start Here
+## Install
+
+```bash
+npm install -g forgecad
+forgecad studio /path/to/your/project
+```
+
+Or without a project folder to start from a blank scratch file:
+
+```bash
+forgecad studio --blank
+```
+
+## Start Here (contributors)
 
 ```bash
 npm install
-npm run dev
+npm link
+forgecad studio
 ```
 
 Then open `http://localhost:5173`.
 
-`npm run dev` opens the `./examples` project by default, so you can edit and save files immediately.
+`forgecad studio` opens the packaged `./examples` project by default, so you can edit and save files immediately.
 
 ## Why ForgeCAD
 
@@ -28,7 +42,7 @@ Most geometry kernels are powerful but low-level. ForgeCAD adds the missing CAD 
 - Constraint-driven sketch workflows
 - Named entities and topology-aware operations
 - Parametric design via `param(...)` sliders
-- Multi-file composition with `importPart(...)`, `importSketch(...)`, and plain `.js` utility modules
+- Multi-file composition with `require(path, paramOverrides?)` and plain `.js` utility modules
 - Assembly + mechanism modeling with joints, sweeps, and collision checks
 - Script-authored BOM + dimension annotations for report export
 - Exact STEP/BREP export for the maintained replayable subset
@@ -37,7 +51,7 @@ The result is a CAD workflow that is version-control friendly, AI-editable, and 
 
 ### JS utility modules
 
-ForgeCAD model files (`.forge.js`, `.sketch.js`) can now use standard JS imports for shared helpers:
+ForgeCAD model files (`.forge.js`) can now use standard JS imports for shared helpers:
 
 ```javascript
 import { buildAssembly } from "./assembly-utils.js";
@@ -52,7 +66,7 @@ import { box, union } from "forgecad";
 
 Modules can also use top-level `return` (including arrays) as the module value, as long as they do not also define exports in the same file.
 
-Use `importPart()` / `importSketch()` when you want the specialized model/sketch import behavior (parameter scoping, SVG parsing, dimension propagation). Use plain JS modules for reusable functions, classes, and constants. See [examples/api/js-module-imports.forge.js](examples/api/js-module-imports.forge.js).
+Use `require("./file.forge.js", { Param: value })` to import model files with optional parameter overrides (parameter scoping, dimension propagation). Use `importSvgSketch()` for SVG files. Use plain JS modules for reusable functions, classes, and constants. See [examples/api/js-module-imports.forge.js](examples/api/js-module-imports.forge.js).
 
 ## Seamless AI integration
 
@@ -61,7 +75,30 @@ ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain 
 - `docs/permanent/` explains the modeling API and workflows
 - `examples/api/` provides concrete model patterns to copy and adapt
 - browser + CLI run the same engine, so AI-generated scripts behave consistently
-- the generated Codex skill is maintained via [docs/processes/MAINTAINING_FORGECAD_SKILL.md](docs/processes/MAINTAINING_FORGECAD_SKILL.md)
+- the generated Codex skill is rebuilt with `npm run build:skill:forgecad`
+
+### Agent skill (Claude Code, Codex, OpenCode, …)
+
+Install a self-contained ForgeCAD skill for coding agents that support the `~/.agents/skills/` convention (all API docs inlined — no repo required):
+
+```bash
+forgecad skill install        # model-authoring docs (for users building models)
+forgecad skill install --dev  # + internals, coding conventions, skill maintenance (for ForgeCAD developers)
+```
+
+This copies a pre-built `SKILL.md` to `~/.agents/skills/forgecad/SKILL.md`. Reload your agent to activate. Run again after upgrading ForgeCAD to pick up updated docs.
+
+The **standard** skill covers primitives, sketch, assembly, SDF, export, and CLI commands — everything needed to author `.forge.js` models. The **dev** skill adds compiler internals, constraint solver architecture, coding conventions, release processes, and skill system maintenance docs — for agents working on ForgeCAD itself.
+
+### Chat UI (Claude.ai, ChatGPT, Gemini, …)
+
+No CLI agent? Generate a single self-contained context file with all ForgeCAD API docs and paste it into any chat session:
+
+```bash
+forgecad skill one-file ~/Desktop/forgecad-context.md
+```
+
+The file includes a preamble explaining the chat-UI setup: the AI has no shell access, so it will ask you to run commands like `forgecad run <file>` and paste back the output for validation and iteration.
 
 ### Instructions for AI model generation
 
@@ -70,13 +107,14 @@ When an AI model is asked to generate ForgeCAD models, require this workflow:
 1. Read `docs/permanent/API/model-building/README.md` first.
 2. Read every file listed there.
 3. Read the relevant files in `examples/api/` next.
-4. Only then generate or modify `.forge.js` / `.sketch.js` models.
-5. Read `docs/permanent/API/runtime/` or `docs/permanent/API/output/` only if the task explicitly needs viewport behavior, reporting, or export.
+4. If the task is exploratory, unfamiliar, or likely to need debugging, start in a `.forge-notebook.json` and iterate there first.
+5. Only then stabilize the result as `.forge.js`, or keep using the notebook when iteration is still active.
+6. Read `docs/permanent/API/runtime/` or `docs/permanent/API/output/` only if the task explicitly needs viewport behavior, reporting, or export.
 
 Use this instruction in prompts to avoid missing API capabilities or producing invalid model code:
 
 ```text
-Before generating any ForgeCAD model code, read docs/permanent/API/model-building/README.md, then every file it lists, then the relevant files in examples/api/. Only read docs/permanent/API/runtime/ or docs/permanent/API/output/ if the task explicitly needs those areas. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
+Before generating any ForgeCAD model code, read docs/permanent/API/model-building/README.md, then every file it lists, then the relevant files in examples/api/. If the task is exploratory, unfamiliar, or likely to need debugging, start in a .forge-notebook.json and iterate there first. Only read docs/permanent/API/runtime/ or docs/permanent/API/output/ if the task explicitly needs those areas. Then generate a runnable model using only documented ForgeCAD APIs and patterns from those files.
 ```
 
 Example AI workflows:
@@ -149,25 +187,44 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 
 ```bash
 npm install
-npm run dev
+npm link          # puts forgecad in PATH
+npm run build:cli # build the CLI (~2s, needed after CLI changes)
+forgecad studio   # opens ./examples by default
 ```
 
 Open `http://localhost:5173`.
 
-This starts ForgeCAD with the `./examples` folder loaded.
+`npm run build:cli` is the fast daily-driver build. Run `npm run build` (20s+) only when you need the production SPA in `dist/` — e.g. before publishing or testing the production server path.
+
+### Troubleshooting
+
+**`wasm32-unknown-unknown target not found` during solver build**
+
+The solver compiles to WebAssembly via `wasm-pack`, which requires the `wasm32-unknown-unknown` Rust target. If you installed Rust through Homebrew (`brew install rust`), this target isn't available and the build will fail.
+
+Fix: switch to [rustup](https://rustup.rs), which manages targets natively:
+
+```bash
+brew uninstall rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env        # or: source ~/.cargo/env.fish
+rustup target add wasm32-unknown-unknown
+```
+
+Then re-run `npm run build`.
 
 ### Open your own project folder
 
 ```bash
-npm run open -- /path/to/your/project
+forgecad studio /path/to/your/project
 ```
 
-Use `--` before the path. ForgeCAD loads `.forge.js` and `.sketch.js` files from that folder, with disk-backed save.
+ForgeCAD loads `.forge.js` files from that folder, with disk-backed save.
 
 ### Blank scratch mode (optional)
 
 ```bash
-npm run dev:blank
+forgecad studio --blank
 ```
 
 Starts ForgeCAD without a project folder (single in-memory scratch file).
@@ -208,24 +265,33 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 
 | Task | Command |
 | --- | --- |
-| Validate a script | `npm run test-run -- examples/cup.forge.js` |
-| Render PNG views | `npm run render -- examples/cup.forge.js` |
-| Render orbit GIF (solid + wireframe) | `npm run gif -- examples/cup.forge.js` |
-| Export sketch SVG | `npm run svg -- examples/frame.sketch.js` |
-| Export exact STEP (supported subset only) | `npm run step -- examples/api/brep-exportable.forge.js` |
-| Export exact BREP (supported subset only) | `npm run brep -- examples/api/brep-exportable.forge.js` |
-| Generate report PDF | `npm run report -- examples/cup.forge.js` |
-| Parameter robustness scan | `npm run param-check -- examples/shoe-rack-doors.forge.js --samples 10` |
-| Transform invariants | `npm run check:transforms` |
-| Dimension propagation invariants | `npm run check:dimensions` |
+| Validate a script | `forgecad run examples/cup.forge.js` |
+| Validate a notebook preview | `forgecad run examples/api/notebook-iteration.forge-notebook.json` |
+| Inspect notebook cells in the terminal | `forgecad notebook view examples/api/notebook-iteration.forge-notebook.json preview` |
+| Render PNG views | `forgecad render examples/cup.forge.js` |
+| Render a notebook preview | `forgecad render examples/api/notebook-iteration.forge-notebook.json` |
+| Render orbit GIF (solid + wireframe) | `forgecad capture gif examples/cup.forge.js` |
+| List notebook capture options | `forgecad capture gif examples/api/notebook-assembly-debug.forge-notebook.json --list` |
+| Export sketch SVG | `forgecad export svg examples/constraints/01-fully-constrained-rect.forge.js` |
+| Export exact STEP (supported subset only) | `forgecad export step examples/api/brep-exportable.forge.js` |
+| Export exact BREP (supported subset only) | `forgecad export brep examples/api/brep-exportable.forge.js` |
+| Generate report PDF | `forgecad export report examples/cup.forge.js` |
+| Parameter robustness scan | `forgecad check params examples/shoe-rack-doors.forge.js --samples 10` |
+| Install agent skill (Claude Code, Codex, OpenCode…) | `forgecad skill install [--dev]` |
+| Export all docs as a single file for chat-UI paste | `forgecad skill one-file ~/Desktop/forgecad-context.md` |
+| Prune merged local-only branches | `uv run cli/forge-prune-local-branches.py` |
+| Transform invariants | `forgecad check transforms` |
+| Dimension propagation invariants | `forgecad check dimensions` |
 
 ### CLI details
 
 - `render` outputs multi-angle PNGs (`front`, `side`, `top`, `iso`) by default.
-- `gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
-- `svg` runs fully in Node (no browser/Puppeteer).
-- `report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
-- `param-check` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
+- For `forgecad run`, `forgecad render`, `forgecad capture gif`, and `forgecad capture mp4`, passing a `.forge-notebook.json` uses that notebook's preview cell.
+- `capture gif` outputs a single orbit animation with a full solid pass, then full wireframe pass.
+- `export svg` runs fully in Node (no browser/Puppeteer).
+- `export report` generates searchable-text PDF pages (overview, unique components, BOM, dimensions).
+- `check params` samples parameter ranges and reports runtime errors, degenerates, and new collisions.
+- `uv run cli/forge-prune-local-branches.py` is a `uv` + Rich utility that reviews local-only branches already merged into `mainline`, removes linked worktrees first, and asks before each deletion.
 
 ## Start with these examples
 
@@ -240,13 +306,15 @@ All CLI tools use the same runtime as the browser (`src/forge/headless.ts`), so 
 - `examples/api/exploded-view.forge.js`: exploded layouts + cut-plane visualization
 - `examples/api/brep-exportable.forge.js`: exact-exportable STEP/BREP subset demo
 - `examples/api/geometry-info.forge.js`: inspect backend/provenance info for solids
+- `examples/api/notebook-iteration.forge-notebook.json`: stateful part exploration with pinned intermediate geometry
+- `examples/api/notebook-assembly-debug.forge-notebook.json`: assembly collision and sweep investigation in notebook cells
 
 BREP export support is intentionally tracked as a living parity table in [docs/permanent/API/output/brep-export.md](docs/permanent/API/output/brep-export.md).
 
 ## Core architecture
 
 ```text
-User script (.forge.js / .sketch.js)
+User script (.forge.js)
         |
         v
 ForgeCAD modeling layer
@@ -277,6 +345,22 @@ Planned/ongoing areas include:
 
 See [Vision](docs/permanent/VISION.md) for the longer-term direction.
 
+## Publishing to npm
+
+```bash
+npm login          # first time only
+npm version patch  # or minor / major
+npm publish        # runs npm run build automatically before publishing
+```
+
+Verify what gets included before publishing:
+
+```bash
+npm pack --dry-run
+```
+
+The build produces `dist/` (browser SPA), `dist-cli/` (CLI bundle), and `dist-skill/` (self-contained Claude Code skill). All three are included in the published package. End users get a fast production server; contributors without a built `dist/` automatically fall back to the Vite dev server.
+
 ## Contributing
 
 Contributions are welcome. Good first contributions:
@@ -288,15 +372,15 @@ Contributions are welcome. Good first contributions:
 Suggested local validation before opening a PR:
 
 ```bash
-npm run test-run -- examples/cup.forge.js
-npm run check:transforms
-npm run check:dimensions
+forgecad run examples/cup.forge.js
+forgecad check transforms
+forgecad check dimensions
 ```
 
 If your change is parametric-heavy, also run:
 
 ```bash
-npm run param-check -- path/to/your-example.forge.js --samples 10
+forgecad check params path/to/your-example.forge.js --samples 10
 ```
 
 ## Additional docs

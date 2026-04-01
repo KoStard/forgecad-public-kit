@@ -1,7 +1,7 @@
 const postHeight = param("Post Height", 26, { min: 12, max: 60, unit: "mm" });
 
 const base = box(48, 32, 8, true);
-const post = cylinder(postHeight, 5, undefined, 48, true)
+const post = cylinder(postHeight, 5, undefined, undefined, true)
   .translate(12, 0, 4 + postHeight / 2);
 
 return union(base, post)

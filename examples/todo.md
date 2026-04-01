@@ -1,2 +1,0 @@
-Create 2 rectangles in some random locations and angles, then create a constraint forcing them to be parallel.
-Then add another one, and add impossible constraint, one making it parallel with rect1, and one making it perpendicular with rect2. Show that it rejects.

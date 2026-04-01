@@ -34,66 +34,106 @@ export interface Theme {
   viewportBg: string;
   gridCell: string;
   gridSection: string;
+
+  // Sketch
+  sketchEdge: string;
+  sketchPoint: string;
+  sketchConstruction: string;
+  sketchSurface: string;
+  sketchConstraint: string;
+  sketchConstraintDim: string;
+  sketchConflicting: string;
+  sketchRedundant: string;
+  sketchSelected: string;
+  sketchFullyConstrained: string;
+  sketchUnderConstrained: string;
+  sketchOverConstrained: string;
 }
 
 const dark: Theme = {
-  bg: '#1e1e1e',
-  bgPanel: '#1f1f1f',
-  bgSurface: '#252525',
-  bgHover: '#2d2d2d',
-  bgActive: '#37373d',
-  bgInput: '#111',
-  bgOverlay: '#202020',
+  bg: '#0d1117',
+  bgPanel: '#161b22',
+  bgSurface: '#1c2128',
+  bgHover: '#242b35',
+  bgActive: '#2d333b',
+  bgInput: '#0a0e14',
+  bgOverlay: '#131920',
 
-  text: '#ccc',
-  textMuted: '#aaa',
-  textDim: '#888',
+  text: '#d2dce6',
+  textMuted: '#8b949e',
+  textDim: '#636e7b',
 
-  border: '#333',
-  borderLight: '#2b2b2b',
+  border: '#30363d',
+  borderLight: '#21262d',
 
-  accent: '#4a9eff',
-  accentText: '#fff',
+  accent: '#58a6ff',
+  accentText: '#ffffff',
 
-  error: '#f48771',
-  errorBg: '#3a1d1d',
-  success: '#6a9955',
-  successBg: '#1a2a1a',
-  warning: '#ffcc00',
+  error: '#f85149',
+  errorBg: '#301a1f',
+  success: '#3fb950',
+  successBg: '#122117',
+  warning: '#d29922',
 
-  viewportBg: '#252526',
-  gridCell: '#404040',
-  gridSection: '#555',
+  viewportBg: '#161b22',
+  gridCell: '#30363d',
+  gridSection: '#484f58',
+
+  sketchEdge: '#e6edf3',
+  sketchPoint: '#ffffff',
+  sketchConstruction: '#636e7b',
+  sketchSurface: '#58a6ff',
+  sketchConstraint: '#3fb950',
+  sketchConstraintDim: '#3fb950',
+  sketchConflicting: '#f85149',
+  sketchRedundant: '#d29922',
+  sketchSelected: '#f0883e',
+  sketchFullyConstrained: '#3fb950',
+  sketchUnderConstrained: '#58a6ff',
+  sketchOverConstrained: '#f85149',
 };
 
 const light: Theme = {
-  bg: '#f5f5f5',
-  bgPanel: '#ffffff',
-  bgSurface: '#eaeaea',
-  bgHover: '#e0e0e0',
-  bgActive: '#d0d8e0',
-  bgInput: '#fff',
-  bgOverlay: '#f0f0f0',
+  bg: '#f0f4f8',
+  bgPanel: '#f8fafc',
+  bgSurface: '#e8edf2',
+  bgHover: '#dfe5ec',
+  bgActive: '#d2dae3',
+  bgInput: '#f8fafc',
+  bgOverlay: '#eef2f6',
 
-  text: '#1e1e1e',
-  textMuted: '#555',
-  textDim: '#888',
+  text: '#1e293b',
+  textMuted: '#506175',
+  textDim: '#8494a7',
 
-  border: '#d0d0d0',
-  borderLight: '#e0e0e0',
+  border: '#d5dde5',
+  borderLight: '#e2e8ef',
 
-  accent: '#0070d6',
-  accentText: '#fff',
+  accent: '#2563eb',
+  accentText: '#ffffff',
 
-  error: '#d32f2f',
+  error: '#dc2626',
   errorBg: '#fde8e8',
-  success: '#2e7d32',
-  successBg: '#e8f5e9',
-  warning: '#e6a700',
+  success: '#16a34a',
+  successBg: '#e5f6ec',
+  warning: '#d97706',
 
-  viewportBg: '#e8e8e8',
-  gridCell: '#c0c0c0',
-  gridSection: '#a0a0a0',
+  viewportBg: '#e4eaf0',
+  gridCell: '#c5ced8',
+  gridSection: '#9baab8',
+
+  sketchEdge: '#1e293b',
+  sketchPoint: '#0f172a',
+  sketchConstruction: '#8494a7',
+  sketchSurface: '#2563eb',
+  sketchConstraint: '#16a34a',
+  sketchConstraintDim: '#16a34a',
+  sketchConflicting: '#dc2626',
+  sketchRedundant: '#d97706',
+  sketchSelected: '#ca8a04',
+  sketchFullyConstrained: '#16a34a',
+  sketchUnderConstrained: '#2563eb',
+  sketchOverConstrained: '#dc2626',
 };
 
 const gruvbox: Theme = {
@@ -119,6 +159,19 @@ const gruvbox: Theme = {
   viewportBg: '#1d2021',
   gridCell: '#504945',
   gridSection: '#7c6f64',
+
+  sketchEdge: '#ebdbb2',
+  sketchPoint: '#fbf1c7',
+  sketchConstruction: '#7c6f64',
+  sketchSurface: '#458588',
+  sketchConstraint: '#b8bb26',
+  sketchConstraintDim: '#b8bb26',
+  sketchConflicting: '#fb4934',
+  sketchRedundant: '#fabd2f',
+  sketchSelected: '#fe8019',
+  sketchFullyConstrained: '#b8bb26',
+  sketchUnderConstrained: '#83a598',
+  sketchOverConstrained: '#fb4934',
 };
 
 const tokyoNight: Theme = {
@@ -144,6 +197,19 @@ const tokyoNight: Theme = {
   viewportBg: '#16161e',
   gridCell: '#292e42',
   gridSection: '#3b4261',
+
+  sketchEdge: '#c0caf5',
+  sketchPoint: '#dfe5fa',
+  sketchConstruction: '#565f89',
+  sketchSurface: '#7aa2f7',
+  sketchConstraint: '#9ece6a',
+  sketchConstraintDim: '#9ece6a',
+  sketchConflicting: '#f7768e',
+  sketchRedundant: '#e0af68',
+  sketchSelected: '#ff9e64',
+  sketchFullyConstrained: '#9ece6a',
+  sketchUnderConstrained: '#7aa2f7',
+  sketchOverConstrained: '#f7768e',
 };
 
 const kanagawaLotus: Theme = {
@@ -169,6 +235,19 @@ const kanagawaLotus: Theme = {
   viewportBg: '#e7dba0',
   gridCell: '#c9c08a',
   gridSection: '#a8a070',
+
+  sketchEdge: '#545464',
+  sketchPoint: '#3a3a4a',
+  sketchConstruction: '#8a8980',
+  sketchSurface: '#597b8c',
+  sketchConstraint: '#6f894e',
+  sketchConstraintDim: '#6f894e',
+  sketchConflicting: '#c84053',
+  sketchRedundant: '#cc6d00',
+  sketchSelected: '#d27e19',
+  sketchFullyConstrained: '#6f894e',
+  sketchUnderConstrained: '#4d699b',
+  sketchOverConstrained: '#c84053',
 };
 
 export const themes: Record<ThemeName, Theme> = { dark, light, gruvbox, 'tokyo-night': tokyoNight, 'kanagawa-lotus': kanagawaLotus };

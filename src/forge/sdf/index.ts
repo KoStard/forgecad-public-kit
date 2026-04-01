@@ -1,0 +1,67 @@
+/**
+ * SDF module barrel export.
+ *
+ * The `sdf` namespace is the user-facing API. Internal types (SdfNode, evaluator)
+ * are imported directly by the backend lowering code.
+ */
+
+export type {
+  BasketWeaveOptions,
+  BlendOptions,
+  BrickOptions,
+  HoneycombOptions,
+  KnurlOptions,
+  NoiseOptions,
+  PerforatedOptions,
+  ScalesOptions,
+  SdfToShapeOptions,
+  SurfaceDisplaceOptions,
+  TpmsOptions,
+  VoronoiOptions,
+  WavesOptions,
+  WeaveOptions,
+} from './sdf';
+export {
+  // Surface patterns (displacement)
+  basketWeave,
+  bend,
+  blend,
+  box,
+  // Surface patterns (intersection)
+  brick,
+  capsule,
+  cone,
+  cylinder,
+  diamond,
+  // Custom
+  fromFunction,
+  // TPMS
+  gyroid,
+  // Patterns
+  honeycomb,
+  knurl,
+  lidinoid,
+  morph,
+  // Noise
+  noise,
+  perforated,
+  repeat,
+  scales,
+  // Builder class
+  SdfShape,
+  schwarzP,
+  smoothDifference,
+  smoothIntersection,
+  // Smooth combinators
+  smoothUnion,
+  // Primitives
+  sphere,
+  // Surface pattern type
+  SurfacePattern,
+  torus,
+  // Domain ops
+  twist,
+  voronoi,
+  waves,
+  weave,
+} from './sdf';

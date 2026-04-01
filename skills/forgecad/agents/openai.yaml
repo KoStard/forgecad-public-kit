@@ -1,4 +1,0 @@
-interface:
-  display_name: "ForgeCAD"
-  short_description: "Build ForgeCAD models via API and CLI"
-  default_prompt: "Use $forgecad to build or edit this ForgeCAD model, including multi-file and notebook workflows."

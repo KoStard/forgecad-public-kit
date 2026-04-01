@@ -108,4 +108,4 @@ if (sweptCollisions > 0) {
 console.log("BOM", solved.bom());
 console.log("BOM CSV\n" + solved.bomCsv());
 
-return solved.toScene();
+return solved;

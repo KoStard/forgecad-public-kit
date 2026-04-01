@@ -1,0 +1,341 @@
+/* ============================================================
+   ForgeCAD — Global UI Polish Layer
+   Adds transitions, hover states, custom scrollbars, and micro-
+   interactions to every interactive element in the app.
+   ============================================================ */
+
+/* --- Selection color --- */
+::selection {
+  background: var(--fc-accent);
+  color: var(--fc-accentText);
+}
+
+/* --- Custom scrollbars (WebKit + Firefox) --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--fc-border);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fc-textDim);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--fc-border) transparent;
+}
+
+/* --- Universal interactive element transitions --- */
+button,
+[role="button"],
+a,
+input,
+select,
+textarea {
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.1s ease;
+}
+
+/* --- Button hover/active/focus states --- */
+button:not(:disabled):hover,
+[role="button"]:not(:disabled):hover {
+  filter: brightness(1.15);
+}
+button:not(:disabled):active,
+[role="button"]:not(:disabled):active {
+  transform: scale(0.97);
+}
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--fc-accent);
+  outline-offset: 1px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- fc-btn: Themed button class for toolbar/panel buttons --- */
+.fc-btn {
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--fc-textMuted);
+  border: 1px solid var(--fc-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+.fc-btn:hover {
+  background: var(--fc-bgHover);
+  color: var(--fc-text);
+  border-color: var(--fc-textDim);
+}
+.fc-btn:active {
+  background: var(--fc-bgActive);
+}
+.fc-btn.active {
+  background: var(--fc-accent);
+  color: var(--fc-accentText);
+  border-color: var(--fc-accent);
+}
+.fc-btn.active:hover {
+  filter: brightness(1.1);
+}
+
+/* --- fc-icon-btn: Small icon-only button --- */
+.fc-icon-btn {
+  padding: 4px;
+  background: transparent;
+  color: var(--fc-textDim);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.fc-icon-btn:hover {
+  background: var(--fc-bgHover);
+  color: var(--fc-text);
+  border-color: var(--fc-border);
+}
+
+/* --- Panel section headers --- */
+.fc-panel-header {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--fc-textDim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.fc-panel-header:hover {
+  background: var(--fc-bgHover);
+  color: var(--fc-textMuted);
+}
+
+/* --- Separator --- */
+.fc-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--fc-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* --- Toolbar --- */
+.fc-toolbar {
+  padding: 6px 12px;
+  background: var(--fc-bgHover);
+  border-bottom: 1px solid var(--fc-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+/* --- Input fields --- */
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+textarea,
+select {
+  background: var(--fc-bgInput);
+  border: 1px solid var(--fc-border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  color: var(--fc-text);
+  font-size: 12px;
+  font-family: inherit;
+}
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--fc-accent);
+  box-shadow: 0 0 0 1px var(--fc-accent);
+}
+
+/* --- Tooltip-like subtle shadow for floating elements --- */
+.fc-floating {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Animations --- */
+@keyframes fc-fadein {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fc-fadein-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fc-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes fc-slide-out-right {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+@keyframes fc-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes fc-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes fc-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes fc-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --- Range inputs (sliders) --- */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--fc-border);
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fc-accent);
+  cursor: pointer;
+  border: 2px solid var(--fc-bgPanel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fc-accent);
+  cursor: pointer;
+  border: 2px solid var(--fc-bgPanel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Color input --- */
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--fc-border);
+  border-radius: 4px;
+  padding: 1px;
+  cursor: pointer;
+  background: transparent;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+/* --- Resize handle polish --- */
+.fc-resize-handle {
+  transition: background 0.15s ease;
+}
+.fc-resize-handle:hover {
+  background: var(--fc-bgActive);
+}

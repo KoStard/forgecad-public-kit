@@ -1,12 +1,12 @@
 // Relative import paths: ./ resolves from this file's folder.
 
-const left = importPart("./import-args-unit.forge.js", {
+const left = require("./import-args-unit.forge.js", {
   "Width": 26,
   "Height": 22,
   "Depth": 9,
 }).translate(-24, 0, 0);
 
-const right = importPart("./import-args-unit.forge.js", {
+const right = require("./import-args-unit.forge.js", {
   "Width": 46,
   "Height": 18,
   "Depth": 12,

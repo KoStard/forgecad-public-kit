@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useForgeStore } from '../store/forgeStore';
+import { fileSystem } from '../fs';
 import {
   appendNotebookCell,
   cellSourceToString,
   deleteNotebookCell,
+  type ForgeNotebookOutput,
   parseNotebook,
   resolveNotebookPreviewCellId,
   serializeNotebook,
   upsertNotebookCellSource,
-  type ForgeNotebookOutput,
 } from '../notebook/model';
+import { useForgeStore } from '../store/forgeStore';
 
 const panelStyle: React.CSSProperties = {
   display: 'flex',
@@ -34,7 +35,18 @@ const buttonStyle: React.CSSProperties = {
 function OutputBlock({ output }: { output: ForgeNotebookOutput }) {
   if (output.output_type === 'error') {
     return (
-      <div style={{ border: '1px solid var(--fc-error)', background: 'rgba(224, 82, 82, 0.08)', color: 'var(--fc-error)', borderRadius: 8, padding: 12, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+      <div
+        style={{
+          border: '1px solid var(--fc-error)',
+          background: 'rgba(224, 82, 82, 0.08)',
+          color: 'var(--fc-error)',
+          borderRadius: 8,
+          padding: 12,
+          fontFamily: 'monospace',
+          fontSize: 12,
+          whiteSpace: 'pre-wrap',
+        }}
+      >
         {[output.evalue, ...output.traceback].join('\n')}
       </div>
     );
@@ -42,14 +54,36 @@ function OutputBlock({ output }: { output: ForgeNotebookOutput }) {
 
   if (output.output_type === 'stream') {
     return (
-      <div style={{ border: '1px solid var(--fc-border)', background: 'var(--fc-bgSurface)', color: output.name === 'stderr' ? 'var(--fc-error)' : 'var(--fc-textMuted)', borderRadius: 8, padding: 12, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+      <div
+        style={{
+          border: '1px solid var(--fc-border)',
+          background: 'var(--fc-bgSurface)',
+          color: output.name === 'stderr' ? 'var(--fc-error)' : 'var(--fc-textMuted)',
+          borderRadius: 8,
+          padding: 12,
+          fontFamily: 'monospace',
+          fontSize: 12,
+          whiteSpace: 'pre-wrap',
+        }}
+      >
         {output.text.join('\n')}
       </div>
     );
   }
 
   return (
-    <div style={{ border: '1px solid var(--fc-border)', background: 'var(--fc-bgSurface)', borderRadius: 8, padding: 12, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--fc-text)' }}>
+    <div
+      style={{
+        border: '1px solid var(--fc-border)',
+        background: 'var(--fc-bgSurface)',
+        borderRadius: 8,
+        padding: 12,
+        fontFamily: 'monospace',
+        fontSize: 12,
+        whiteSpace: 'pre-wrap',
+        color: 'var(--fc-text)',
+      }}
+    >
       {output.data['text/plain'].join('\n')}
     </div>
   );
@@ -83,11 +117,9 @@ export function NotebookEditor() {
       setActiveCellId(null);
       return;
     }
-    setActiveCellId((current) => (
-      current && parsed.notebook?.cells.some((cell) => cell.id === current)
-        ? current
-        : resolveNotebookPreviewCellId(parsed.notebook)
-    ));
+    setActiveCellId((current) =>
+      current && parsed.notebook?.cells.some((cell) => cell.id === current) ? current : resolveNotebookPreviewCellId(parsed.notebook),
+    );
   }, [parsed.notebook]);
 
   const replaceNotebookText = (nextText: string, markSaved: boolean) => {
@@ -111,6 +143,12 @@ export function NotebookEditor() {
 
   const runCell = async (cellId: string) => {
     if (!parsed.notebook) return;
+    if (!fileSystem.capabilities.notebookServer) {
+      setRequestError(
+        'Notebook execution requires the local ForgeCAD Studio (forgecad studio <dir>). Run the app locally to use notebooks.',
+      );
+      return;
+    }
     setRequestError(null);
     setRunningCellId(cellId);
     try {
@@ -139,11 +177,7 @@ export function NotebookEditor() {
   };
 
   if (!parsed.notebook) {
-    return (
-      <div style={{ padding: 16, color: 'var(--fc-error)', fontSize: 13 }}>
-        Notebook JSON is invalid: {parsed.error}
-      </div>
-    );
+    return <div style={{ padding: 16, color: 'var(--fc-error)', fontSize: 13 }}>Notebook JSON is invalid: {parsed.error}</div>;
   }
 
   return (
@@ -168,7 +202,16 @@ export function NotebookEditor() {
       </div>
 
       {requestError && (
-        <div style={{ border: '1px solid var(--fc-error)', borderRadius: 8, background: 'rgba(224, 82, 82, 0.08)', color: 'var(--fc-error)', padding: 12, fontSize: 12 }}>
+        <div
+          style={{
+            border: '1px solid var(--fc-error)',
+            borderRadius: 8,
+            background: 'rgba(224, 82, 82, 0.08)',
+            color: 'var(--fc-error)',
+            padding: 12,
+            fontSize: 12,
+          }}
+        >
           {requestError}
         </div>
       )}
@@ -186,7 +229,15 @@ export function NotebookEditor() {
               boxShadow: isActive ? '0 0 0 1px color-mix(in srgb, var(--fc-accent) 22%, transparent)' : 'none',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid var(--fc-border)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 12px',
+                borderBottom: '1px solid var(--fc-border)',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 12, color: 'var(--fc-textDim)', fontFamily: 'monospace' }}>
                   In [{cell.execution_count ?? ' '}]
@@ -194,11 +245,7 @@ export function NotebookEditor() {
                 <span style={{ fontSize: 12, color: 'var(--fc-textMuted)' }}>Cell {index + 1}</span>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  style={buttonStyle}
-                  disabled={runningCellId === cell.id}
-                  onClick={() => void runCell(cell.id)}
-                >
+                <button style={buttonStyle} disabled={runningCellId === cell.id} onClick={() => void runCell(cell.id)}>
                   {runningCellId === cell.id ? 'Running...' : 'Run'}
                 </button>
                 <button
@@ -229,9 +276,9 @@ export function NotebookEditor() {
               value={source}
               spellCheck={false}
               onFocus={() => setActiveCellId(cell.id)}
-              onChange={(event) => updateNotebook((notebook) => serializeNotebook(
-                upsertNotebookCellSource(notebook, cell.id, event.target.value),
-              ))}
+              onChange={(event) =>
+                updateNotebook((notebook) => serializeNotebook(upsertNotebookCellSource(notebook, cell.id, event.target.value)))
+              }
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && event.shiftKey) {
                   event.preventDefault();

@@ -1,10 +1,17 @@
-import { build3mfBlob, buildBinaryStl, type MeshExportObject } from '@forge/exportMesh';
-import { runScript, type ForgeQualityPreset, type RunResult } from '@forge/index';
+import { build3mfBlob, buildBinaryStl, buildObjBlob, type MeshExportObject } from '@forge/export/exportMesh';
+import { type ForgeQualityPreset, type RunResult, runScript } from '@forge/index';
 import { setParamOverrides } from '@forge/params';
-import { useForgeStore, type ObjectSettings } from '../store/forgeStore';
+import { sketchToDxf } from '@forge/sketch/exportDxf';
+import { generateSketchPdf } from '@forge/sketch/exportSketchPdf';
+import { sketchToSvg } from '@forge/sketch/exportSvg';
+import { isNotebookFile } from '../notebook/model';
+import { type ObjectSettings, useForgeStore } from '../store/forgeStore';
+import { evalWorkerClient } from '../workers/evalWorkerClient';
 import { generateReportInWorker } from '../workers/reportWorkerClient';
 
-export type MeshExportFormat = '3mf' | 'stl';
+export type MeshExportFormat = '3mf' | 'stl' | 'obj';
+export type ExactExportFormat = 'step' | 'brep';
+export type SketchExportFormat = 'svg' | 'dxf' | 'pdf';
 export type OrbitGifMode = 'solid' | 'wireframe';
 export type ExportQualityChoice = 'default' | 'live' | 'high';
 
@@ -68,9 +75,7 @@ function normalizeExportQuality(quality?: ExportQualityChoice): ExportQualityCho
   return 'default';
 }
 
-function shouldRegenerateForQuality(
-  quality: ExportQualityChoice,
-): quality is Exclude<ForgeQualityPreset, 'default'> {
+function shouldRegenerateForQuality(quality: ExportQualityChoice): quality is Exclude<ForgeQualityPreset, 'default'> {
   return quality === 'live' || quality === 'high';
 }
 
@@ -98,10 +103,7 @@ function resolveRunResultForExport(qualityChoice: ExportQualityChoice): RunResul
   return rerunActiveScriptForQuality(qualityChoice);
 }
 
-function toMeshExportObjects(
-  runResult: RunResult,
-  objectSettings: Record<string, ObjectSettings>,
-): MeshExportObject[] {
+function toMeshExportObjects(runResult: RunResult, objectSettings: Record<string, ObjectSettings>): MeshExportObject[] {
   const shapeObjects = runResult.objects.filter((obj) => obj.shape);
   return shapeObjects.map((obj) => ({
     name: obj.name,
@@ -139,22 +141,53 @@ export async function exportMeshFromStore(
     return;
   }
 
+  if (format === 'obj') {
+    const blob = buildObjBlob(meshObjects);
+    triggerDownload(blob, `${stem}.obj`);
+    return;
+  }
+
   const stlBuffer = buildBinaryStl(meshObjects);
   const stlBlob = new Blob([stlBuffer], { type: 'model/stl' });
   triggerDownload(stlBlob, `${stem}.stl`);
 }
 
-export async function exportReportFromStore(
-  preferredStem?: string,
-  options: ExportQualityOptions = {},
-): Promise<void> {
+export async function exportExactFromStore(format: ExactExportFormat, preferredStem?: string): Promise<void> {
+  const { result, activeFile, files, paramOverrides, runQuality } = useForgeStore.getState();
+  requireSuccessfulRunResult(result);
+
+  const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+  const code = files[activeFile];
+  if (!code) throw new Error(`Active file "${activeFile}" is missing.`);
+
+  // Export runs in the eval worker where live OCCT TopoDS_Shape objects exist.
+  // The main thread only has FrozenShapes (Manifold-backed mesh reconstructions)
+  // which lack the B-rep topology needed for STEP/BREP export.
+  // Script context is passed so the worker can re-evaluate if needed (e.g. cache hit).
+  try {
+    const blob = await evalWorkerClient.exportExact(format, {
+      code,
+      file: activeFile,
+      files,
+      quality: runQuality,
+      paramOverrides,
+      isNotebook: isNotebookFile(activeFile),
+    });
+    triggerDownload(blob, `${stem}.${format}`);
+  } finally {
+    useForgeStore.setState({ evaluationPhase: 'idle' });
+  }
+}
+
+export async function exportReportFromStore(preferredStem?: string, options: ExportQualityOptions = {}): Promise<void> {
   const { result, files, activeFile, paramOverrides, objectSettings } = useForgeStore.getState();
-  const hasShapes = (result?.objects?.some((obj) => Boolean(obj.shape)) ?? false);
+  const hasShapes = result?.objects?.some((obj) => Boolean(obj.shape)) ?? false;
   if (!hasShapes) {
     throw new Error('No 3D objects available for report export.');
   }
 
   const quality = normalizeExportQuality(options.quality);
+  const lengthUnit = useForgeStore.getState().lengthUnit;
   const title = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
   const report = await generateReportInWorker({
     files,
@@ -164,16 +197,14 @@ export async function exportReportFromStore(
     title,
     includeDisassembled: true,
     objectVisuals: objectSettings,
+    lengthUnit,
   });
   const bytes = new Uint8Array(report.pdf);
   const blob = new Blob([bytes], { type: 'application/pdf' });
   triggerDownload(blob, `${title}.report.pdf`);
 }
 
-export async function exportOrbitGifFromStore(
-  preferredStem?: string,
-  options?: OrbitGifExportOptions,
-): Promise<void> {
+export async function exportOrbitGifFromStore(preferredStem?: string, options?: OrbitGifExportOptions): Promise<void> {
   if (!orbitGifExporter) {
     throw new Error('Viewport is not ready for GIF export. Try again in a moment.');
   }
@@ -189,11 +220,45 @@ export async function exportOrbitGifFromStore(
   const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
   const exporterOptions = shouldRegenerateForQuality(quality)
     ? {
-      ...(options ?? {}),
-      runResult,
-      objectSettings,
-    }
+        ...(options ?? {}),
+        runResult,
+        objectSettings,
+      }
     : options;
   const blob = await orbitGifExporter(exporterOptions);
   triggerDownload(blob, `${stem}.orbit.gif`);
+}
+
+export function exportSketchFromStore(format: SketchExportFormat, preferredStem?: string): void {
+  const { result, activeFile } = useForgeStore.getState();
+  const current = requireSuccessfulRunResult(result);
+  const sketchObjects = current.objects.filter((obj) => obj.sketch);
+  if (sketchObjects.length === 0) {
+    throw new Error('No 2D sketch objects available for export.');
+  }
+
+  const stem = sanitizeExportStem(preferredStem ?? deriveExportStem(activeFile));
+
+  for (const obj of sketchObjects) {
+    const sketch = obj.sketch!;
+    const name = sketchObjects.length === 1 ? stem : `${stem}-${obj.name}`;
+
+    if (format === 'svg') {
+      const svg = sketchToSvg(sketch);
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      triggerDownload(blob, `${name}.svg`);
+    } else if (format === 'pdf') {
+      const meta = obj.sketchMeta;
+      if (!meta) {
+        throw new Error('Sketch PDF export requires a constrained sketch (with sketchMeta). Use constrainedSketch() API.');
+      }
+      const { pdf } = generateSketchPdf(meta);
+      const blob = new Blob([new Uint8Array(pdf)], { type: 'application/pdf' });
+      triggerDownload(blob, `${name}.sketch.pdf`);
+    } else {
+      const dxf = sketchToDxf(sketch);
+      const blob = new Blob([dxf], { type: 'application/dxf' });
+      triggerDownload(blob, `${name}.dxf`);
+    }
+  }
 }

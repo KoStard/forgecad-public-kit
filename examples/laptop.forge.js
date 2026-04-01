@@ -63,7 +63,7 @@ const usbC2 = roundedRect(9, 3.5, 1.5, true).extrude(8)
 base = base.subtract(usbC1).subtract(usbC2);
 
 // Headphone jack — right side
-const hpJack = cylinder(8, 2, undefined, 16)
+const hpJack = cylinder(8, 2)
   .rotate(0, 90, 0)
   .translate(w / 2, -d * 0.1, baseH * 0.5);
 base = base.subtract(hpJack);
@@ -96,7 +96,7 @@ const screenCut = roundedRect(screenW, screenD, cornerR - screenInset / 2, true)
 lid = lid.subtract(screenCut);
 
 // Camera dot (tiny cylinder on top bezel)
-const cameraDot = cylinder(lidH + 2, 2, undefined, 16)
+const cameraDot = cylinder(lidH + 2, 2)
   .translate(0, d / 2 - screenInset / 2, -1);
 lid = lid.subtract(cameraDot);
 
@@ -127,10 +127,10 @@ const openScreen = screenAtHinge.rotateAround([1, 0, 0], lidAngle, [0, hingeY, h
 // Hinge cylinders (cosmetic)
 const hingeR = baseH * 0.35;
 const hingeLen = 40;
-const hingeL = cylinder(hingeLen, hingeR, undefined, 16)
+const hingeL = cylinder(hingeLen, hingeR)
   .pointAlong([-1, 0, 0])
   .translate(-w * 0.25 + hingeLen / 2, hingeY, hingeZ);
-const hingeR2 = cylinder(hingeLen, hingeR, undefined, 16)
+const hingeR2 = cylinder(hingeLen, hingeR)
   .pointAlong([1, 0, 0])
   .translate(w * 0.25 - hingeLen / 2, hingeY, hingeZ);
 

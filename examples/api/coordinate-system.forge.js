@@ -24,7 +24,7 @@ const yMark = box(7, 7, 7, true).translate(0, axisLen + tipH + 5, 0).color('#44c
 // Z axis — blue, pointing up
 const zShaft = cylinder(axisLen, shaftR).color('#4444cc');
 const zTip = cylinder(tipH, tipR, 0).translate(0, 0, axisLen).color('#4444cc');
-const zMark = cylinder(4, 4, 4, 6).translate(0, 0, axisLen + tipH + 5).color('#4444cc');
+const zMark = ngon(6, 4).extrude(4, { center: true }).translate(0, 0, axisLen + tipH + 5).color('#4444cc');
 
 // Origin
 const origin = sphere(3).color('#ffffff');
