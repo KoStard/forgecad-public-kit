@@ -132,10 +132,10 @@ export async function initOCCT(): Promise<OCCTModule> {
     const ocModule = await import('opencascade.js');
     const initOpenCascade = ocModule.default;
 
-    // The default WASM asset is imported by opencascade.js's index.js as
-    // `ocFullWasm`. We get the same URL by importing it through the package.
-    // Vite resolves this to an asset URL at build time.
-    const { default: ocFullWasm } = await import('opencascade.js/dist/opencascade.full.wasm' as string);
+    // The default WASM asset is served from CDN to avoid bundling a 48MB file
+    // (exceeds Cloudflare Pages' 25MB limit). The version must match the
+    // installed opencascade.js package version in package.json.
+    const ocFullWasm = 'https://cdn.jsdelivr.net/npm/opencascade.js@2.0.0-beta.b5ff984/dist/opencascade.full.wasm';
 
     const oc = await initOpenCascade({
       mainWasm: ocFullWasm,

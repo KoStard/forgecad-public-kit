@@ -740,6 +740,26 @@ function forgeDocsPlugin() {
   };
 }
 
+/**
+ * Removes the OCCT WASM from the build output so it can be loaded from CDN
+ * instead. The file is ~48MB which exceeds Cloudflare Pages' 25MB asset limit.
+ */
+function removeOcctWasmPlugin() {
+  return {
+    name: 'remove-occt-wasm',
+    closeBundle() {
+      const assetsDir = path.resolve(__dirname, 'dist', 'assets');
+      if (!fs.existsSync(assetsDir)) return;
+      for (const file of fs.readdirSync(assetsDir)) {
+        if (file.startsWith('opencascade.full') && file.endsWith('.wasm')) {
+          fs.unlinkSync(path.join(assetsDir, file));
+          console.log('✓ Removed OCCT WASM from dist (loaded from CDN instead)');
+        }
+      }
+    },
+  };
+}
+
 export default defineConfig(({ command }) => {
   // Ensure the CONTEXT.md stub exists so the ?raw import doesn't break dev server
   if (command === 'serve') ensureSkillContextStub();
@@ -757,6 +777,8 @@ export default defineConfig(({ command }) => {
     ...(forgeMode === 'web' && command === 'build' ? [forgeSkillStaticPlugin()] : []),
     // Serve docs at /docs/ in dev and copy into dist/docs/ for production
     forgeDocsPlugin(),
+    // Remove OCCT WASM from dist — it's loaded from CDN (too large for Cloudflare Pages)
+    ...(command === 'build' ? [removeOcctWasmPlugin()] : []),
   ],
   // GitHub Pages serves at /ForgeCAD/; local dev serves at /
   base: forgeMode === 'web' ? '/ForgeCAD/' : '/',
