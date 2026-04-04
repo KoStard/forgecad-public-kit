@@ -1,2 +1,0 @@
-If we make some changes to the file, then we save it through the web app, it saves, we see that the actual file in the FS changed.
-But if we refresh, it loads an old cached version of the file, even though the actual file is now fixed.

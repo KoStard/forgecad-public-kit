@@ -1,8 +1,0 @@
-# Benchmark results (generated per-run, not tracked)
-results/
-
-# Temporary scoring files
-_bench_harness.forge.js
-_bench_candidate.forge.js
-_metrics_harness.forge.js
-solution.forge.js

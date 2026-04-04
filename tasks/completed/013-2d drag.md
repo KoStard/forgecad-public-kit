@@ -1,2 +1,0 @@
-In 2D view, regular mouse drag is disabled, as in 3d it was rotating the viewport and here it's not allowed.
-Instead, regular mouse drag should just move the camera around, like what happens if I press command and then do mouse drag.

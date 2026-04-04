@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -8 14 12" width="400" height="340">
-  <rect x="-3" y="-8" width="14" height="12" fill="#1a1a2e"/>
-  <text x="0" y="-6.5" fill="#888" font-size="1.2" font-family="sans-serif" text-anchor="middle">Angle Arc (45°)</text>
-  <line x1="0" y1="0" x2="6" y2="0" stroke="#555" stroke-width="0.3"/>
-  <line x1="0" y1="0" x2="4.243" y2="-4.243" stroke="#555" stroke-width="0.3"/>
-  <circle cx="0" cy="0" r="0.4" fill="#555"/>
-  <path d="M3,0 A3,3 0 0,0 2.121,-2.121" fill="none" stroke="#4ade80" stroke-width="0.3"/>
-  <text x="4.157" y="-1.722" fill="#4ade80" font-size="1.6" font-family="sans-serif" text-anchor="middle" dominant-baseline="central">45°</text>
-</svg>

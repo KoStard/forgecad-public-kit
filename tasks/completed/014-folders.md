@@ -1,2 +1,0 @@
-In the Files panel we see all the files that the system identifies to be of matching type.
-But it doesn't allow folders. Add more rich controls here, allowing to create folders, rename files, drag/drop a file/folder into another folder/root, etc. Like in VSCode or proper IDEs.

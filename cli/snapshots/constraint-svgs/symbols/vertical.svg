@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-5 -4 10 8" width="300" height="240">
-  <rect x="-5" y="-4" width="10" height="8" fill="#1a1a2e"/>
-  <text x="0" y="-2.5" fill="#888" font-size="1.2" font-family="sans-serif" text-anchor="middle">Vertical V</text>
-  <line x1="-4" y1="0" x2="4" y2="0" stroke="#555" stroke-width="0.2"/>
-  <text x="0.000" y="0.000" fill="#4ade80" font-size="1.8" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" font-weight="bold">V</text>
-</svg>
