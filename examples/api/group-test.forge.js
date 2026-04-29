@@ -1,6 +1,6 @@
 // Test assembly grouping — nested group format
-const baseW = param("Base Width", 100, { min: 60, max: 200, unit: "mm" });
-const baseD = param("Base Depth", 80, { min: 40, max: 150, unit: "mm" });
+const baseW = Param.number("Base Width", 100, { min: 60, max: 200, unit: "mm" });
+const baseD = Param.number("Base Depth", 80, { min: 40, max: 150, unit: "mm" });
 
 // Bed assembly
 const bedPlate = box(baseW, baseD, 5).color('#666666');
@@ -14,7 +14,7 @@ const crossBar = box(baseW + 20, 5, 5).translate(-10, baseD / 2, 63).color('#aaa
 
 // Extruder (intentionally overlaps crossbar — intra-group collision)
 const nozzle = cylinder(15, 4).translate(baseW / 2, baseD / 2, 48).color('#ff8800');
-const heatsink = box(20, 20, 10, true).translate(baseW / 2, baseD / 2, 60).color('#cccccc');
+const heatsink = box(20, 20, 10).translate(baseW / 2, baseD / 2, 60).color('#cccccc');
 
 return [
   { name: "Bed Assembly", group: [

@@ -8,7 +8,7 @@ const sk = constrainedSketch();
 
 const COLS = 3;
 const ROWS = 2;
-const SIDE = param("cell_size", 8, { unit: "mm" });
+const SIDE = Param.number("cell_size", 8, { unit: "mm" });
 
 // Flat-top hex: vertex 0 at 0° (right), CCW
 const vAngles = [0, 60, 120, 180, 240, 300].map(d => d * Math.PI / 180);

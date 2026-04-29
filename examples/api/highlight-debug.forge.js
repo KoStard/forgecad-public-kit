@@ -29,4 +29,8 @@ highlight(b.edge('top-right'), { color: 'blue', label: 'top-right edge' });
 // Shape highlight — transparent colored overlay on the entire shape
 highlight(b, { color: '#ff00ff' });
 
+// Intermediary shape highlight — snapshot a temporary shape that is not returned
+const temporary = b.translate(40, 0, 0);
+highlight(temporary, { color: '#00ffff', label: 'temporary snapshot' });
+
 return b;

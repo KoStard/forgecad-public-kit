@@ -20,10 +20,10 @@ sk.addLoop([p1, p2, p4, p3]);
 sk.fix(p1);
 sk.horizontal(bottom);
 sk.vertical(left);
-sk.length(bottom, param("width", 20, { unit: "mm" }));
+sk.length(bottom, Param.number("width", 20, { unit: "mm" }));
 
 // lineDistance already implies parallel:
-sk.lineDistance(bottom, top, param("height", 10, { unit: "mm" }));
+sk.lineDistance(bottom, top, Param.number("height", 10, { unit: "mm" }));
 sk.parallel(bottom, top);  // redundant — lineDistance already forces parallel
 
 sk.parallel(left, right);

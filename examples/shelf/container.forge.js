@@ -1,11 +1,11 @@
 // Storage Container — parametric open-top bin
 // Used by shelf-unit.forge.js via require()
 
-const w = param("Container Width", 120, { min: 60, max: 200, unit: "mm" });
-const d = param("Container Depth", 180, { min: 100, max: 300, unit: "mm" });
-const h = param("Container Height", 100, { min: 50, max: 200, unit: "mm" });
-const wall = param("Wall", 3, { min: 1.5, max: 6, unit: "mm" });
-const lipH = param("Lip Height", 5, { min: 2, max: 10, unit: "mm" });
+const w = Param.number("Container Width", 120, { min: 60, max: 200, unit: "mm" });
+const d = Param.number("Container Depth", 180, { min: 100, max: 300, unit: "mm" });
+const h = Param.number("Container Height", 100, { min: 50, max: 200, unit: "mm" });
+const wall = Param.number("Wall", 3, { min: 1.5, max: 6, unit: "mm" });
+const lipH = Param.number("Lip Height", 5, { min: 2, max: 10, unit: "mm" });
 
 // Outer shell
 const outer = box(w, d, h);

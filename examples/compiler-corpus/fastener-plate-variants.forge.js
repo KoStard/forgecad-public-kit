@@ -1,11 +1,11 @@
 // Guard part: counterbore/countersink hole variants plus an up-to-face service pocket in one ordinary plate workflow.
 
-const plate = roundedRect(118, 76, 8, true).extrude(18);
+const plate = roundedRect(118, 76, 8).extrude(18);
 const entryFace = plate.face('top');
 const exitFace = plate.face('bottom');
-const pocketExitFace = plate.toShape().face('side-top');
+const pocketExitFace = plate.face('side-top');
 
-const servicePocket = roundedRect(34, 18, 4, true)
+const servicePocket = roundedRect(34, 18, 4)
   .onFace(plate, 'front', { u: 0, v: -2, selfAnchor: 'center' });
 
 const fastenerPlate = plate

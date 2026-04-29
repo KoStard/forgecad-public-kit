@@ -1,0 +1,314 @@
+---
+skill-group: sdf
+skill-order: 100
+---
+
+# SDF Modeling (Experimental)
+
+Signed Distance Field modeling for organic forms, smooth booleans, TPMS lattices, and deformations. Return raw `SdfShape` values directly for native preview; use `toShape(...)` when materializing SDF trees for CAD/export workflows.
+
+## Contents
+
+- [SDF Materialization](#sdf-materialization) — `toShape`, `combine`
+- [SdfShape](#sdfshape)
+- [sdf](#sdf)
+
+## Functions
+
+### SDF Materialization
+
+#### `toShape()` — Materialize one SDF leaf or all SDF leaves in a renderable tree.
+
+Raw `SdfShape` values become mesh-backed [`Shape`](/docs/core#shape)s. Plain objects and arrays preserve their renderable children as a [`ShapeGroup`](/docs/core#shapegroup) when more than one leaf is found. Non-renderable metadata is ignored for materialization and remains available to callers through normal [`require()`](/docs/core#require) return values.
+
+```ts
+toShape(value: unknown, options?: SdfToShapeOptions): ToShapeTreeResult
+```
+
+**`SdfToShapeOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `edgeLength?` | `number` | Target mesh edge length. Smaller = finer mesh. Overrides quality-derived resolution. |
+| `bounds?` | `{ min: Vec3; max: Vec3; }` | Override auto-computed bounds. Strongly recommended for infinite/repeated fields. |
+| `quality?` | `SdfMeshingQuality` | Coarse quality preset. Default: 'preview'. |
+| `tolerance?` | `number` | Preferred absolute surface tolerance in millimeters. |
+| `minFeatureSize?` | `number` | Smallest feature that should survive meshing, in millimeters. |
+| `simplify?` | `boolean \| "safe"` | Simplification control. `false` disables, `true` and `'safe'` use topology-validated simplification. |
+| `maxTriangles?` | `number` | Optional post-extraction triangle budget. |
+| `maxGridPoints?` | `number` | Optional pre-extraction grid-point budget. Default is browser-safe. |
+| `minEdgeLength?` | `number` | Lower clamp for resolved edge length. Default: 0.15mm. |
+| `diagnostics?` | `boolean` | Log resolved meshing settings and backend extraction timings. |
+
+#### `combine()` — Collapse a tree of SDF leaves into one continuous SDF field.
+
+This intentionally discards per-leaf color/material identity because the result is one scalar field. Use plain object returns for multi-material SDF preview, and use `combine(...)` only when you want one implicit body.
+
+```ts
+combine(value: unknown, options?: CombineOptions): SdfShape
+```
+
+`CombineOptions`: `{ op?: "union" | "intersection" }`
+
+---
+
+## Classes
+
+### `SdfShape`
+
+An immutable SDF expression. Supports SDF-specific operations (smooth booleans, domain warps, etc.), can be returned directly for native preview, and converts to a ForgeCAD Shape via `.toShape()` when materialization is needed.
+
+#### `colorHex()` — Display color carried by this implicit leaf.
+
+```ts
+get colorHex(): string | undefined
+```
+
+#### `materialProps()` — Display material carried by this implicit leaf.
+
+```ts
+get materialProps(): ShapeMaterialProps | undefined
+```
+
+#### `explicitBounds()` — Explicit bounds carried by this implicit leaf, if any.
+
+```ts
+get explicitBounds(): SdfBounds | undefined
+```
+
+#### `clone()` — Clone this SDF expression and its visual metadata.
+
+```ts
+clone(): SdfShape
+```
+
+#### `toShape()` — Mesh this SDF into a ForgeCAD Shape through ForgeCAD's Surface Nets pipeline. Once converted, the result is a regular Shape — booleans, transforms, export all work.
+
+```ts
+toShape(options?: SdfToShapeOptions): Shape
+```
+
+#### `color()` — Set the display color for this implicit leaf.
+
+```ts
+color(value: string | undefined): SdfShape
+```
+
+#### `material()` — Set PBR display material properties for this implicit leaf.
+
+```ts
+material(props: ShapeMaterialProps): SdfShape
+```
+
+#### `bounds()` — Set explicit preview/meshing bounds for this implicit leaf.
+
+```ts
+bounds(bounds: SdfBounds | [ Vec3, Vec3 ]): SdfShape
+```
+
+#### [`union()`](/docs/core#union) — SDF union (sharp).
+
+```ts
+union(...others: SdfShape[]): SdfShape
+```
+
+#### `subtract()` — SDF difference (sharp) — subtracts others from this.
+
+```ts
+subtract(...others: SdfShape[]): SdfShape
+```
+
+#### `intersect()` — SDF intersection (sharp).
+
+```ts
+intersect(...others: SdfShape[]): SdfShape
+```
+
+#### `clipBox()` — Clip this SDF to an explicit box-shaped design space.
+
+```ts
+clipBox(x: number, y: number, z: number): SdfShape
+```
+
+#### `smoothUnion()` — Smooth union — blends shapes together with a smooth radius.
+
+```ts
+smoothUnion(other: SdfShape, radius: number): SdfShape
+```
+
+#### `smoothSubtract()` — Smooth difference — smoothly carves other from this.
+
+```ts
+smoothSubtract(other: SdfShape, radius: number): SdfShape
+```
+
+#### `smoothIntersect()` — Smooth intersection — smoothly intersects.
+
+```ts
+smoothIntersect(other: SdfShape, radius: number): SdfShape
+```
+
+#### `morph()` — Morph between this shape and another. t=0 → this, t=1 → other.
+
+```ts
+morph(other: SdfShape, t: number): SdfShape
+```
+
+#### `translate()` — Translate this SDF by the given offsets in millimeters.
+
+```ts
+translate(x: number, y: number, z: number): SdfShape
+```
+
+#### `rotate()` — Rotate around an arbitrary axis through the origin.
+
+```ts
+rotate(axis: [ number, number, number ], angleDeg: number): SdfShape
+```
+
+#### `rotateX()` — Rotate around the X axis by the given angle in degrees.
+
+```ts
+rotateX(angleDeg: number): SdfShape
+```
+
+#### `rotateY()` — Rotate around the Y axis by the given angle in degrees.
+
+```ts
+rotateY(angleDeg: number): SdfShape
+```
+
+#### `rotateZ()` — Rotate around the Z axis by the given angle in degrees.
+
+```ts
+rotateZ(angleDeg: number): SdfShape
+```
+
+#### `scale()` — Uniformly scale this SDF around the origin.
+
+```ts
+scale(factor: number): SdfShape
+```
+
+#### `twist()` — Twist around the Z axis.
+
+```ts
+twist(degreesPerUnit: number): SdfShape
+```
+
+#### `bend()` — Bend around the Z axis with given radius.
+
+```ts
+bend(radius: number): SdfShape
+```
+
+#### `repeat()` — Repeat in space. Spacing of 0 on an axis means no repetition. Count of 0 = infinite.
+
+```ts
+repeat(spacing: Vec3, count?: Vec3): SdfShape
+```
+
+#### `shell()` — Hollow out, keeping only a shell of given thickness.
+
+```ts
+shell(thickness: number): SdfShape
+```
+
+#### `displace()` — Displace the surface by a function of position, or by a pattern SdfShape.
+
+```js
+// Function displacement
+shape.displace((x, y, z) => Math.sin(x) * 0.5)
+
+// Pattern displacement (e.g. basketWeave)
+shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+```
+
+```ts
+displace(fn: ((x: number, y: number, z: number) => number) | SdfShape, constants?: Record<string, number>): SdfShape
+```
+
+#### `surfaceDisplace()` — Displace the surface using a 2D pattern in surface-local UV coordinates.
+
+Automatically detects the shape's UV parametrization (sphere, cylinder, torus) from the SDF tree. Falls back to triplanar mapping for arbitrary shapes.
+
+UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3` always produce 3mm spacing, regardless of shape size.
+
+```js
+// Surface-following basket weave — auto-detects sphere UV
+sdf.sphere(27).shell(3)
+  .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
+  .toShape()
+
+// Custom 2D pattern via function
+shape.surfaceDisplace((u, v) => -Math.sin(u * 2) * 0.3)
+```
+
+```ts
+surfaceDisplace(pattern: SurfacePattern | ((u: number, v: number) => number), options?: SurfaceDisplaceOptions): SdfShape
+```
+
+#### `onion()` — Create concentric onion layers.
+
+```ts
+onion(layers: number, thickness: number): SdfShape
+```
+
+---
+
+## Constants
+
+### `sdf`
+
+SDF modeling — signed distance field primitives, smooth booleans, TPMS lattices, domain warps, and surface patterns.
+
+**Experimental.** Return `SdfShape` values directly from a ForgeCAD script for native raymarch preview. Plain objects and arrays of SDF leaves are renderable too, so object keys become named preview parts.
+
+Call `.toShape()` or `toShape(...)` only when you need a mesh-backed ForgeCAD Shape for export, mesh booleans, or mixed SDF/manifold projects. All shapes live as a lazy expression tree until that materialization boundary.
+
+```js
+return sdf.smoothUnion(sdf.sphere(10), sdf.box(15, 15, 15), { radius: 3 })
+  .color('#4488cc');
+```
+
+```js
+return {
+  shell: sdf.sphere(20).shell(2).color('#9be7ff'),
+  core: sdf.gyroid({ cellSize: 6, wallThickness: 0.8 })
+    .intersect(sdf.sphere(18))
+    .color('#ffcf5a'),
+};
+```
+
+- `sphere(radius: number): SdfShape` — Create an SDF sphere centered at the origin.
+- `box(x: number, y: number, z: number): SdfShape` — Create an SDF box centered at the origin with given full dimensions (not half-extents).
+- `cylinder(height: number, radius: number): SdfShape` — Create an SDF cylinder centered at the origin, axis along Z.
+- `torus(majorRadius: number, minorRadius: number): SdfShape` — Create an SDF torus centered at the origin, lying in the XY plane.
+- `capsule(height: number, radius: number): SdfShape` — Create an SDF capsule centered at the origin, axis along Z.
+- `cone(height: number, radius: number): SdfShape` — Create an SDF cone with base at z=0 and tip at z=height.
+- `smoothUnion(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfShape` — Smooth union — blends shapes together with a smooth transition radius.
+- `smoothDifference(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfShape` — Smooth difference — smoothly subtracts b from a.
+- `smoothIntersection(a: SdfShape, b: SdfShape, options: { radius: number; }): SdfShape` — Smooth intersection — smoothly intersects a and b.
+- `morph(a: SdfShape, b: SdfShape, t: number): SdfShape` — Morph between two SDF shapes. t=0 → a, t=1 → b.
+- `blend(a: SdfShape, b: SdfShape, fn: (x: number, y: number, z: number) => number, options?: BlendOptions): SdfShape` — Spatially blend between two SDF patterns. The blend function receives (x, y, z) and returns 0..1: 0 = fully pattern `a`, 1 = fully pattern `b`.
+- `gyroid(options: TpmsOptions): SdfShape` — Gyroid TPMS lattice — the most common lattice for additive manufacturing.
+- `schwarzP(options: TpmsOptions): SdfShape` — Schwarz-P TPMS lattice — isotropic pore structure.
+- `diamond(options: TpmsOptions): SdfShape` — Diamond TPMS lattice — stiffest TPMS structure.
+- `lidinoid(options: TpmsOptions): SdfShape` — Lidinoid TPMS lattice — visually distinct from gyroid, popular in research and art.
+- `tpmsBlock(options: TpmsBlockOptions): SdfShape` — TPMS block preset clipped to an explicit design space.
+- `withinBox(shape: SdfShape, options: { size: Vec3; }): SdfShape` — Clip an SDF shape to a box-shaped design space.
+- `noise(options?: NoiseOptions): SdfShape` — 3D Simplex noise field — produces organic, natural-looking displacements.
+- `voronoi(options?: VoronoiOptions): SdfShape` — 3D Voronoi pattern — organic cellular structures like bone, coral, or soap bubbles.
+- `honeycomb(options?: HoneycombOptions): SdfShape` — Honeycomb (hexagonal) lattice pattern. Intersect with your shape to apply.
+- `waves(options?: WavesOptions): SdfShape` — Sinusoidal wave ridges — parallel ridges along an axis.
+- `knurl(options?: KnurlOptions): SdfShape` — Knurl pattern — crossed helical grooves for grips and handles.
+- `perforated(options?: PerforatedOptions): SdfShape` — Perforated plate pattern — regular array of cylindrical holes.
+- `scales(options?: ScalesOptions): SdfShape` — Fish/dragon scale pattern — overlapping circular scales in hex-packed rows.
+- `brick(options?: BrickOptions): SdfShape` — Brick/stone wall pattern — running bond with mortar grooves.
+- `weave(options?: WeaveOptions): SdfShape` — Grid lattice pattern — two families of infinite slabs crossing at 90°.
+- `basketWeave(options?: BasketWeaveOptions): SurfacePattern` — Basket weave surface pattern — threads with over-under crossings in UV space. Returns a SurfacePattern for use with `.surfaceDisplace()`.
+- `twist(shape: SdfShape, degreesPerUnit: number): SdfShape` — Twist an SDF shape around the Z axis.
+- `bend(shape: SdfShape, radius: number): SdfShape` — Bend an SDF shape around the Z axis.
+- `repeat(shape: SdfShape, spacing: Vec3, count?: Vec3): SdfShape` — Repeat an SDF shape in space.
+- `SurfacePattern: typeof SurfacePattern` — A 2D surface pattern — a heightmap function for use with `.surfaceDisplace()`.
+- `fromFunction(fn: SdfFunctionSource, options: SdfFunctionOptions): SdfShape` — Create a custom SDF from one expression; shader-safe expressions raymarch directly.

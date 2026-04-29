@@ -47,9 +47,9 @@ sk.vertical(lLeft);
 sk.horizontal(lLeftTop);
 sk.vertical(lLeftUp);
 
-sk.length(lBottom, param("base_width", 50, { unit: "mm" }));
-sk.length(lLeft, param("leg_height", 20, { unit: "mm" }));
-sk.length(lLeftTop, param("step_width", 15, { unit: "mm" }));
-sk.length(lLeftUp, param("top_height", 20, { unit: "mm" }));
+sk.length(lBottom, Param.number("base_width", 50, { unit: "mm" }));
+sk.length(lLeft, Param.number("leg_height", 20, { unit: "mm" }));
+sk.length(lLeftTop, Param.number("step_width", 15, { unit: "mm" }));
+sk.length(lLeftUp, Param.number("top_height", 20, { unit: "mm" }));
 
 return sk.solve();

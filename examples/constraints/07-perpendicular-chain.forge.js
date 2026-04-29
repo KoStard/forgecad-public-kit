@@ -20,9 +20,9 @@ sk.absoluteAngle(l1, 0);
 sk.perpendicular(l1, l2);
 sk.perpendicular(l2, l3);
 sk.perpendicular(l3, l4);
-sk.length(l1, param("seg1", 20, { unit: "mm" }));
-sk.length(l2, param("seg2", 15, { unit: "mm" }));
-sk.length(l3, param("seg3", 15, { unit: "mm" }));
-sk.length(l4, param("seg4", 15, { unit: "mm" }));
+sk.length(l1, Param.number("seg1", 20, { unit: "mm" }));
+sk.length(l2, Param.number("seg2", 15, { unit: "mm" }));
+sk.length(l3, Param.number("seg3", 15, { unit: "mm" }));
+sk.length(l4, Param.number("seg4", 15, { unit: "mm" }));
 
 return sk.solve();

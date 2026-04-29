@@ -6,7 +6,7 @@
 const sk = constrainedSketch();
 
 const N = 50; // number of segments
-const SEG_LEN = param("seg_len", 5, { unit: "mm" });
+const SEG_LEN = Param.number("seg_len", 5, { unit: "mm" });
 
 // Build a spiral: each segment turns 90° left from the previous,
 // with increasing runs (1,1,2,2,3,3,4,4,...) to form a square spiral.

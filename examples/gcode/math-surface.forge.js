@@ -7,9 +7,9 @@
  * The surface function creates an undulating bowl shape.
  */
 
-const outerRadius = param('radius', 40, 15, 60);
-const amplitude = param('amplitude', 8, 1, 20);
-const waves = param('waves', 4, 1, 8);
+const outerRadius = Param.number('radius', 40, 15, 60);
+const amplitude = Param.number('amplitude', 8, 1, 20);
+const waves = Param.number('waves', 4, 1, 8);
 const layerHeight = 0.3;
 const lineSpacing = 0.6; // spacing between concentric passes
 

@@ -1,14 +1,14 @@
 // pointAlong() — orient a cylinder's axis without thinking about Euler angles.
 //
 // Cylinders default to Z-up. To lay one along X or Y:
-//   ❌ cylinder(80, 5).rotate(90, 0, 0)   — which axis? confusing
+//   ❌ cylinder(80, 5).rotateX(90)         — works, but less readable
 //   ✅ cylinder(80, 5).pointAlong([0, 1, 0]) — "point along Y"
 //
 // After pointAlong, the cylinder starts at origin and extends in that direction.
 // Always call pointAlong BEFORE translate/attachTo.
 
-const len = param("Length", 80, { min: 30, max: 150, unit: "mm" });
-const r = param("Radius", 5, { min: 2, max: 15, unit: "mm" });
+const len = Param.number("Length", 80, { min: 30, max: 150, unit: "mm" });
+const r = Param.number("Radius", 5, { min: 2, max: 15, unit: "mm" });
 const spacing = 40;
 
 // Default: along +Z (up)

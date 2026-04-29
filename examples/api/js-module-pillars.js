@@ -16,7 +16,7 @@ export default class PillarPair {
   }
 
   build() {
-    const pillar = box(6, 6, this.height, true);
+    const pillar = box(6, 6, this.height);
     return union(
       pillar.translate(-this.spacing / 2, 0, this.height / 2),
       pillar.translate(this.spacing / 2, 0, this.height / 2),

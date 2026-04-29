@@ -24,7 +24,7 @@ sk.absoluteAngle(lBottom, 0);  // line must be at 0 degrees (= horizontal)
 sk.vertical(lRight);
 sk.vertical(lLeft);
 sk.horizontal(lTop);
-sk.length(lBottom, param("width", 10, { unit: "mm" }));
-sk.length(lRight, param("height", 5, { unit: "mm" }));
+sk.length(lBottom, Param.number("width", 10, { unit: "mm" }));
+sk.length(lRight, Param.number("height", 5, { unit: "mm" }));
 
 return sk.solve();

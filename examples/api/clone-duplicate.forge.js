@@ -1,9 +1,9 @@
 // clone() / duplicate() — explicit copy helpers for Shape, TrackedShape, Sketch, and ShapeGroup.
 
-const spacing = param("Spacing", 90, { min: 40, max: 180, unit: "mm" });
+const spacing = Param.number("Spacing", 90, { min: 40, max: 180, unit: "mm" });
 
 // --- Shape clone ---
-const block = box(36, 20, 12, true).color("#4a90e2");
+const block = box(36, 20, 12).color("#4a90e2");
 const blockL = block.clone().translate(-spacing / 2, 0, 0);
 const blockR = block.duplicate().translate(spacing / 2, 0, 0);
 

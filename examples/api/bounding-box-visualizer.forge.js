@@ -36,8 +36,8 @@ function vizBBox(shape) {
 // --- Demo shapes ---
 
 // A rotated box — bbox is larger than the shape itself
-const angle = param("Rotation", 30, { min: 0, max: 90, unit: "°" });
-const rotBox = box(40, 30, 20, true).rotate(0, 0, angle).color('#4488cc');
+const angle = Param.number("Rotation", 30, { min: 0, max: 90, unit: "°" });
+const rotBox = box(40, 30, 20).rotateZ(angle).color('#4488cc');
 const rotBBox = vizBBox(rotBox).color('#cc4444');
 
 // A sphere — bbox is a perfect cube around it
@@ -45,7 +45,7 @@ const sph = sphere(20).translate(80, 0, 0).color('#44cc44');
 const sphBBox = vizBBox(sph).color('#cc4444');
 
 // A tilted cylinder — bbox shows the extent
-const tiltCyl = cylinder(50, 10).rotate(30, 0, 0).translate(0, 80, 0).color('#cc88ff');
+const tiltCyl = cylinder(50, 10).rotateX(30).translate(0, 80, 0).color('#cc88ff');
 const cylBBox = vizBBox(tiltCyl).color('#cc4444');
 
 return [

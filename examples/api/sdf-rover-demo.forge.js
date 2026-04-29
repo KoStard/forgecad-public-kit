@@ -26,33 +26,33 @@ const wheelbase = 250;
 const groundClearance = 26;
 const bodyZ = wheelRadius + groundClearance + chassisHeight * 0.5;
 
-const baseDeck = box(chassisLength, chassisWidth, chassisHeight, true)
+const baseDeck = box(chassisLength, chassisWidth, chassisHeight)
   .translate(0, 0, bodyZ);
 
-const roofPod = box(roofLength, roofWidth, roofHeight, true)
+const roofPod = box(roofLength, roofWidth, roofHeight)
   .translate(20, 0, bodyZ + 40);
 
 const bumper = union(
-  box(54, bumperWidth, bumperDepth, true).translate(chassisLength * 0.5 - 18, 0, wheelRadius + 6),
-  box(bumperLength, bumperWidth - 42, bumperDepth * 0.7, true).translate(chassisLength * 0.5 + 46, 0, wheelRadius - 10),
+  box(54, bumperWidth, bumperDepth).translate(chassisLength * 0.5 - 18, 0, wheelRadius + 6),
+  box(bumperLength, bumperWidth - 42, bumperDepth * 0.7).translate(chassisLength * 0.5 + 46, 0, wheelRadius - 10),
 ).color('#c8742b');
 
 const sensorMast = union(
-  cylinder(92, 10, undefined, 40, true).translate(58, 0, bodyZ + 78),
-  box(78, 34, 26, true).translate(88, 0, bodyZ + 126),
+  cylinder(92, 10, undefined, 40).translate(58, 0, bodyZ + 78),
+  box(78, 34, 26).translate(88, 0, bodyZ + 126),
 ).color('#d7dee8');
 
 const chassis = union(baseDeck, roofPod)
   .color('#60707d');
 
 const wheelTire = difference(
-  cylinder(wheelWidth, wheelRadius, undefined, 64, true).pointAlong([0, 1, 0]),
-  cylinder(wheelWidth + 2, wheelRadius * 0.56, undefined, 48, true).pointAlong([0, 1, 0]),
+  cylinder(wheelWidth, wheelRadius, undefined, 64).pointAlong([0, 1, 0]),
+  cylinder(wheelWidth + 2, wheelRadius * 0.56, undefined, 48).pointAlong([0, 1, 0]),
 ).color('#1d2329');
 
 const wheelRim = union(
-  cylinder(wheelWidth * 0.86, wheelRadius * 0.52, undefined, 40, true).pointAlong([0, 1, 0]),
-  cylinder(wheelWidth * 1.02, wheelRadius * 0.16, undefined, 28, true).pointAlong([0, 1, 0]),
+  cylinder(wheelWidth * 0.86, wheelRadius * 0.52, undefined, 40).pointAlong([0, 1, 0]),
+  cylinder(wheelWidth * 1.02, wheelRadius * 0.16, undefined, 28).pointAlong([0, 1, 0]),
 ).color('#b8c5d3');
 
 const wheel = group(

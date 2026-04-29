@@ -1,5 +1,5 @@
 // Voronoi sphere — hollow sphere with organic cell walls
-// Hero demo for surface pattern SDF features
+// This uses explicit materialization because Voronoi preview still uses meshing.
 
 const shell = sdf.sphere(20).shell(3);
 const pattern = sdf.voronoi({ cellSize: 8, wallThickness: 1.5, seed: 42 });

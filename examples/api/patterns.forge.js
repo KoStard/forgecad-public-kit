@@ -1,8 +1,8 @@
 // Patterns — linearPattern and circularPattern for repeating shapes.
 
-const count = param("Count", 6, { min: 2, max: 12, integer: true });
-const spacing = param("Spacing", 20, { min: 10, max: 40, unit: "mm" });
-const radius = param("Ring Radius", 40, { min: 20, max: 80, unit: "mm" });
+const count = Param.number("Count", 6, { min: 2, max: 12, integer: true });
+const spacing = Param.number("Spacing", 20, { min: 10, max: 40, unit: "mm" });
+const radius = Param.number("Ring Radius", 40, { min: 20, max: 80, unit: "mm" });
 
 // --- linearPattern: repeat along a direction ---
 const peg = cylinder(15, 4).color('#4488cc');

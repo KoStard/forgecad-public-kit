@@ -1,7 +1,7 @@
 // Compare common sketch-rounding strategies on the same roof profile.
 // Only the selective fillet keeps the lower roof corners sharp.
 
-const radius = param("Radius", 14, { min: 4, max: 24, unit: "mm" });
+const radius = Param.number("Radius", 14, { min: 4, max: 24, unit: "mm" });
 const gap = 120;
 const bodyWidth = 90;
 const bodyHeight = 44;

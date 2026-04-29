@@ -7,10 +7,10 @@
  * Try tweaking: amplitude, frequency, baseRadius, height, layerHeight.
  */
 
-const amplitude = param('amplitude', 8, 1, 20);
-const frequency = param('frequency', 6, 1, 20);
-const baseRadius = param('radius', 25, 10, 60);
-const height = param('height', 80, 20, 200);
+const amplitude = Param.number('amplitude', 8, 1, 20);
+const frequency = Param.number('frequency', 6, 1, 20);
+const baseRadius = Param.number('radius', 25, 10, 60);
+const height = Param.number('height', 80, 20, 200);
 const layerHeight = 0.2;
 const nozzle = 0.4;
 

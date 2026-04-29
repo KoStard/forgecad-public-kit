@@ -5,10 +5,10 @@
  * Creates beautiful organic-looking walls with a continuously changing profile.
  */
 
-const a = param('a', 3, 1, 7);     // X frequency
-const b = param('b', 2, 1, 7);     // Y frequency
-const baseRadius = param('radius', 25, 10, 50);
-const height = param('height', 100, 30, 200);
+const a = Param.number('a', 3, 1, 7);     // X frequency
+const b = Param.number('b', 2, 1, 7);     // Y frequency
+const baseRadius = Param.number('radius', 25, 10, 50);
+const height = Param.number('height', 100, 30, 200);
 const layerHeight = 0.2;
 
 const g = gcode({ nozzle: 0.4, layerHeight, printSpeed: 1800 });

@@ -17,6 +17,6 @@ sk.addLoop([p1, p2, p3]);
 // Only constrain shape, not position
 sk.equal(l1, l2);
 sk.equal(l1, l3);
-sk.length(l1, param("side", 20, { unit: "mm" }));
+sk.length(l1, Param.number("side", 20, { unit: "mm" }));
 
 return sk.solve();

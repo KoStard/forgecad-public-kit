@@ -1,5 +1,5 @@
 // Patterned vase — tapered cylinder with voronoi walls
-// Shows surface patterns on revolved forms
+// Uses explicit materialization for custom displacement and Voronoi patterning.
 
 const vase = sdf.cylinder(40, 15)
   .displace((x, y, z) => -2 * Math.cos(y * 0.08) - 3 * Math.exp(-y * y / 800));

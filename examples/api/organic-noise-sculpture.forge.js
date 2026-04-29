@@ -1,5 +1,5 @@
 // Organic noise sculpture — natural, coral-like form
-// Demonstrates noise field intersected with geometry
+// Noise is still materialized because native preview does not raymarch it yet.
 
 const shell = sdf.sphere(20).shell(4);
 const texture = sdf.noise({ scale: 0.15, amplitude: 3, octaves: 3 });

@@ -8,8 +8,8 @@ const spine = spline3d([
   [60, 10, 30],
 ], { tension: 0.4 });
 
-const smallCircle = circle2d(3, 24);
-const largeCircle = circle2d(8, 24);
+const smallCircle = circle2d(3);
+const largeCircle = circle2d(8);
 
 const tapered = variableSweep(spine, [
   { t: 0.0, profile: smallCircle },

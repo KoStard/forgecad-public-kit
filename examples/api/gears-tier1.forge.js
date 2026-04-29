@@ -1,10 +1,10 @@
 // Tier 1 gears demo: spur pair + ring gear + rack gear
 
-const moduleSize = param("Module", 1.25, { min: 0.6, max: 3.0, step: 0.05 });
-const pinionTeeth = param("Pinion Teeth", 14, { min: 8, max: 28, integer: true });
-const drivenTeeth = param("Driven Teeth", 42, { min: 16, max: 90, integer: true });
-const backlash = param("Backlash", 0.05, { min: 0, max: 0.2, step: 0.01, unit: "mm" });
-const faceWidth = param("Face Width", 10, { min: 4, max: 18, unit: "mm" });
+const moduleSize = Param.number("Module", 1.25, { min: 0.6, max: 3.0, step: 0.05 });
+const pinionTeeth = Param.number("Pinion Teeth", 14, { min: 8, max: 28, integer: true });
+const drivenTeeth = Param.number("Driven Teeth", 42, { min: 16, max: 90, integer: true });
+const backlash = Param.number("Backlash", 0.05, { min: 0, max: 0.2, step: 0.01, unit: "mm" });
+const faceWidth = Param.number("Face Width", 10, { min: 4, max: 18, unit: "mm" });
 
 const pair = lib.gearPair({
   pinion: {

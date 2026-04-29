@@ -8,7 +8,7 @@
 const W = 80, D = 50, H = 30;
 
 // ── Base enclosure ────────────────────────────────────────────────────────────
-const body = roundedRect(W, D, 4, true)
+const body = roundedRect(W, D, 4)
   .extrude(H)
   .color('#c8cdd6');
 
@@ -41,7 +41,7 @@ const vents = ribSketch
   .color('#1a1a2e');
 
 // ── Badge recess on the front face ────────────────────────────────────────────
-const badge = roundedRect(36, 12, 2, true)
+const badge = roundedRect(36, 12, 2)
   .onFace(body, 'front', { v: 4, protrude: 0.05 })
   .extrude(1.5)
   .color('#2563eb');

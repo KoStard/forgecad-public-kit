@@ -1,15 +1,15 @@
 // Transition Curves — smooth connections between edges
-// Demonstrates transitionCurve(), transitionSurface(), pickEdgeSegment(),
-// connectEdges(), and weighted blending (G1 + G2 continuity).
+// Demonstrates transitionCurve(), transitionSurface(), connectEdges(),
+// and weighted blending (G1 + G2 continuity).
 
-const weight = param("Weight A", 1.0, { min: 0.1, max: 5.0, step: 0.1 });
-const weightB = param("Weight B", 1.0, { min: 0.1, max: 5.0, step: 0.1 });
-const radius = param("Tube Radius", 1.5, { min: 0.3, max: 5, unit: "mm" });
+const weight = Param.number("Weight A", 1.0, { min: 0.1, max: 5.0, step: 0.1 });
+const weightB = Param.number("Weight B", 1.0, { min: 0.1, max: 5.0, step: 0.1 });
+const radius = Param.number("Tube Radius", 1.5, { min: 0.3, max: 5, unit: "mm" });
 
 // Small anchor block at a point (visual reference for where the tube connects)
 function anchor(pos) {
   const s = 3;
-  return box(s, s, s, true).translate(pos[0], pos[1], pos[2]);
+  return box(s, s, s).translate(pos[0], pos[1], pos[2]);
 }
 
 // ── 1. L-bend: 90-degree pipe turn ──────────────────────────────
@@ -51,10 +51,11 @@ const boxB = box(10, 10, 10).translate(35, 15, -20);
 const topEdgeA = selectEdge(boxA, { atZ: -25, parallel: [1, 0, 0] });
 const bottomEdgeB = selectEdge(boxB, { atZ: -20, parallel: [1, 0, 0] });
 
-const pickA = pickEdgeSegment(topEdgeA, { end: 'mid', tangentMode: 'outward' });
-const pickB = pickEdgeSegment(bottomEdgeB, { end: 'mid', tangentMode: 'outward' });
-
-const edgeConnector = transitionSurface(pickA, pickB, {
+const edgeConnector = connectEdges(topEdgeA, bottomEdgeB, {
+  endA: 'mid',
+  endB: 'mid',
+  tangentModeA: 'outward',
+  tangentModeB: 'outward',
   radius: 2,
   weightA: weight,
   weightB: weightB,

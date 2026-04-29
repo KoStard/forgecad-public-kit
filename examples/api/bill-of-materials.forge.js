@@ -1,14 +1,14 @@
 // API demo: script-declared bill of materials that gets auto-summed in report export
 
-const frameWidth = param('Frame Width', 900, { min: 300, max: 1800, unit: 'mm' });
-const frameDepth = param('Frame Depth', 500, { min: 200, max: 1200, unit: 'mm' });
-const legHeight = param('Leg Height', 720, { min: 300, max: 1200, unit: 'mm' });
-const tubeW = param('Tube Width', 30, { min: 15, max: 80, unit: 'mm' });
-const tubeH = param('Tube Height', 20, { min: 10, max: 80, unit: 'mm' });
+const frameWidth = Param.number('Frame Width', 900, { min: 300, max: 1800, unit: 'mm' });
+const frameDepth = Param.number('Frame Depth', 500, { min: 200, max: 1200, unit: 'mm' });
+const legHeight = Param.number('Leg Height', 720, { min: 300, max: 1200, unit: 'mm' });
+const tubeW = Param.number('Tube Width', 30, { min: 15, max: 80, unit: 'mm' });
+const tubeH = Param.number('Tube Height', 20, { min: 10, max: 80, unit: 'mm' });
 
-const frontBolts = param('Front Bolts', 8, { min: 0, max: 64, integer: true });
-const rearBolts = param('Rear Bolts', 8, { min: 0, max: 64, integer: true });
-const boltLength = param('Bolt Length', 16, { min: 6, max: 60, unit: 'mm' });
+const frontBolts = Param.number('Front Bolts', 8, { min: 0, max: 64, integer: true });
+const rearBolts = Param.number('Rear Bolts', 8, { min: 0, max: 64, integer: true });
+const boltLength = Param.number('Bolt Length', 16, { min: 6, max: 60, unit: 'mm' });
 
 const wall = 2;
 const longTubeMm = frameWidth * 2;

@@ -10,7 +10,7 @@
  * Drag the Blend Weight slider to shift the blend shape!
  */
 
-const blendWeight = param('Blend Weight', 0.5, { min: 0.1, max: 0.9, step: 0.05 });
+const blendWeight = Param.number('Blend Weight', 0.5, { min: 0.1, max: 0.9, step: 0.05 });
 
 // ─── 1. Gothic arch — two arcs meeting at a point ──────────────────────────
 // Two arcs sharing a crown point — smooth by construction since both

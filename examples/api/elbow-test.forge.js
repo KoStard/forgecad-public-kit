@@ -1,7 +1,7 @@
 // Test lib.elbow() — pipe bend primitive
-const pipeR = param("Pipe Radius", 5, { min: 2, max: 15, unit: "mm" });
-const bendR = param("Bend Radius", 25, { min: 10, max: 60, unit: "mm" });
-const angle = param("Angle", 90, { min: 15, max: 180, unit: "°" });
+const pipeR = Param.number("Pipe Radius", 5, { min: 2, max: 15, unit: "mm" });
+const bendR = Param.number("Bend Radius", 25, { min: 10, max: 60, unit: "mm" });
+const angle = Param.number("Angle", 90, { min: 15, max: 180, unit: "°" });
 
 // Basic elbow at default orientation
 const basic = lib.elbow(pipeR, bendR, angle).color('#B87333');

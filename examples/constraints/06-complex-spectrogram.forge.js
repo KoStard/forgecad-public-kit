@@ -1,4 +1,4 @@
-const width = param('width', 39);
+const width = Param.number('width', 39);
 
 /** Create an open polyline of `count` segments from startPoint to endPoint. */
 function polyline(sk, startPoint, endPoint, count) {

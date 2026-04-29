@@ -29,7 +29,7 @@ let body = constrainedSketch()
 // Subtract center bore
 body = body.subtract(circle2d(R_CORE_IN))
 
-const solidCutRectangle = rect(200, 8, true);
+const solidCutRectangle = rect(200, 8);
 const solidRing = circle2d(R_CORE)
   .subtract(circle2d(R_CORE_IN))
   .subtract(solidCutRectangle)

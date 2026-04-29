@@ -7,11 +7,11 @@
 //   - BOM listing fastener quantities
 //   - Optional exploded view
 
-const plateW    = param("Plate Width",  60, { min: 40, max: 120, unit: "mm" });
-const plateD    = param("Plate Depth",  40, { min: 30, max:  80, unit: "mm" });
-const topThick  = param("Top Thick",     8, { min:  4, max:  20, unit: "mm" });
-const botThick  = param("Bot Thick",     8, { min:  4, max:  20, unit: "mm" });
-const exploded  = param("Explode",       0, { min:  0, max:  1,  step: 1 });
+const plateW    = Param.number("Plate Width",  60, { min: 40, max: 120, unit: "mm" });
+const plateD    = Param.number("Plate Depth",  40, { min: 30, max:  80, unit: "mm" });
+const topThick  = Param.number("Top Thick",     8, { min:  4, max:  20, unit: "mm" });
+const botThick  = Param.number("Bot Thick",     8, { min:  4, max:  20, unit: "mm" });
+const exploded  = Param.number("Explode",       0, { min:  0, max:  1,  step: 1 });
 
 // Bolt-circle inset from plate edge
 const inset = 10;
@@ -32,7 +32,7 @@ const hw      = lib.fastenerSet("M5", grip + 4);
 const { dims } = hw;
 
 // --- Top plate: clearance holes (normal fit) ---
-let topPlate = box(plateW, plateD, topThick, true);
+let topPlate = box(plateW, plateD, topThick);
 for (const [x, y] of boltPositions) {
   topPlate = topPlate.subtract(
     hw.clearanceHole.translate(x, y, 0),
@@ -47,7 +47,7 @@ const botCenter  = -(topThick / 2 + botThick / 2);
 const botFace    =  botCenter - botThick / 2;   // bottom face of bottom plate
 
 // --- Bottom plate: tapped holes ---
-let botPlate = box(plateW, plateD, botThick, true).translate(0, 0, botCenter);
+let botPlate = box(plateW, plateD, botThick).translate(0, 0, botCenter);
 for (const [x, y] of boltPositions) {
   botPlate = botPlate.subtract(
     hw.tappedHole.translate(x, y, botCenter),

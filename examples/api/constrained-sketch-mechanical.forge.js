@@ -11,10 +11,10 @@
  *   4. Connecting rod    — constrained trapezoid with symmetric sides
  */
 
-const W  = param('width',  60, { min: 30, max: 120, unit: 'mm' });
-const H  = param('height', 40, { min: 20, max: 80, unit: 'mm' });
-const T  = param('thick',   8, { min: 3, max: 20, unit: 'mm' });
-const R  = param('radius', 10, { min: 5, max: 25, unit: 'mm' });
+const W  = Param.number('width',  60, { min: 30, max: 120, unit: 'mm' });
+const H  = Param.number('height', 40, { min: 20, max: 80, unit: 'mm' });
+const T  = Param.number('thick',   8, { min: 3, max: 20, unit: 'mm' });
+const R  = Param.number('radius', 10, { min: 5, max: 25, unit: 'mm' });
 
 // ─── 1. Slotted plate ─────────────────────────────────────────────────────────
 const slottedPlate = (() => {

@@ -6,10 +6,10 @@
 
 const sk = constrainedSketch();
 
-const OW = param("outer_w", 120, { unit: "mm" });
-const OH = param("outer_h", 100, { unit: "mm" });
-const IW = param("inner_w", 60, { unit: "mm" });
-const IH = param("inner_h", 50, { unit: "mm" });
+const OW = Param.number("outer_w", 120, { unit: "mm" });
+const OH = Param.number("outer_h", 100, { unit: "mm" });
+const IW = Param.number("inner_w", 60, { unit: "mm" });
+const IH = Param.number("inner_h", 50, { unit: "mm" });
 
 // Outer rectangle
 const o1 = sk.point(0, 0);

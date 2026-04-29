@@ -5,10 +5,10 @@
  * Each layer is a hexagon that twists slightly more than the last.
  */
 
-const sides = param('sides', 6, 3, 12);
-const radius = param('radius', 20, 10, 40);
-const height = param('height', 60, 20, 120);
-const twistDeg = param('twist', 90, 0, 360);
+const sides = Param.number('sides', 6, 3, 12);
+const radius = Param.number('radius', 20, 10, 40);
+const height = Param.number('height', 60, 20, 120);
+const twistDeg = Param.number('twist', 90, 0, 360);
 const layerHeight = 0.2;
 
 const g = gcode({ nozzle: 0.4, layerHeight, printSpeed: 1800 });

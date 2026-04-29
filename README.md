@@ -8,7 +8,7 @@ ForgeCAD is a multi-backend CAD system with a JavaScript/TypeScript modeling API
 
 TypeScript is the file format. The browser is the CAD system.
 
-[**Try it live →**](https://forgecad.io) • [Docs](https://forgecad.io/docs) • [Examples](examples)
+[**Try it live →**](https://forgecad.io) • [Docs](https://forgecad.io/docs) • [Examples](examples) • [Agent Skill](skills/forgecad/SKILL.md)
 
 ## Get Started
 
@@ -25,15 +25,16 @@ forgecad studio --blank
 
 ## About This Repository
 
-This is ForgeCAD's **community home** — the place to file issues, follow development, explore benchmarks, and find examples and documentation.
+This is ForgeCAD's **community home** — the place to file issues, follow development, explore benchmarks, and find maintained examples, docs links, and agent context.
 
-Active development happens in a private repository so we can move fast and iterate freely. As the project matures, we plan to progressively open-source more components of the codebase here. If you have something specific you'd like to see opened up, [open an issue](https://github.com/KoStard/ForgeCAD/issues) — community input directly shapes what we prioritize.
+Active development happens in a private repository so we can move fast and iterate freely. This public repository is intentionally small: it keeps the user-facing examples and agent context fresh without exposing the private implementation. As the project matures, we plan to progressively open-source more components of the codebase here. If you have something specific you'd like to see opened up, [open an issue](https://github.com/KoStard/ForgeCAD/issues) — community input directly shapes what we prioritize.
 
 ### What lives here
 
 - **Issues & discussions** — bug reports, feature requests, and questions ([open an issue](https://github.com/KoStard/ForgeCAD/issues))
 - **LLM benchmarks** — how well do different models handle code-first CAD?
 - **Examples** — ready-to-run `.forge.js` scripts you can learn from and adapt
+- **Agent skill** — generated ForgeCAD modeling context in [`skills/forgecad/`](skills/forgecad/SKILL.md)
 - **Documentation** — available at [forgecad.io/docs](https://forgecad.io/docs)
 
 ## Your First Script
@@ -77,6 +78,8 @@ Install a self-contained ForgeCAD skill for coding agents:
 forgecad skill install        # model-authoring docs
 forgecad skill install --dev  # + internals and coding conventions
 ```
+
+This repository also includes the generated public modeling skill at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md), with the referenced docs checked in beside it.
 
 ### Chat UI (Claude.ai, ChatGPT, Gemini, …)
 

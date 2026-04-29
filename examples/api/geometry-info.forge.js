@@ -2,11 +2,10 @@
 // Run with: forgecad run examples/api/geometry-info.forge.js
 // The CLI now prints backend/representation/fidelity/topology for each object.
 
-const base = rectangle(-35, -20, 70, 40).extrude(18).color('#5f7c8a');
+const base = Rectangle2D.fromDimensions(-35, -20, 70, 40).extrude(18).color('#5f7c8a');
 
 const cutter = circle2d(11, 36).extrude(26).translate(0, 0, -4);
 const machined = base
-  .toShape()
   .subtract(cutter)
   .color('#9eb4bf')
   .translate(0, 72, 0);

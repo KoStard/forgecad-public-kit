@@ -6,8 +6,8 @@
 
 const sk = constrainedSketch();
 
-const W = param("width", 150, { unit: "mm" });
-const H = param("height", 100, { unit: "mm" });
+const W = Param.number("width", 150, { unit: "mm" });
+const H = Param.number("height", 100, { unit: "mm" });
 
 // Outer box corners
 const p00 = sk.point(0, 0);

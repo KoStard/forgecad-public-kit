@@ -21,7 +21,7 @@ sk.horizontal(bottom);
 sk.vertical(right);
 sk.parallel(bottom, top);
 sk.parallel(right, left);
-sk.length(bottom, param("width", 40, { unit: "mm" }));
-sk.length(right, param("height", 30, { unit: "mm" }));
+sk.length(bottom, Param.number("width", 40, { unit: "mm" }));
+sk.length(right, Param.number("height", 30, { unit: "mm" }));
 
 return sk.solve();

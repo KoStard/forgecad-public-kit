@@ -5,7 +5,7 @@
 
 const sk = constrainedSketch();
 
-const SIZE = param("size", 60, { unit: "mm" });
+const SIZE = Param.number("size", 60, { unit: "mm" });
 
 // L-shape vertices (going CCW)
 //   (0,60)────(60,60)
