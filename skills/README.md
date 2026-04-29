@@ -8,7 +8,13 @@ The default command:
 forgecad skill install
 ```
 
-still installs only the self-contained `forgecad` modeling skill. These additional skills expose more of the workflow prompts Ruben uses for planning, building, inspecting, optimizing, and documenting ForgeCAD models. Clone this repository if you want to read or copy them directly.
+still installs only the self-contained `forgecad` modeling skill. To install the broader workflow library with namespaced skill names, use:
+
+```bash
+forgecad skill install --library
+```
+
+These additional skills expose more of the workflow prompts Ruben uses for planning, building, inspecting, optimizing, and documenting ForgeCAD models. Clone this repository if you want to read the source prompts directly.
 
 | Skill | Purpose |
 | --- | --- |

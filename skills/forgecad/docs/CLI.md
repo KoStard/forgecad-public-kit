@@ -450,6 +450,9 @@ ForgeCAD files are plain JavaScript. AI coding agents write and iterate on them 
 # Give your agent full ForgeCAD API knowledge
 forgecad skill install
 
+# Install the broader namespaced ForgeCAD workflow library too
+forgecad skill install --library
+
 # Or export a single context file for chat UIs (Claude.ai, ChatGPT, ...)
 forgecad skill one-file ~/Desktop/forgecad-context.md
 ```

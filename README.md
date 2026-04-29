@@ -77,6 +77,7 @@ Install a self-contained ForgeCAD skill for coding agents:
 ```bash
 forgecad skill install        # model-authoring docs
 forgecad skill install --dev  # + internals and coding conventions
+forgecad skill install --library  # + namespaced companion workflow skills
 ```
 
 This repository also includes the generated public modeling skill at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md), with the referenced docs checked in beside it.
@@ -85,7 +86,7 @@ This repository also includes the generated public modeling skill at [`skills/fo
 
 People often ask for the exact prompts and workflows used to produce ForgeCAD models. Those live in [`skills/`](skills/README.md).
 
-The default `forgecad skill install` command stays intentionally small and installs only the core `forgecad` modeling skill. If you want the broader workflow set, clone this repository and browse or copy the public skills directly:
+The default `forgecad skill install` command stays intentionally small and installs only the core `forgecad` modeling skill. Use `forgecad skill install --library` to install the broader workflow set with namespaced skill names such as `forgecad-prepare-prompt`, `forgecad-make-a-model`, and `forgecad-lld`. You can also clone this repository to read the source prompts directly:
 
 - build-brief preparation with [`prepare-forgecad-prompt`](skills/prepare-forgecad-prompt/SKILL.md)
 - model authoring with [`make-a-model`](skills/make-a-model/SKILL.md)
