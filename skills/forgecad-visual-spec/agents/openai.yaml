@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeCAD Visual Spec"
+  short_description: "Builder-honest image prompt packs"
+  default_prompt: "Use $forgecad-visual-spec to turn this ForgeCAD artifact into image prompts that show the final product without hiding how it is built."

@@ -81,6 +81,18 @@ forgecad skill install --dev  # + internals and coding conventions
 
 This repository also includes the generated public modeling skill at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md), with the referenced docs checked in beside it.
 
+### Expanded skill library
+
+People often ask for the exact prompts and workflows used to produce ForgeCAD models. Those live in [`skills/`](skills/README.md).
+
+The default `forgecad skill install` command stays intentionally small and installs only the core `forgecad` modeling skill. If you want the broader workflow set, clone this repository and browse or copy the public skills directly:
+
+- build-brief preparation with [`prepare-forgecad-prompt`](skills/prepare-forgecad-prompt/SKILL.md)
+- model authoring with [`make-a-model`](skills/make-a-model/SKILL.md)
+- component discipline with [`component-model`](skills/component-model/SKILL.md)
+- render-bundle verification with [`forgecad-render-inspect`](skills/forgecad-render-inspect/SKILL.md)
+- visual prompt generation with [`forgecad-visual-spec`](skills/forgecad-visual-spec/SKILL.md)
+
 ### Chat UI (Claude.ai, ChatGPT, Gemini, …)
 
 Generate a single context file with all ForgeCAD API docs for any chat session:

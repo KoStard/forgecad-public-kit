@@ -1,6 +1,7 @@
 ---
 name: forgecad
 description: ForgeCAD model authoring, editing, debugging, and execution guidance for .forge.js, SVG-import, assembly, and CLI workflows. Use when building or modifying ForgeCAD geometry, structuring multi-file projects, validating scripts, or using ForgeCAD export/render tooling.
+forgecad-public: true
 ---
 
 # ForgeCAD
