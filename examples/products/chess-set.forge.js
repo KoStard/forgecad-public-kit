@@ -18,6 +18,10 @@ const whitePiece = "#f1eadf";
 const blackPiece = "#2b2a29";
 const accentMetal = "#c7a86a";
 
+function centeredBox(width, depth, height) {
+  return box(width, depth, height).translate(0, 0, -height / 2);
+}
+
 function ring(height, outerRadius, innerRadius) {
   return cylinder(height, outerRadius).subtract(
     cylinder(height + 2, innerRadius).translate(0, 0, -1)
@@ -52,7 +56,7 @@ function rookShape() {
     .translate(0, 0, squareSize * 0.34);
   const crown = cylinder(squareSize * 0.17, squareSize * 0.23)
     .translate(0, 0, squareSize * 0.79);
-  const slot = box(squareSize * 0.08, squareSize * 0.18, squareSize * 0.14)
+  const slot = centeredBox(squareSize * 0.08, squareSize * 0.18, squareSize * 0.14)
     .translate(0, squareSize * 0.18, squareSize * 0.88);
   const battlements = crown.subtract(circularPattern(slot, 4));
   return union(base, lowerBody, tower, battlements);
@@ -68,7 +72,7 @@ function bishopShape() {
   const crown = ring(squareSize * 0.05, squareSize * 0.16, squareSize * 0.11)
     .translate(0, 0, squareSize * 0.74);
   const piece = union(base, lowerBody, body, crown, head);
-  const slit = box(squareSize * 0.06, squareSize * 0.28, squareSize * 0.42)
+  const slit = centeredBox(squareSize * 0.06, squareSize * 0.28, squareSize * 0.42)
     .rotateZ(32)
     .translate(0, 0, squareSize * 0.86);
   return piece.subtract(slit);
@@ -100,9 +104,9 @@ function kingShape() {
     .translate(0, 0, squareSize * 0.37);
   const shoulder = sphere(squareSize * 0.12).translate(0, 0, squareSize * 0.94);
   const neck = cylinder(squareSize * 0.08, squareSize * 0.08).translate(0, 0, squareSize * 1.04);
-  const crossStem = box(squareSize * 0.055, squareSize * 0.055, squareSize * 0.22)
+  const crossStem = centeredBox(squareSize * 0.055, squareSize * 0.055, squareSize * 0.22)
     .translate(0, 0, squareSize * 1.2);
-  const crossArm = box(squareSize * 0.18, squareSize * 0.05, squareSize * 0.05)
+  const crossArm = centeredBox(squareSize * 0.18, squareSize * 0.05, squareSize * 0.05)
     .translate(0, 0, squareSize * 1.23);
   return union(base, lowerBody, body, shoulder, neck, crossStem, crossArm);
 }
@@ -124,16 +128,16 @@ function knightShape() {
     sphere(squareSize * 0.055).translate(0, squareSize * 0.24, squareSize * 0.98),
     sphere(squareSize * 0.045).translate(0, squareSize * 0.31, squareSize * 0.94)
   );
-  const mane = box(squareSize * 0.08, squareSize * 0.12, squareSize * 0.36)
+  const mane = centeredBox(squareSize * 0.08, squareSize * 0.12, squareSize * 0.36)
     .rotateX(-12)
     .translate(0, squareSize * 0.03, squareSize * 0.94);
-  const earL = box(squareSize * 0.035, squareSize * 0.08, squareSize * 0.12)
+  const earL = centeredBox(squareSize * 0.035, squareSize * 0.08, squareSize * 0.12)
     .rotateX(-18).rotateZ(14)
     .translate(-squareSize * 0.04, squareSize * 0.18, squareSize * 1.2);
-  const earR = box(squareSize * 0.035, squareSize * 0.08, squareSize * 0.12)
+  const earR = centeredBox(squareSize * 0.035, squareSize * 0.08, squareSize * 0.12)
     .rotateX(-18).rotateZ(-14)
     .translate(squareSize * 0.04, squareSize * 0.18, squareSize * 1.2);
-  const chinCut = box(squareSize * 0.5, squareSize * 0.28, squareSize * 0.34)
+  const chinCut = centeredBox(squareSize * 0.5, squareSize * 0.28, squareSize * 0.34)
     .rotateX(58)
     .translate(0, -squareSize * 0.04, squareSize * 0.93);
   return union(base, chest, neck, head, muzzle, mane, earL, earR).subtract(chinCut);
@@ -166,8 +170,8 @@ function placePiece(kind, file, rank, color, facingDeg, name) {
 }
 
 const frame = difference(
-  box(frameSize, frameSize, boardThickness).translate(0, 0, boardThickness * 0.5),
-  box(boardSize + 1, boardSize + 1, boardThickness * 0.32)
+  centeredBox(frameSize, frameSize, boardThickness).translate(0, 0, boardThickness * 0.5),
+  centeredBox(boardSize + 1, boardSize + 1, boardThickness * 0.32)
     .translate(0, 0, boardThickness - boardThickness * 0.16)
 )
   .color(woodDark);
@@ -177,7 +181,7 @@ const darkSquares = [];
 for (let file = 0; file < 8; file += 1) {
   for (let rank = 0; rank < 8; rank += 1) {
     const [x, y] = squareCenter(file, rank);
-    const tile = box(squareSize, squareSize, tileHeight)
+    const tile = centeredBox(squareSize, squareSize, tileHeight)
       .translate(x, y, boardTop + tileHeight * 0.5);
     if ((file + rank) % 2 === 0) lightSquares.push(tile);
     else darkSquares.push(tile);
@@ -188,9 +192,9 @@ const lightSquareField = union(...lightSquares).color(woodLight);
 const darkSquareField = union(...darkSquares).color(squareDark);
 
 const trim = difference(
-  box(frameSize - borderWidth * 0.45, frameSize - borderWidth * 0.45, tileHeight * 0.9)
+  centeredBox(frameSize - borderWidth * 0.45, frameSize - borderWidth * 0.45, tileHeight * 0.9)
     .translate(0, 0, boardTop + tileHeight * 0.45),
-  box(boardSize + borderWidth * 0.2, boardSize + borderWidth * 0.2, tileHeight * 2)
+  centeredBox(boardSize + borderWidth * 0.2, boardSize + borderWidth * 0.2, tileHeight * 2)
     .translate(0, 0, boardTop + tileHeight * 0.45)
 ).color(woodMid);
 

@@ -35,6 +35,10 @@ const blackKeyWidth = whiteKeyWidth * 0.6;
 const blackKeyDepth = whiteKeyDepth * 0.6;
 const blackKeyHeight = keyHeight * 1.4;
 
+function centeredBox(width, depth, height) {
+  return box(width, depth, height).translate(0, 0, -height / 2);
+}
+
 // --- Body outline (grand-style curve via constrained sketch with arcs) ---
 // Grand piano outline: straight keyboard edge (front/−Y), straight left side,
 // large sweeping curve around the tail, and a curved right side (bent side).
@@ -130,12 +134,12 @@ const propStick = union(
 ).color('#8B7355');
 
 // --- Keybed ---
-const keybed = box(keyboardWidth, keyboardDepth, keybedHeight)
+const keybed = centeredBox(keyboardWidth, keyboardDepth, keybedHeight)
   .attachTo(body, 'top-front', 'top-front', [0, 0, -2])
   .color('#222222');
 
 // --- White keys ---
-const whiteKey = box(whiteKeyWidth * 0.98, whiteKeyDepth, keyHeight).color('#f5f5f5');
+const whiteKey = centeredBox(whiteKeyWidth * 0.98, whiteKeyDepth, keyHeight).color('#f5f5f5');
 const keyboardLeft = -keyboardWidth / 2 + whiteKeyWidth / 2;
 
 const whiteKeyRow = linearPattern(whiteKey, whiteKeyCount, whiteKeyWidth, 0, 0)
@@ -145,7 +149,7 @@ const whiteKeys = whiteKeyRow
   .attachTo(keybed, 'top-front', 'bottom-front', [0, -2, 0.1]);
 
 // --- Black keys ---
-const blackKey = box(blackKeyWidth, blackKeyDepth, blackKeyHeight).color('#111111');
+const blackKey = centeredBox(blackKeyWidth, blackKeyDepth, blackKeyHeight).color('#111111');
 const blackPattern = [0, 1, 3, 4, 5];
 const blackKeysList = [];
 
@@ -161,12 +165,12 @@ const blackKeys = blackKeysRow
   .attachTo(keybed, 'top-front', 'bottom-front', [0, whiteKeyDepth * 0.2, 0.1]);
 
 // --- Key slip (front rail below keyboard) ---
-const keySlip = box(keyboardWidth, 12, 6)
+const keySlip = centeredBox(keyboardWidth, 12, 6)
   .attachTo(keybed, 'bottom-front', 'top-front', [0, -4, -2])
   .color('#1b1b1b');
 
 // --- Fallboard (keyboard cover, resting behind the keys) ---
-const fallboard = box(keyboardWidth, 4, keybedHeight + keyHeight + 2)
+const fallboard = centeredBox(keyboardWidth, 4, keybedHeight + keyHeight + 2)
   .attachTo(keybed, 'top-back', 'bottom-front', [0, 2, 0])
   .color('#111111');
 
@@ -178,11 +182,11 @@ const standLipHeight = 8;
 const standLipDepth = 6;
 
 // Main panel of the music stand
-const standPanel = box(standWidth, standThickness, standHeight)
+const standPanel = centeredBox(standWidth, standThickness, standHeight)
   .translate(0, 0, standHeight / 2);
 
 // Bottom lip to hold sheet music
-const standLip = box(standWidth, standLipDepth, standLipHeight)
+const standLip = centeredBox(standWidth, standLipDepth, standLipHeight)
   .attachTo(standPanel, 'bottom-front', 'bottom-back', [0, 0, 0]);
 
 // Combine panel + lip, tilt back, then position behind the fallboard
@@ -223,11 +227,11 @@ const frontRightBB = frontRightLeg.boundingBox();
 const pedalRailY = (frontLeftBB.min[1] + frontLeftBB.max[1]) / 2;
 const pedalRailZ = legHeight * 0.15;
 
-const pedalRail = box(50, 14, 6)
+const pedalRail = centeredBox(50, 14, 6)
   .translate(bodyCenterX, pedalRailY, pedalRailZ)
   .color('#bfa14a');
 
-const pedalBlade = box(4, 18, 2).rotateX(10).color('#d8b45a');
+const pedalBlade = centeredBox(4, 18, 2).rotateX(10).color('#d8b45a');
 const pedalSpacing = 12;
 
 const pedalL = pedalBlade.attachTo(pedalRail, 'top', 'bottom', [-pedalSpacing, 0, 0]);
@@ -240,7 +244,7 @@ const benchDepth = keyboardDepth * 0.6;
 const benchSeatThickness = 6;
 const benchHeight = legHeight * 0.7;
 
-const benchSeat = box(benchWidth, benchDepth, benchSeatThickness)
+const benchSeat = centeredBox(benchWidth, benchDepth, benchSeatThickness)
   .translate(bodyCenterX, frontY - keyboardDepth * 0.9, benchHeight + benchSeatThickness / 2)
   .color('#3b2a1a');
 
