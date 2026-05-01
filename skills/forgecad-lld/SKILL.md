@@ -1,5 +1,5 @@
 ---
-name: lld
+name: forgecad-lld
 description: Write a Low-Level Design (LLD) for a CAD model — exact dimensions, constraints, parameters, and verification criteria. Use after a High-Level Design (HLD) exists and decisions are locked, or for simple parts that don't need an HLD. The detailed design document that code implements.
 forgecad-public: true
 ---
@@ -10,7 +10,7 @@ Create detailed, authoritative design documents for ForgeCAD models. This is the
 
 ## Prerequisites
 
-Before writing an LLD, a High-Level Design (`/high-level-spec`) should exist with its Decisions table filled. The HLD defines *what* to build and *why*. The LLD defines *exactly how*.
+Before writing an LLD, a High-Level Design (`/forgecad-high-level-spec`) should exist with its Decisions table filled. The HLD defines *what* to build and *why*. The LLD defines *exactly how*.
 
 For simple parts (single body, no alternatives to explore), skip the HLD and write the LLD directly.
 
@@ -125,6 +125,6 @@ Always specify units. Always provide rationale for defaults and ranges.
 
 | Stage | Skill | Output |
 |-------|-------|--------|
-| 1. Explore the problem space | `/high-level-spec` | `*-hld.md` |
-| 2. Detailed design | `/lld` (this skill) | `*-lld.md` |
-| 3. Implementation | `/make-a-model` + `/forgecad` | `.forge.js` files |
+| 1. Explore the problem space | `/forgecad-high-level-spec` | `*-hld.md` |
+| 2. Detailed design | `/forgecad-lld` (this skill) | `*-lld.md` |
+| 3. Implementation | `/forgecad-make-a-model` + `/forgecad` | `.forge.js` files |

@@ -15,7 +15,7 @@ Good triggers:
 - a request like "write image prompts for this model"
 - a request to show the final product without hiding how it is built
 
-Do not use this skill for a vague artifact brief. If the object is still underspecified, use `prepare-forgecad-prompt` first.
+Do not use this skill for a vague artifact brief. If the object is still underspecified, use `forgecad-prepare-prompt` first.
 
 ## Core Rule
 

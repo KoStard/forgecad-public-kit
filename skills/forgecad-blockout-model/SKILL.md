@@ -1,5 +1,5 @@
 ---
-name: blockout-model
+name: forgecad-blockout-model
 description: Create rough high-level ForgeCAD concept models from simple primitives to explore layout, proportions, motion, and part relationships without production detail. Use when asked for a quick model sketch, blockout, spatial mockup, or intuitive low-detail 3D concept.
 forgecad-public: true
 ---
@@ -28,9 +28,9 @@ Routing:
 
 | Need | Skill |
 |------|-------|
-| High-level 3D idea using simple masses | `blockout-model` |
-| Written concept or architecture before CAD | `high-level-spec` |
-| Accurate, detailed, parametric ForgeCAD model | `make-a-model` |
+| High-level 3D idea using simple masses | `forgecad-blockout-model` |
+| Written concept or architecture before CAD | `forgecad-high-level-spec` |
+| Accurate, detailed, parametric ForgeCAD model | `forgecad-make-a-model` |
 
 ## File Placement
 
@@ -86,7 +86,7 @@ Do not spend time on:
 - hidden internal structure that does not affect the concept
 - mathematical precision that the concept does not justify
 
-If you notice yourself reaching for detailed constraints, pause and ask whether the blockout should instead hand off to `make-a-model`.
+If you notice yourself reaching for detailed constraints, pause and ask whether the blockout should instead hand off to `forgecad-make-a-model`.
 
 ## Render-Verify Loop
 
@@ -135,4 +135,4 @@ return [
 
 ## Handoff Rule
 
-When the blockout has answered the high-level questions, stop. If the next question is about real fit, tunable dimensions, part details, or manufacturing logic, switch to `make-a-model` rather than refining the blockout indefinitely.
+When the blockout has answered the high-level questions, stop. If the next question is about real fit, tunable dimensions, part details, or manufacturing logic, switch to `forgecad-make-a-model` rather than refining the blockout indefinitely.

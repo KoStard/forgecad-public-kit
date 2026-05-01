@@ -12,7 +12,7 @@ skill-order: 100
 - [3D Primitives](#3d-primitives) — `box`, `cylinder`, `sphere`, `torus`
 - [Boolean Operations](#boolean-operations) — `union`, `difference`, `intersection`
 - [Edge Features](#edge-features) — `fillet`, `chamfer`, `draft`, `offsetSolid`
-- [Patterns & Layout](#patterns-layout) — `selectEdges`, `selectEdge`, `coalesceEdges`, `circularLayout`, `polygonVertices`, `linearPattern`, `circularPattern`, `linearPattern2d`, `circularPattern2d`, `mirrorCopy`
+- [Patterns & Layout](#patterns-layout) — `circularLayout`, `polygonVertices`, `linearPattern`, `circularPattern`, `linearPattern2d`, `circularPattern2d`, `mirrorCopy`, `selectEdges`, `selectEdge`, `coalesceEdges`
 - [Imports & Composition](#imports-composition) — `require`, `importSvgSketch`, `importMesh`, `importStep`
 - [Parameters](#parameters) — `Param.number`, `Param.string`, `Param.bool`, `Param.choice`, `Param.list`
 - [Grouping & Local Coordinates](#grouping-local-coordinates) — `group`
@@ -204,89 +204,6 @@ offsetSolid(shape: Shape, thickness: number): Shape
 
 ### Patterns & Layout
 
-#### `selectEdges()` — Select all edges from a shape that match the given query.
-
-Extracts sharp edges from the mesh (dihedral angle > 1°), applies all filters in the query, and returns the matching `EdgeSegment[]`. When `near` is specified the results are sorted closest-first.
-
-Works on any shape — primitives, booleans, shells, and imported meshes. Use this when tracked topology is unavailable (e.g. after a difference or on imported geometry). For simpler cases, pass an `EdgeQuery` directly to `fillet()` or `chamfer()` instead of calling `selectEdges` separately.
-
-```ts
-// Fillet all top edges of a box
-const topEdges = selectEdges(part, { atZ: 20, perpendicular: [0, 0, 1] });
-let result = part;
-for (const edge of coalesceEdges(topEdges)) {
-  result = fillet(result, 2, edge);
-}
-```
-
-```ts
-selectEdges(shape: Shape, query?: EdgeQuery): EdgeSegment[]
-```
-
-**`EdgeQuery`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `near?` | `Vec3` | Sort by proximity to this point (closest first). When used with `selectEdge`, picks the closest match. |
-| `parallel?` | `Vec3` | Filter: edge direction approximately parallel to this vector. |
-| `perpendicular?` | `Vec3` | Filter: edge direction approximately perpendicular to this vector. |
-| `convex?` | `boolean` | Filter: only convex (outside corner) edges. |
-| `concave?` | `boolean` | Filter: only concave (inside corner) edges. |
-| `minAngle?` | `number` | Filter: minimum dihedral angle in degrees. |
-| `maxAngle?` | `number` | Filter: maximum dihedral angle in degrees. |
-| `minLength?` | `number` | Filter: minimum edge length. |
-| `maxLength?` | `number` | Filter: maximum edge length. |
-| `within?` | `BoundingRegion` | Filter: edge midpoint must be within this bounding region. |
-| `atZ?` | `number` | Shorthand: edge midpoint Z ≈ this value (within `tolerance`). Equivalent to `within: { zMin: atZ - tol, zMax: atZ + tol }`. |
-| `tolerance?` | `number` | Position tolerance for approximate matches (default: `1.0`). Used by `atZ` and `near`. |
-| `angleTolerance?` | `number` | Angular tolerance in degrees for `parallel`/`perpendicular` filters (default: `10`). |
-
-`BoundingRegion`: `{ xMin?: number, xMax?: number, yMin?: number, yMax?: number, zMin?: number, zMax?: number }`
-
-**`EdgeSegment`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `index` | `number` | Stable index within the extraction (deterministic for a given mesh). |
-| `direction` | `Vec3` | Normalized direction from start → end. |
-| `dihedralAngle` | `number` | Dihedral angle in degrees (0 = coplanar, 180 = knife edge). |
-| `convex` | `boolean` | true = outside corner (convex), false = inside corner (concave). |
-| `normalA` | `Vec3` | Normal of first adjacent face. |
-| `normalB` | `Vec3` | Normal of second adjacent face (same as normalA for boundary edges). |
-| `boundary` | `boolean` | true if this is a boundary (unmatched) edge — unusual for closed solids. |
-| `start`, `end`, `midpoint`, `length` | | — |
-
-#### `selectEdge()` — Select the single best-matching edge from a shape.
-
-When `near` is specified, returns the edge whose midpoint is closest to that point. Otherwise returns the first matching edge in mesh order. Throws if no edges match the query — useful as a guard when you expect exactly one result.
-
-```ts
-// Chamfer one specific edge near a known point
-const bottomEdge = selectEdge(part, { near: [25, 0, 0], atZ: 0 });
-result = chamfer(result, 1.5, bottomEdge);
-```
-
-```ts
-selectEdge(shape: Shape, query?: EdgeQuery): EdgeSegment
-```
-
-#### `coalesceEdges()` — Merge collinear edge segments into longer logical edges.
-
-Tessellation often splits one geometric edge into multiple short segments. `coalesceEdges` groups adjacent collinear segments and merges each group into a single `EdgeSegment` spanning the full extent. This is usually needed before passing edges to `fillet()` or `chamfer()` on non-primitive shapes.
-
-The `tolerance` controls the maximum perpendicular distance from collinearity before two segments are considered non-collinear. Default: `0.01`.
-
-```ts
-const topEdges = selectEdges(part, { atZ: 20 });
-for (const edge of coalesceEdges(topEdges)) {
-  result = fillet(result, 2, edge);
-}
-```
-
-```ts
-coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
-```
-
 #### `circularLayout()` — Compute evenly-spaced positions around a circle.
 
 Eliminates the most common trig pattern in CAD scripts:
@@ -406,6 +323,89 @@ mirrorCopy(box(50, 30, 10), [1, 0, 0])
 
 ```ts
 mirrorCopy(shape: Shape, normal: [ number, number, number ]): Shape
+```
+
+#### `selectEdges()` — Select all edges from a shape that match the given query.
+
+Extracts sharp edges from the mesh (dihedral angle > 1°), applies all filters in the query, and returns the matching `EdgeSegment[]`. When `near` is specified the results are sorted closest-first.
+
+Works on any shape — primitives, booleans, shells, and imported meshes. Use this when tracked topology is unavailable (e.g. after a difference or on imported geometry). For simpler cases, pass an `EdgeQuery` directly to `fillet()` or `chamfer()` instead of calling `selectEdges` separately.
+
+```ts
+// Fillet all top edges of a box
+const topEdges = selectEdges(part, { atZ: 20, perpendicular: [0, 0, 1] });
+let result = part;
+for (const edge of coalesceEdges(topEdges)) {
+  result = fillet(result, 2, edge);
+}
+```
+
+```ts
+selectEdges(shape: Shape, query?: EdgeQuery): EdgeSegment[]
+```
+
+**`EdgeQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `near?` | `Vec3` | Sort by proximity to this point (closest first). When used with `selectEdge`, picks the closest match. |
+| `parallel?` | `Vec3` | Filter: edge direction approximately parallel to this vector. |
+| `perpendicular?` | `Vec3` | Filter: edge direction approximately perpendicular to this vector. |
+| `convex?` | `boolean` | Filter: only convex (outside corner) edges. |
+| `concave?` | `boolean` | Filter: only concave (inside corner) edges. |
+| `minAngle?` | `number` | Filter: minimum dihedral angle in degrees. |
+| `maxAngle?` | `number` | Filter: maximum dihedral angle in degrees. |
+| `minLength?` | `number` | Filter: minimum edge length. |
+| `maxLength?` | `number` | Filter: maximum edge length. |
+| `within?` | `BoundingRegion` | Filter: edge midpoint must be within this bounding region. |
+| `atZ?` | `number` | Shorthand: edge midpoint Z ≈ this value (within `tolerance`). Equivalent to `within: { zMin: atZ - tol, zMax: atZ + tol }`. |
+| `tolerance?` | `number` | Position tolerance for approximate matches (default: `1.0`). Used by `atZ` and `near`. |
+| `angleTolerance?` | `number` | Angular tolerance in degrees for `parallel`/`perpendicular` filters (default: `10`). |
+
+`BoundingRegion`: `{ xMin?: number, xMax?: number, yMin?: number, yMax?: number, zMin?: number, zMax?: number }`
+
+**`EdgeSegment`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `index` | `number` | Stable index within the extraction (deterministic for a given mesh). |
+| `direction` | `Vec3` | Normalized direction from start → end. |
+| `dihedralAngle` | `number` | Dihedral angle in degrees (0 = coplanar, 180 = knife edge). |
+| `convex` | `boolean` | true = outside corner (convex), false = inside corner (concave). |
+| `normalA` | `Vec3` | Normal of first adjacent face. |
+| `normalB` | `Vec3` | Normal of second adjacent face (same as normalA for boundary edges). |
+| `boundary` | `boolean` | true if this is a boundary (unmatched) edge — unusual for closed solids. |
+| `start`, `end`, `midpoint`, `length` | | — |
+
+#### `selectEdge()` — Select the single best-matching edge from a shape.
+
+When `near` is specified, returns the edge whose midpoint is closest to that point. Otherwise returns the first matching edge in mesh order. Throws if no edges match the query — useful as a guard when you expect exactly one result.
+
+```ts
+// Chamfer one specific edge near a known point
+const bottomEdge = selectEdge(part, { near: [25, 0, 0], atZ: 0 });
+result = chamfer(result, 1.5, bottomEdge);
+```
+
+```ts
+selectEdge(shape: Shape, query?: EdgeQuery): EdgeSegment
+```
+
+#### `coalesceEdges()` — Merge collinear edge segments into longer logical edges.
+
+Tessellation often splits one geometric edge into multiple short segments. `coalesceEdges` groups adjacent collinear segments and merges each group into a single `EdgeSegment` spanning the full extent. This is usually needed before passing edges to `fillet()` or `chamfer()` on non-primitive shapes.
+
+The `tolerance` controls the maximum perpendicular distance from collinearity before two segments are considered non-collinear. Default: `0.01`.
+
+```ts
+const topEdges = selectEdges(part, { atZ: 20 });
+for (const edge of coalesceEdges(topEdges)) {
+  result = fillet(result, 2, edge);
+}
+```
+
+```ts
+coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
 ```
 
 ### Imports & Composition

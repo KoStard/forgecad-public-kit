@@ -22,11 +22,11 @@ physical connected components, collisions, local thickness, or cross-sections.
 ## Command
 
 ```bash
-forgecad render inspect examples/api/connector-basics.forge.js
+forgecad render inspect examples/api/static-assembly-connectors.forge.js
 forgecad render inspect model.forge.js out/model-inspect --force
 forgecad render inspect model.forge.js --channels rgb,mask,section
-forgecad render inspect model.forge.js --focus "Shelf 1"
-forgecad render inspect model.forge.js --hide "Object 1.Left,Object 1.Right"
+forgecad render inspect model.forge.js --focus Bench
+forgecad render inspect model.forge.js --hide "Bench.Slat0,Bench.Slat1"
 forgecad render inspect model.forge.js --channels thickness --min-thickness 1.2 --warn-thickness 2.0
 ```
 

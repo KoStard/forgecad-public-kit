@@ -1,5 +1,5 @@
 ---
-name: optimize-print-time
+name: forgecad-optimize-print-time
 description: Optimize a ForgeCAD model for 3D printing time reduction. Use when the user wants to reduce print time for a .forge.js model. Analyzes geometry height, volume, material usage, and compares against reference STLs or known-fast designs.
 forgecad-public: true
 ---

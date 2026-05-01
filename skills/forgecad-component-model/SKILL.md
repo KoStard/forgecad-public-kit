@@ -1,5 +1,5 @@
 ---
-name: component-model
+name: forgecad-component-model
 description: "Enforce the ForgeCAD Component Model when building multi-part assemblies. Parts build at origin, connectors position them, data flows down from parent. Use when building or reviewing any multi-file ForgeCAD project."
 forgecad-public: true
 ---

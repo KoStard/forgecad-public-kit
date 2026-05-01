@@ -111,7 +111,7 @@ Render a Forge scene. Use a subcommand — `3d`, `inspect`, `section`, `wirefram
 
 ```bash
 forgecad render 3d examples/cup.forge.js
-forgecad render inspect examples/api/connector-basics.forge.js
+forgecad render inspect examples/api/static-assembly-connectors.forge.js
 forgecad render wireframe examples/cup.forge.js
 forgecad render section examples/furniture/01-table.forge.js --plane XZ
 forgecad render hq examples/cup.forge.js --preset dramatic
@@ -151,9 +151,9 @@ Use `--focus` to isolate specific parts or hide mocks, and `--hide` to remove na
 For bundle layout, channel encodings, and manifest semantics, see [Inspection Bundles](guides/inspection-bundles.md).
 
 ```bash
-forgecad render inspect examples/api/connector-basics.forge.js
-forgecad render inspect examples/api/connector-basics.forge.js out/connector-inspect --focus "Shelf 1"
-forgecad render inspect examples/api/connector-basics.forge.js --hide "Object 1.Left" --force
+forgecad render inspect examples/api/static-assembly-connectors.forge.js
+forgecad render inspect examples/api/static-assembly-connectors.forge.js out/bench-inspect --focus Bench
+forgecad render inspect examples/api/static-assembly-connectors.forge.js --hide "Bench.Slat0" --force
 ```
 
 ### `forgecad render wireframe`
@@ -233,6 +233,7 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 | `--background <color>` | Canvas background override |
 | `--render-mode <solid\|wireframe>` | Shaded solid (default) or wireframe only |
 | `--edges <off\|thin\|bold>` | Edge overlay preset in solid mode (default: thin) |
+| `--style <beauty\|technical>` | Presentation style (default: technical) |
 | `--port <n>` | Vite dev server port |
 | `--chrome-path <path>` | Chrome or Chromium executable path |
 | `--output <path>` | Output file path |

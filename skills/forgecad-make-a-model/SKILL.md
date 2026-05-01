@@ -1,5 +1,5 @@
 ---
-name: make-a-model
+name: forgecad-make-a-model
 description: Create new ForgeCAD (.forge.js) models in the active CAD project. Handles file placement, invokes the forgecad skill for API guidance, and validates the result.
 forgecad-public: true
 ---

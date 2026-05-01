@@ -5,20 +5,32 @@ skill-order: 100
 
 # Curves & Surfacing
 
-Smooth curves, lofted surfaces, swept solids, and splines.
+Smooth curves, lofted surfaces, swept solids, splines, and high-level product skins.
 
 ## Contents
 
 - [Curves & Surfacing](#curves-surfacing) — `hermiteTransitionG2`, `nurbs3d`, `spline2d`, `spline3d`, `loft`, `loftAlongSpine`, `sweep`, `variableSweep`, `nurbsSurface`, `surfacePatch`, `transitionCurve`, `transitionSurface`, `connectEdges`
+- [Product Modeling](#product-modeling) — `applyMaterial`, `profileSize`, `ovalProfile`, `superEllipseProfile`, `roundedRectProfile`, `circleProfile`, `describeProfile`, `scaleProfileTo`, `scenePreset`
 - [Curve3D](#curve3d)
 - [NurbsCurve3D](#nurbscurve3d)
 - [NurbsSurface](#nurbssurface)
 - [PathBuilder](#pathbuilder) — Line Segments, Arcs, Curves, Closing & Output
 - [HermiteCurve3D](#hermitecurve3d)
 - [QuinticHermiteCurve3D](#quintichermitecurve3d)
+- [ProductSkin](#productskin)
+- [ProductSurfaceRef](#productsurfaceref)
+- [ProductSkinBuilder](#productskinbuilder)
+- [ProductStationBuilder](#productstationbuilder)
+- [ProductPanelBuilder](#productpanelbuilder)
+- [ProductSpoutBuilder](#productspoutbuilder)
+- [ProductHandleBuilder](#producthandlebuilder)
+- [ProductHandleFeature](#producthandlefeature)
 - [Surface](#surface)
 - [Blend](#blend)
 - [Analysis](#analysis)
+- [Product](#product)
+- [profiles](#profiles)
+- [materials](#materials)
 
 ## Functions
 
@@ -336,6 +348,91 @@ connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptio
 | `tangentB?` | `Vec3` | Explicit tangent for edge B. |
 | `flipA?` | `boolean` | Flip tangent A. |
 | `flipB?` | `boolean` | Flip tangent B. |
+
+### Product Modeling
+
+#### `applyMaterial()` — Apply a product material preset to a Shape, including color and PBR material properties.
+
+```ts
+applyMaterial(shape: Shape, preset: ProductMaterial | undefined): Shape
+```
+
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
+
+#### `profileSize()` — Return the width/depth of a 2D profile from its sketch bounds.
+
+```ts
+profileSize(sketch: Sketch): { width: number; depth: number; }
+```
+
+#### `ovalProfile()` — Create a centered oval profile using full product width and depth dimensions.
+
+```ts
+ovalProfile(width: number, depth: number, options?: ProductProfileOptions): Sketch
+```
+
+`ProductProfileOptions`: `{ segments?: number }`
+
+#### `superEllipseProfile()` — Create a centered superellipse profile using full product width/depth dimensions.
+
+```ts
+superEllipseProfile(width: number, depth: number, options?: ProductSuperEllipseOptions): Sketch
+```
+
+
+**`ProductSuperEllipseOptions`** extends ProductProfileOptions
+- `exponent?: number` — Higher values produce squarer product surfaces; 2 is an ellipse.
+
+#### `roundedRectProfile()` — Create a centered rounded-rectangle product profile.
+
+```ts
+roundedRectProfile(width: number, depth: number, radius: number): Sketch
+```
+
+#### `circleProfile()` — Create a centered circular product profile from its diameter.
+
+```ts
+circleProfile(diameter: number, options?: ProductProfileOptions): Sketch
+```
+
+#### `describeProfile()` — Describe a sketch as a product profile so surface helpers can derive station dimensions.
+
+```ts
+describeProfile(sketch: Sketch, kind?: ProductProfileKind, radius?: number): ProductProfileDescriptor
+```
+
+`ProductProfileDescriptor`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number }`
+
+#### `scaleProfileTo()` — Scale an existing profile sketch to a target width and depth.
+
+```ts
+scaleProfileTo(sketch: Sketch, width: number, depth: number): Sketch
+```
+
+#### `scenePreset()` — Apply an opinionated scene preset for product, service, or mechanical review renders.
+
+```ts
+scenePreset(name: ProductScenePreset): void
+```
 
 ---
 
@@ -854,6 +951,458 @@ sampleAdaptive(minCount?: number, maxCount?: number): Vec3[]
 toPolyline(samples?: number): Vec3[]
 ```
 
+### `ProductSkin`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+| `shape` | `Shape` | — |
+| `axis` | `ProductSkinAxis` | — |
+| `stations` | `ProductStationSpec[]` | — |
+| `rails` | `Record<string, ProductRailSpec>` | — |
+
+**Methods:**
+
+#### [`toShape()`](/docs/sdf#toshape) — Return the renderable shape generated for this product skin.
+
+```ts
+toShape(): Shape
+```
+
+#### `with()` — Create a group containing this skin plus named child details.
+
+```ts
+with(...children: GroupInput[]): ShapeGroup
+```
+
+#### `integrate()` — Boolean-union structural details into the skin body.
+
+```ts
+integrate(...details: Shape[]): Shape
+```
+
+#### `diagnostics()` — Return lowering representation, station names, rail names, and warnings.
+
+```ts
+diagnostics(): ProductSkinDiagnostics
+```
+
+#### `uv()` — Create a side/u/v surface-ref query on this skin.
+
+```ts
+uv(side: ProductSkinSide, u?: number, v?: number): ProductSkinRefQuery
+```
+
+#### `ref()` — Resolve a named ref published with Product.skin().refs(...).
+
+```ts
+ref(name: string): ProductSurfaceRef
+```
+
+#### `curveOnSurface()` — Create a sampled curve as a sequence of surface refs on this skin.
+
+```ts
+curveOnSurface(name: string, points: Array<Partial<ProductSkinRefQuery> & { side: ProductSkinSide; }>): ProductSurfaceRef[]
+```
+
+#### `stationAt()` — Interpolate center, width, and depth at a normalized v or absolute axis value.
+
+```ts
+stationAt(vOrAxis: number): { center: Vec3; width: number; depth: number; dWidth: number; dDepth: number; axisValue: number; }
+```
+
+#### `frame()` — Build a local surface frame from a side/u/v query.
+
+```ts
+frame(query: ProductSkinRefQuery): ProductSurfaceFrame
+```
+
+### `ProductSurfaceRef`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string | undefined` | — |
+
+**Methods:**
+
+#### `frame()` — Resolve this semantic surface ref into a point, normal, tangents, and placement matrix.
+
+```ts
+frame(overrides?: Partial<ProductSkinRefQuery>): ProductSurfaceFrame
+```
+
+#### `with()` — Return a copy of this ref with side/u/v/offset overrides.
+
+```ts
+with(overrides: Partial<ProductSkinRefQuery>): ProductSurfaceRef
+```
+
+#### `attach()` — Place a detail shape or group on this ref's local surface frame.
+
+```ts
+attach(detail: Shape | ShapeGroup, options?: ProductAttachOptions): Shape | ShapeGroup
+```
+
+#### `querySpec()` — Return the serializable side/u/v query behind this ref.
+
+```ts
+querySpec(): ProductSkinRefQuery
+```
+
+### `ProductSkinBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `axis()` — Choose the primary station axis for the skin loft.
+
+```ts
+axis(axis: ProductSkinAxis): this
+```
+
+#### `stations()` — Set named cross-section stations for the product skin.
+
+```ts
+stations(stations: Array<ProductStationBuilder | ProductStationSpec>): this
+```
+
+#### `rails()` — Attach guide rails as ProductSkin IR metadata and diagnostics.
+
+```ts
+rails(rails: Record<string, ProductRailSpec>): this
+```
+
+#### `ref()` — Publish a named semantic surface ref on the skin.
+
+```ts
+ref(name: string, query: ProductSkinRefQuery): this
+```
+
+#### `refs()` — Publish multiple named semantic surface refs on the skin.
+
+```ts
+refs(refs: Record<string, ProductSkinRefQuery>): this
+```
+
+#### `uv()` — Create a side/u/v surface-ref query for use in refs(...) or Product.ref(...).
+
+```ts
+uv(side: ProductSkinSide, u?: number, v?: number): ProductSkinRefQuery
+```
+
+#### `material()` — Apply a product material preset to the lowered skin.
+
+```ts
+material(material: ProductMaterial): this
+```
+
+#### `color()` — Apply a simple color override to the lowered skin.
+
+```ts
+color(color: string): this
+```
+
+#### `edgeLength()` — Set the sampled loft target edge length.
+
+```ts
+edgeLength(value: number): this
+```
+
+#### `wall()` — Records a target wall thickness; v1 keeps exterior skin lowering sampled and reports wall as a diagnostic.
+
+```ts
+wall(thickness: number): this
+```
+
+#### `build()` — Lower stations and refs into a ProductSkin body.
+
+```ts
+build(): ProductSkin
+```
+
+### `ProductStationBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `at()` — Position this station in world coordinates.
+
+```ts
+at(point: Vec3): this
+```
+
+#### `z()` — Convenience for traditional Z-up section stacks.
+
+```ts
+z(z: number): this
+```
+
+#### `y()` — Convenience for product bodies running front-to-back along Y.
+
+```ts
+y(y: number): this
+```
+
+#### `x()` — Convenience for product bodies running left-to-right along X.
+
+```ts
+x(x: number): this
+```
+
+#### `oval()` — Use an oval cross-section with full width and depth dimensions.
+
+```ts
+oval(width: number, depth: number, options?: { segments?: number; }): this
+```
+
+#### `superEllipse()` — Use a superellipse cross-section for soft-square product surfaces.
+
+```ts
+superEllipse(width: number, depth: number, options?: ProductStationSuperEllipseOptions): this
+```
+
+#### [`roundedRect()`](/docs/sketch#roundedrect) — Use a rounded-rectangle cross-section with the given corner radius.
+
+```ts
+roundedRect(width: number, depth: number, radius: number): this
+```
+
+#### [`circle()`](/docs/sketch#circle) — Use a circular cross-section from a full diameter.
+
+```ts
+circle(diameter: number, options?: { segments?: number; }): this
+```
+
+#### `custom()` — Use a custom 2D sketch as the station cross-section.
+
+```ts
+custom(sketch: Sketch, width: number, depth: number): this
+```
+
+#### `crown()` — Stores a semantic crown amount for diagnostics and future rail solving.
+
+```ts
+crown(amount: number): this
+```
+
+#### `toSpec()` — Return the immutable station spec consumed by Product.skin().
+
+```ts
+toSpec(): ProductStationSpec
+```
+
+### `ProductPanelBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `rounded()` — Use a rounded rectangle panel profile.
+
+```ts
+rounded(width: number, height: number, radius?: number): this
+```
+
+#### `oval()` — Use an oval panel profile.
+
+```ts
+oval(width: number, height: number): this
+```
+
+#### `profile()` — Use a custom 2D panel profile.
+
+```ts
+profile(profile: Sketch): this
+```
+
+#### `thickness()` — Set panel extrusion thickness.
+
+```ts
+thickness(thickness: number): this
+```
+
+#### `material()` — Apply a product material preset to the panel.
+
+```ts
+material(material: ProductMaterial): this
+```
+
+#### `color()` — Apply a simple color override to the panel.
+
+```ts
+color(color: string): this
+```
+
+#### `build()` — Build the panel in local coordinates.
+
+```ts
+build(): Shape
+```
+
+#### `attachTo()` — Build and attach this panel to a ProductSurfaceRef.
+
+```ts
+attachTo(ref: ProductRefInput, options?: ProductPanelAttachOptions): Shape
+```
+
+### `ProductSpoutBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `from()` — Set the skin ref this spout projects from.
+
+```ts
+from(ref: ProductSurfaceRef): this
+```
+
+#### `sections()` — Set local spout section profiles from root to mouth.
+
+```ts
+sections(sections: Array<Sketch | ProductStationBuilder | ProductStationSpec>): this
+```
+
+#### `projection()` — Set the projection length along the source ref normal.
+
+```ts
+projection(length: number): this
+```
+
+#### `edgeLength()` — Set the sampled loft target edge length for the spout.
+
+```ts
+edgeLength(value: number): this
+```
+
+#### `material()` — Apply a product material preset to the spout.
+
+```ts
+material(material: ProductMaterial): this
+```
+
+#### `color()` — Apply a simple color override to the spout.
+
+```ts
+color(color: string): this
+```
+
+#### `build()` — Build the spout in local coordinates.
+
+```ts
+build(): Shape
+```
+
+#### `attach()` — Build and place the spout on its source ref.
+
+```ts
+attach(options?: ProductAttachOptions): Shape
+```
+
+### `ProductHandleBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `between()` — Set the upper body ref and lower world anchor for the handle.
+
+```ts
+between(upper: ProductSurfaceRef, lower: Vec3): this
+```
+
+#### `spine()` — Set an explicit handle centerline from points or a rail spec.
+
+```ts
+spine(points: Vec3[] | ProductRailSpec): this
+```
+
+#### `grip()` — Set the grip cross-section profile.
+
+```ts
+grip(profile: Sketch): this
+```
+
+#### `material()` — Apply a product material preset to the grip.
+
+```ts
+material(material: ProductMaterial): this
+```
+
+#### `padMaterial()` — Apply a product material preset to handle landing pads.
+
+```ts
+padMaterial(material: ProductMaterial): this
+```
+
+#### `edgeLength()` — Set the sampled loft target edge length for the grip.
+
+```ts
+edgeLength(value: number): this
+```
+
+#### `build()` — Build the handle grip and landing pads.
+
+```ts
+build(): ProductHandleFeature
+```
+
+### `ProductHandleFeature`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `grip` | `Shape` | — |
+| `upperPad` | `Shape` | — |
+| `lowerPad` | `Shape` | — |
+
+**Methods:**
+
+#### `structural()` — Return the physical shapes that make up this handle feature.
+
+```ts
+structural(): Shape[]
+```
+
+#### [`toShape()`](/docs/sdf#toshape) — Boolean-union the handle feature into a single shape.
+
+```ts
+toShape(): Shape
+```
+
+#### `toGroup()` — Return the handle as a named ShapeGroup preserving child colors.
+
+```ts
+toGroup(): ShapeGroup
+```
+
 ---
 
 ## Constants
@@ -884,3 +1433,29 @@ toPolyline(samples?: number): Vec3[]
 - `SurfaceContinuity(shape: Shape, options?: EdgeContinuityThresholds): EdgeContinuityReport`
 - `CurvatureComb(input: NurbsCurve3D | EdgeRef, options?: { samples?: number; }): CurvatureSample[]`
 - `SurfaceHealth(shape: Shape, options?: { tinyEdgeThreshold?: number; sliverThreshold?: number; }): SurfaceHealthReport`
+
+### `Product`
+
+- `skin(name: string): ProductSkinBuilder` — Start a named product skin builder.
+- `station(name: string): ProductStationBuilder` — Start a named cross-section station for Product.skin(...).stations(...).
+- `rail: { bezier(points: Vec3[], options?: { name?: string; }): ProductRailSpec; nurbs(points: Vec3[], options?: { degree?: number; name?: string; }): ProductRailSpec; polyline(points: Vec3[], options?: { name?: string; }): ProductRailSpec; }` — Namespaced rail builders for product skin guide rails and handle spines.
+- `ref(skin: ProductSkin, query: ProductSkinRefQuery): ProductSurfaceRef` — Create an ad-hoc ProductSurfaceRef from a skin and side/u/v query.
+- `panel(name: string): ProductPanelBuilder` — Start a panel feature builder.
+- `spout(name: string): ProductSpoutBuilder` — Start a spout/nozzle feature builder.
+- `handle(name: string): ProductHandleBuilder` — Start a handle feature builder.
+- `place(detail: Shape | ShapeGroup, ref: ProductRefInput, options?: ProductAttachOptions): Shape | ShapeGroup` — Place a shape or group on a ProductSurfaceRef.
+- `landing(name: string, radius?: number, material?: ProductMaterial): Shape` — Small blended landing volume for manual structural bridges and connection proofs.
+
+### `profiles`
+
+- `oval(width: number, depth: number, options?: ProductProfileOptions): Sketch` — Create a centered oval profile using full product width and depth dimensions.
+- `superEllipse(width: number, depth: number, options?: ProductSuperEllipseOptions): Sketch` — Create a centered superellipse profile for soft square-to-oval product sections.
+- `roundedRect(width: number, depth: number, radius: number): Sketch` — Create a centered rounded-rectangle product profile.
+- `circle(diameter: number, options?: ProductProfileOptions): Sketch` — Create a centered circular product profile from its diameter.
+
+### `materials`
+
+- `mattePlastic(color?: string): ProductMaterial` — Matte molded plastic for appliance shells and consumer-product housings.
+- `softRubber(options?: ColorMaterialOptions): ProductMaterial` — Soft low-gloss rubber for grips, feet, pads, and inserts.
+- `clearPolycarbonate(options?: ClearMaterialOptions): ProductMaterial` — Transparent tinted polycarbonate for windows, lenses, and display covers.
+- `brushedSteel(options?: ColorMaterialOptions): ProductMaterial` — Brushed steel-like material for trim, soleplates, and hardware.

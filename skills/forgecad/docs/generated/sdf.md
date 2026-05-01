@@ -12,6 +12,7 @@ Signed Distance Field modeling for organic forms, smooth booleans, TPMS lattices
 - [SDF Materialization](#sdf-materialization) — `toShape`, `combine`
 - [SdfShape](#sdfshape)
 - [sdf](#sdf)
+- [Sculpt](#sculpt)
 
 ## Functions
 
@@ -104,6 +105,66 @@ material(props: ShapeMaterialProps): SdfShape
 
 ```ts
 bounds(bounds: SdfBounds | [ Vec3, Vec3 ]): SdfShape
+```
+
+#### `at()` — Sculpt-style alias for translate().
+
+```ts
+at(x: number, y: number, z: number): SdfShape
+```
+
+#### `move()` — Sculpt-style alias for translate().
+
+```ts
+move(x: number, y: number, z: number): SdfShape
+```
+
+#### `spin()` — Sculpt-style alias for rotateZ().
+
+```ts
+spin(angleDeg: number): SdfShape
+```
+
+#### `tilt()` — Sculpt-style tilt around X, Y, Z, or a custom axis.
+
+```ts
+tilt(angleDeg: number, axis?: "x" | "y" | "z" | Vec3): SdfShape
+```
+
+#### `round()` — Sculpt-style rounded-box helper. Currently applies directly to primitive SDF boxes.
+
+```ts
+round(radius: number): SdfShape
+```
+
+#### `blend()` — Sculpt-style smooth blend with another implicit shape.
+
+```ts
+blend(other: SdfShape, options?: number | { radius?: number; }): SdfShape
+```
+
+#### `goop()` — Sculpt-style alias for blend().
+
+```ts
+goop(other: SdfShape, options?: number | { radius?: number; }): SdfShape
+```
+
+#### `carve()` — Sculpt-style smooth carve/subtract.
+
+```ts
+carve(other: SdfShape, options?: number | { radius?: number; }): SdfShape
+```
+
+#### `keep()` — Sculpt-style smooth intersection/keep operation.
+
+```ts
+keep(other: SdfShape, options?: number | { radius?: number; }): SdfShape
+```
+
+#### `polish()` — Apply a Sculpt material preset or direct material props.
+
+```ts
+polish(input?: SculptPolishInput): SdfShape
 ```
 
 #### [`union()`](/docs/core#union) — SDF union (sharp).
@@ -312,3 +373,26 @@ return {
 - `repeat(shape: SdfShape, spacing: Vec3, count?: Vec3): SdfShape` — Repeat an SDF shape in space.
 - `SurfacePattern: typeof SurfacePattern` — A 2D surface pattern — a heightmap function for use with `.surfaceDisplace()`.
 - `fromFunction(fn: SdfFunctionSource, options: SdfFunctionOptions): SdfShape` — Create a custom SDF from one expression; shader-safe expressions raymarch directly.
+- `Sculpt: { sphere: (radius: number) => SdfShape; box: (x: number, y: number, z: number, options?: SculptBoxOptions) => SdfShape; cylinder: (height: number, radius: number) => SdfShape; disk: (radius: number, thickness?: number) => SdfShape; circle: (radius: number, thickness?: number) => SdfShape; capsule: (height: number, radius: number) => SdfShape; torus: (majorRadius: number, minorRadius: number) => SdfShape; cone: (height: number, radius: number) => SdfShape; tube: (points: SculptPointList, options?: SculptTubeOptions) => SdfShape; curve: (points: SculptPointList, options?: SculptTubeOptions) => SdfShape; path: (points: SculptPointList, options?: SculptTubeOptions) => SdfShape; blend: (first?: SculptBlendInput | SculptBlendOptions, optionsOrShape?: SculptBlendInput | SculptBlendOptions, ...rest: (SculptBlendInput | SculptBlendOptions)[]) => SdfShape; union: (first?: SculptBlendInput, ...rest: SculptBlendInput[]) => SdfShape; carve: (base: SdfShape, cutters: SculptBlendInput, options?: SculptBlendOptions) => SdfShape; keep: (first?: SculptBlendInput | SculptBlendOptions, optionsOrShape?: SculptBlendInput | SculptBlendOptions, ...rest: (SculptBlendInput | SculptBlendOptions)[]) => SdfShape; polish: (shape: SdfShape, input?: SculptPolishInput) => SdfShape; material: (input?: SculptPolishInput) => ShapeMaterialProps & { color?: string; }; look: (preset?: SculptLookPreset) => SceneOptions; knownMaterials: typeof knownSculptMaterialPresets; }` — Sculpt-like facade: friendly liquid-modeling verbs backed by the same SDF kernel.
+
+### `Sculpt`
+
+- `sphere(radius: number): SdfShape` — Create a liquid SDF sphere centered at the origin.
+- `box(x: number, y: number, z: number, options?: SculptBoxOptions): SdfShape` — Create a liquid SDF box; pass `{ radius }` for a rounded box.
+- `cylinder(height: number, radius: number): SdfShape` — Create a liquid SDF cylinder centered at the origin, axis along Z.
+- `disk(radius: number, thickness?: number): SdfShape` — Create a thin circular disk centered at the origin, axis along Z. Useful as a circular cutter or insert.
+- `circle(radius: number, thickness?: number): SdfShape` — Alias for `Sculpt.disk()`.
+- `capsule(height: number, radius: number): SdfShape` — Create a liquid SDF capsule centered at the origin, axis along Z.
+- `torus(majorRadius: number, minorRadius: number): SdfShape` — Create a liquid SDF torus lying in the XY plane.
+- `cone(height: number, radius: number): SdfShape` — Create a liquid SDF cone.
+- `tube(points: SculptPointList, options?: SculptTubeOptions): SdfShape` — Create a smooth tube through a list of 3D points.
+- `curve(points: SculptPointList, options?: SculptTubeOptions): SdfShape` — Create a smooth variable-thickness sweep through 3D control points.
+- `path(points: SculptPointList, options?: SculptTubeOptions): SdfShape` — Alias for `Sculpt.tube()`; points may use [x, y, z, radius] for variable thickness.
+- `blend(first?: SculptBlendArg, optionsOrShape?: SculptBlendArg, ...rest: SculptBlendArg[]): SdfShape` — Smoothly blend one or more SDF shapes into a continuous body.
+- `union(first?: SculptBlendInput, ...rest: SculptBlendInput[]): SdfShape` — Sharply union one or more SDF shapes.
+- `carve(base: SdfShape, cutters: SculptBlendInput, options?: SculptBlendOptions): SdfShape` — Smoothly subtract one or more cutter shapes from a base shape.
+- `keep(first?: SculptBlendArg, optionsOrShape?: SculptBlendArg, ...rest: SculptBlendArg[]): SdfShape` — Smoothly intersect one or more SDF shapes.
+- `polish(shape: SdfShape, input?: SculptPolishInput): SdfShape` — Apply a Sculpt material preset or direct material properties.
+- `material(input?: SculptPolishInput): ShapeMaterialProps & { color?: string; }` — Resolve a Sculpt material preset to ForgeCAD material properties.
+- `look(preset?: SculptLookPreset): SceneOptions` — Return a polished scene preset tuned for liquid SDF preview.
+- `knownMaterials(): SculptMaterialPreset[]` — List the built-in Sculpt material preset names.

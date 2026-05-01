@@ -14,7 +14,7 @@ This skill is for understanding, not for shipping code directly. The deliverable
 
 - Use this skill when the user wants a multi-page concept tree, not a single page.
 - If the user only wants one short narrative memo, use `concept-one-pager` instead.
-- If the user wants implementation design without the teaching artifact, use `high-level-spec` or `design-doc`.
+- If the user wants implementation design without the teaching artifact, use `forgecad-high-level-spec` or `design-doc`.
 - If the user wants brainstorming or pushback before writing, use `nonaction` or `discuss`.
 
 ## Output Contract

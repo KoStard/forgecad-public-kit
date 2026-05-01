@@ -25,7 +25,7 @@ Routing:
 | Need | Skill |
 |------|-------|
 | Learn or use ForgeCAD APIs while authoring geometry | `forgecad` |
-| Create a new model in the personal model repo | `make-a-model` |
+| Create a new model in the personal model repo | `forgecad-make-a-model` |
 | Run and interpret inspection bundles | `forgecad-render-inspect` |
 | Debug the `render inspect` command implementation itself | `forgecad` plus this skill's source map |
 

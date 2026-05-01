@@ -1,5 +1,5 @@
 ---
-name: prepare-forgecad-prompt
+name: forgecad-prepare-prompt
 description: Turn a fuzzy physical product, mechanism, or CAD artifact request into a concrete ForgeCAD build brief and a single master prompt for the modeling pass. Use when the engineering brief is incomplete, manufacturing/process choice is underspecified, or the work needs a specific operating story to avoid generic toy solutions.
 forgecad-public: true
 ---
@@ -49,6 +49,10 @@ Instead:
 5. Choose a defensible family-scoped starter assumption set if the user stays vague.
 6. Produce one single ForgeCAD master prompt with explicit assumptions.
 
+When a product naturally has multiple versions of the same object, treat those versions as selectable parameters, not simultaneous geometry.
+The master prompt should ask for one selected variant to be rendered at a time through choice params such as `Variant`, `Preset`, `Style`, or `Configuration`.
+Do not ask the modeling pass to show a lineup of all variants by default; if a comparison view is useful, make it an explicit non-default debug/presentation mode so final collision inspection still proves one real assembly.
+
 ## What Good Looks Like
 
 By the end of this skill, there should be:
@@ -61,6 +65,8 @@ By the end of this skill, there should be:
 - a motion / load / size target
 - a BOM boundary
 - a validation boundary
+- a variant-selection policy when the artifact has multiple sizes/styles/revisions
+- a file-organization policy, including `main.forge.js` as the entry point for multi-file projects
 - one ready-to-copy master prompt for the modeling pass
 
 ## Workflow
@@ -150,11 +156,14 @@ By the end of this skill, there should be:
    - manufacturing/process stack and material defaults
    - purchased-part boundary
    - validation standard
+   - variant-selection policy when multiple versions of the same object are requested
+   - file-organization policy: if the implementation needs multiple files, the runnable ForgeCAD entry point must be `main.forge.js`, with helpers/parts/constants in neighboring plain `.js` modules
    - explicit uncertainty policy
 
 8. Emit one master prompt.
    Start from `references/master-prompt.md`.
    Fill in the placeholders using the chosen profile and assumptions.
+   If the requested model is complex enough to split across files, include an explicit instruction that the project must use `main.forge.js` as the runnable entry point.
    Return the finished prompt, not notes about the prompt.
 
 9. If implementation continues immediately, hand off to `forgecad`.

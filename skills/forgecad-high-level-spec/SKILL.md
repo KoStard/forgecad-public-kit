@@ -1,5 +1,5 @@
 ---
-name: high-level-spec
+name: forgecad-high-level-spec
 description: Write a high-level design document (HLD) for a model, mechanism, or assembly before detailed specification or coding. Use when starting a new design, rethinking an existing one, or when the user asks to spec out, plan, or think through a model at a high level. Works backwards from requirements — defines the problem, explores alternatives, records decisions. Produces a short document for review and iteration.
 forgecad-public: true
 ---
@@ -186,9 +186,9 @@ Agent writes HLD → git commit → User reviews (edits file or gives feedback)
 
 | Stage | Skill | Output |
 |-------|-------|--------|
-| 1. Explore the problem space | `/high-level-spec` (this skill) | `*-hld.md` |
-| 2. Detailed design | `/lld` | `*-lld.md` |
-| 3. Implementation | `/make-a-model` + `/forgecad` | `.forge.js` files |
+| 1. Explore the problem space | `/forgecad-high-level-spec` (this skill) | `*-hld.md` |
+| 2. Detailed design | `/forgecad-lld` | `*-lld.md` |
+| 3. Implementation | `/forgecad-make-a-model` + `/forgecad` | `.forge.js` files |
 
 The HLD must have its Decisions table filled before writing an LLD. The LLD must exist before implementation (unless the model is simple enough to skip straight from HLD to code).
 

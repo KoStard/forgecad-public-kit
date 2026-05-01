@@ -1,5 +1,5 @@
 ---
-name: api-dogfood
+name: forgecad-api-dogfood
 description: Build a ForgeCAD model while actively hunting for API friction — missing helpers, awkward patterns, bad defaults, verbose boilerplate. Use when asked to dogfood, stress-test the API, or build a model with the goal of improving ForgeCAD.
 forgecad-public: true
 ---
@@ -28,7 +28,7 @@ Invoke the `forgecad` skill to get the current API docs. Read the Core API refer
 
 ### 3. Build bottom-up, journal friction as you go
 
-Follow the same decomposition strategy as make-a-model (smallest piece first, verify, compose upward). But at every step, maintain a **friction journal** — a running list of issues encountered.
+Follow the same decomposition strategy as forgecad-make-a-model (smallest piece first, verify, compose upward). But at every step, maintain a **friction journal** — a running list of issues encountered.
 
 For each friction point, capture:
 - **What you were trying to do** (intent)
