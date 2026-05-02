@@ -22,16 +22,20 @@ physical connected components, collisions, local thickness, or cross-sections.
 ## Command
 
 ```bash
-forgecad render inspect examples/api/static-assembly-connectors.forge.js
-forgecad render inspect model.forge.js out/model-inspect --force
+forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask
+forgecad render inspect model.forge.js out/model-inspect --channels rgb,section --force
 forgecad render inspect model.forge.js --channels rgb,mask,section
-forgecad render inspect model.forge.js --focus Bench
-forgecad render inspect model.forge.js --hide "Bench.Slat0,Bench.Slat1"
+forgecad render inspect model.forge.js --channels collisions --focus Bench
+forgecad render inspect model.forge.js --channels rgb,mask --hide "Bench.Slat0,Bench.Slat1"
 forgecad render inspect model.forge.js --channels thickness --min-thickness 1.2 --warn-thickness 2.0
 ```
 
 The default output directory is `<script-name>-inspect/` next to the input file.
 Pass `--force` to replace an existing bundle directory.
+
+There are no default channels. Pass `--channels` every time, either as a
+comma-separated subset or as `--channels all` when you intentionally want every
+implemented channel.
 
 `--focus` and `--hide` use the same object-name filtering semantics as
 `forgecad run` and `forgecad render 3d`. A bare `--focus` hides mock objects;
@@ -40,7 +44,8 @@ matching objects from an otherwise visible scene.
 
 ## Bundle Layout
 
-The default bundle emits the core fast channels:
+A bundle that asks for `--channels rgb,depth,normals,mask,section` has this
+layout:
 
 ```text
 model-inspect/
@@ -82,7 +87,7 @@ model-inspect/
 ```
 
 Use `--channels all` for every implemented channel, including the more expensive
-connectivity, collisions, and thickness analyses, or pass an explicit
+connectivity, collisions, and thickness analyses, or pass a smaller
 comma-separated subset:
 
 ```bash
@@ -131,15 +136,19 @@ background. Non-black pixels resolve through
 Connectivity is computed from visible scene objects:
 
 ```text
-overlap edge = boolean intersection volume > 0.1mm^3
+bbox overlap edge = bbox interiors overlap
 touching edge = bbox contact gap <= 0.05 model units
 component = transitive closure over overlap/touching edges
 ```
 
 The manifest stores the edge list, component list, per-object body counts, and
 warnings. Component colors group scene objects; if one scene object contains
-multiple disconnected kernel bodies, the manifest reports `bodyCount > 1` but the
-PNG cannot color those internal bodies separately yet.
+multiple disconnected kernel bodies and the caller supplied a body count, the
+manifest reports `bodyCount > 1` but the PNG cannot color those internal bodies
+separately yet.
+
+Connectivity is a fast bbox-neighborhood graph. Use the `collisions` channel
+when you need exact positive-volume boolean overlap evidence.
 
 `distance` emits one rooted physical-component-distance heatmap per view. Black
 is background. Non-black pixels resolve through

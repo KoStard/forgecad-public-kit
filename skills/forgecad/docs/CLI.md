@@ -13,17 +13,19 @@ Run, export, render, and publish `.forge.js` models from your terminal. Everythi
 # 1. Install
 npm install -g forgecad
 
-# 2. Create a model
-forgecad new cup
+# 2. Clone a hosted project
+forgecad login
+forgecad project clone start-here
+cd start-here
 
 # 3. Run it
-forgecad run cup.forge.js
+forgecad run 00-start-here.forge.js
 
 # 4. Open the editor (live reload)
-forgecad dev
+forgecad dev .
 
 # 5. Export
-forgecad export stl cup.forge.js
+forgecad export stl 00-start-here.forge.js
 ```
 
 ## Editor
@@ -32,17 +34,16 @@ ForgeCAD includes a local editor with live reload. Edit a `.forge.js` file, save
 
 | Command | Description |
 |---------|-------------|
-| `dev` | Start the Vite dev server with live reload. No build step required — the preferred way to run ForgeCAD during active development. |
-| `studio` | Serve the production build of the studio (requires dist/ — run `npm run build` first). |
+| `dev <project-path> [project-path ...]` | Start the Vite dev server with live reload. No build step required — the preferred way to run ForgeCAD during active development. |
+| `studio <project-path> [project-path ...]` | Serve the production build of the studio (requires dist/ — run `npm run build` first). |
 | `web` | Start a local dev server in web/playground mode (no filesystem, localStorage only). |
-| `open` | Alias for `forgecad studio`. |
+| `open <project-path> [project-path ...]` | Alias for `forgecad studio`. |
 
 <details>
 <summary>Common flags for dev / studio</summary>
 
 | Option | Description |
 |--------|-------------|
-| `--blank` | Start without a project folder |
 | `--port <n>` | Bind to a specific port |
 | `--host [host]` | Expose the server on the network |
 | `--open` | Open a browser window automatically |
@@ -78,7 +79,7 @@ Intra-group pairs (same assembly group) and mock-to-mock pairs are skipped. If a
 
 **Spatial analysis** — reports directional relationships and gap distances between nearby objects (e.g. `bracket is ABOVE base (gap: 5mm)`). When no issues are found: `(no collisions, all objects well-separated)`.
 
-**Physical connectivity** — pass `--connectivity` to list physically connected components across visible objects. Overlapping objects are joined by boolean intersection volume; touching objects are joined by bbox contact within `--connectivity-tolerance` (default `0.05` model units). This helps answer whether the model is one continuous assembly or several separate islands.
+**Physical connectivity** — pass `--connectivity` to list physically connected components across visible objects. Overlapping or touching bboxes are joined within `--connectivity-tolerance` (default `0.05` model units); use collision inspection for exact positive-volume overlaps. This helps answer whether the model is one continuous assembly or several separate islands.
 
 **Parameters** — lists all declared parameters with their current values. Overridden values are marked with `*`.
 
@@ -111,7 +112,7 @@ Render a Forge scene. Use a subcommand — `3d`, `inspect`, `section`, `wirefram
 
 ```bash
 forgecad render 3d examples/cup.forge.js
-forgecad render inspect examples/api/static-assembly-connectors.forge.js
+forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask
 forgecad render wireframe examples/cup.forge.js
 forgecad render section examples/furniture/01-table.forge.js --plane XZ
 forgecad render hq examples/cup.forge.js --preset dramatic
@@ -123,7 +124,7 @@ Render a Forge scene to PNG using the real viewport renderer.
 
 Launches a headless Chrome instance, renders the scene with the same WebGL viewport as the editor, and saves a PNG. The output path defaults to `<script-name>.png` next to the input file.
 
-Use `--focus` to isolate specific parts (hides everything else) or `--hide` to remove clutter like mock objects. The `--camera` flag accepts named views (`front`, `top`, `iso`) or `azimuth:elevation` angles — pass it multiple times to render several viewpoints in one run.
+Use `--focus` to isolate specific parts (hides everything else) or `--hide` to remove clutter like mock objects. The `--camera` flag accepts named views (`front`, `top`, `iso`), `azimuth:elevation` angles, or an exact `proj/pos/target/up/fov` camera spec — pass it multiple times to render several viewpoints in one run.
 
 Use `--edges=<off|thin|bold>` to control the edge overlay. For a pure wireframe look, use `render wireframe` instead.
 
@@ -135,6 +136,7 @@ forgecad render 3d examples/cup.forge.js --focus
 forgecad render 3d examples/cup.forge.js --focus bracket
 forgecad render 3d examples/cup.forge.js --hide "wall,bolt"
 forgecad render 3d model.forge.js --camera 45:30
+forgecad render 3d model.forge.js --camera "proj=perspective;pos=200,-160,120;target=0,0,20;up=0,0,1;fov=38"
 forgecad render 3d model.forge.js --camera front --camera side
 forgecad render 3d model.forge.js --edges bold
 forgecad render 3d model.forge.js --edges off
@@ -144,16 +146,16 @@ forgecad render 3d model.forge.js --edges off
 
 Render a machine-readable inspection bundle with geometry channels and a manifest.
 
-Launches the headless viewport renderer and writes a directory bundle for agent and automation workflows. It emits canonical `front`, `right`, `top`, and `iso` views for RGB, depth, normals, object masks, physical connectivity, rooted component distance, collisions, and wall thickness, plus a principal-plane section atlas and a root `manifest.json` with scene metadata, filters, object visibility, and relative file paths.
+Launches the headless viewport renderer and writes a directory bundle for agent and automation workflows. Every channel is opt-in with `--channels`; there is no default bundle. Selected channels emit canonical `front`, `right`, `top`, and `iso` views for RGB, depth, normals, object masks, physical connectivity, rooted component distance, collisions, and wall thickness, or a principal-plane section atlas, plus a root `manifest.json` with scene metadata, filters, object visibility, and relative file paths.
 
 Use `--focus` to isolate specific parts or hide mocks, and `--hide` to remove named clutter. Output defaults to `<script-name>-inspect/` next to the input file.
 
 For bundle layout, channel encodings, and manifest semantics, see [Inspection Bundles](guides/inspection-bundles.md).
 
 ```bash
-forgecad render inspect examples/api/static-assembly-connectors.forge.js
-forgecad render inspect examples/api/static-assembly-connectors.forge.js out/bench-inspect --focus Bench
-forgecad render inspect examples/api/static-assembly-connectors.forge.js --hide "Bench.Slat0" --force
+forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask
+forgecad render inspect examples/api/static-assembly-connectors.forge.js out/bench-inspect --channels collisions --focus Bench
+forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels all --hide "Bench.Slat0" --force
 ```
 
 ### `forgecad render wireframe`
@@ -193,9 +195,11 @@ Renders an animated sequence by either orbiting the camera around the model or p
 ```bash
 forgecad capture gif examples/cup.forge.js
 forgecad capture gif examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
+forgecad capture gif model.forge.js out/raw.gif --param "Output=raw-sdf"
 forgecad capture gif examples/3d-printer.forge.js out/sweep.gif --capture section-sweep --sweep-plane YZ
 forgecad capture mp4 examples/cup.forge.js
 forgecad capture mp4 examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
+forgecad capture mp4 model.forge.js out/raw.mp4 --param "Output=raw-sdf"
 forgecad capture mp4 examples/3d-printer.forge.js out/sweep.mp4 --capture section-sweep --sweep-plane YZ --sweep-frames 180
 ```
 
@@ -227,7 +231,7 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 |--------|-------------|
 | `--focus <names>` | Focus: no arg hides mocks; comma-separated names shows only those |
 | `--hide <names>` | Hide comma-separated object names |
-| `--camera <front\|back\|side\|right\|top\|iso\|az:el\|az:el:dist\|spec>` | Camera preset, spherical (az:el), or full spec. Repeatable. |
+| `--camera <front\|back\|side\|right\|top\|iso\|az:el\|az:el:dist\|spec>` | Camera preset, spherical (az:el), or full spec such as `proj=perspective;pos=x,y,z;target=x,y,z;up=x,y,z;fov=45`. Repeatable. |
 | `--size <px>` | Image size in pixels |
 | `--scene <json>` | Viewport scene state JSON |
 | `--background <color>` | Canvas background override |
@@ -237,7 +241,7 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 | `--port <n>` | Vite dev server port |
 | `--chrome-path <path>` | Chrome or Chromium executable path |
 | `--output <path>` | Output file path |
-| `--channels <all\|rgb,depth,normals,mask,connectivity,distance,collisions,thickness,section>` | Inspection channels to emit (default: rgb,depth,normals,mask,section) |
+| `--channels <all\|rgb,depth,normals,mask,connectivity,distance,collisions,thickness,section>` | Required inspection channels to emit; no default |
 | `--quality <default\|live\|high>` | Mesh/render quality |
 | `--force` | Replace an existing bundle directory |
 | `--min-thickness <mm>` | Critical thickness threshold in model units |
@@ -262,6 +266,8 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 | `--animation <name>` | Named jointsView animation clip |
 | `--animation-loops <n>` | Repeat the selected animation clip |
 | `--cut-plane <name>` | Enable a named cut plane |
+| `--param <Key=Value>` | Override a parameter value (Key=Value). Repeatable. |
+| `-p <Key=Value>` | Shorthand for --param |
 | `--sweep-plane <XY\|XZ\|YZ>` | Moving plane for section-sweep |
 | `--sweep-normal <x,y,z>` | Custom section-sweep normal |
 | `--sweep-from <min\|max\|offset>` | Section-sweep start offset |
@@ -344,12 +350,17 @@ forgecad export sdf rover.forge.js --output out/forge_scout
 
 ForgeCAD has a hosted platform at [forgecad.io](https://forgecad.io). The CLI connects your local files to it.
 
+A project is a local folder linked to the hosted app by `.forgecad/project.json`. Use `forgecad project clone <slug>` to download an existing hosted project into a local folder, or run `forgecad project init` inside a folder that should become a ForgeCAD project. Open local projects with `forgecad studio <project-path> [project-path ...]`.
+
 ### Get started
 
 ```bash
 forgecad login
 # or, for Google/web-auth accounts:
 forgecad login --token
+forgecad project clone start-here
+
+# or initialize the current folder as a new project:
 forgecad project init "Spool Adapter"
 ```
 
@@ -456,6 +467,9 @@ forgecad skill install --library
 
 # Or export a single context file for chat UIs (Claude.ai, ChatGPT, ...)
 forgecad skill one-file ~/Desktop/forgecad-context.md
+
+# Or export one flattened Markdown file per bundled skill
+forgecad skill flattened-files ~/Desktop/forgecad-skills
 ```
 
 > **Workflow:** Agent writes the model → `forgecad run` validates it → `forgecad check params` sweeps the parameter range → `forgecad export stl` ships the result. All in the terminal.
@@ -487,6 +501,7 @@ forgecad check params path/to/model.forge.js --samples 12
 | Command | Description |
 |---------|-------------|
 | `check suite` | Run the repo invariant suite, with smoke and full profiles for the fast merge lane vs the broader regression sweep. |
+| `check runtime-globals` | Ensure the script sandbox does not add new lowercase injected globals. |
 | `check transforms` | Run transform and assembly invariants. |
 | `check dimensions` | Run dimension propagation invariants. |
 | `check placement` | Run placement reference invariants. |

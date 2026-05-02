@@ -3,9 +3,9 @@ skill-group: sdf
 skill-order: 100
 ---
 
-# SDF Modeling (Experimental)
+# SDF Modeling
 
-Signed Distance Field modeling for organic forms, smooth booleans, TPMS lattices, and deformations. Return raw `SdfShape` values directly for native preview; use `toShape(...)` when materializing SDF trees for CAD/export workflows.
+Signed Distance Field modeling for organic forms, smooth booleans, TPMS lattices, and deformations. SDFs are inherently implicit fields, not B-rep/exact geometry; use them with caution when precision or exact export matters. Return raw `SdfShape` values directly for native preview; use `toShape(...)` when materializing SDF trees for CAD/export workflows.
 
 ## Contents
 
@@ -323,9 +323,11 @@ onion(layers: number, thickness: number): SdfShape
 
 SDF modeling — signed distance field primitives, smooth booleans, TPMS lattices, domain warps, and surface patterns.
 
-**Experimental.** Return `SdfShape` values directly from a ForgeCAD script for native raymarch preview. Plain objects and arrays of SDF leaves are renderable too, so object keys become named preview parts.
+Return `SdfShape` values directly from a ForgeCAD script for native raymarch preview. Plain objects and arrays of SDF leaves are renderable too, so object keys become named preview parts.
 
 Call `.toShape()` or `toShape(...)` only when you need a mesh-backed ForgeCAD Shape for export, mesh booleans, or mixed SDF/manifold projects. All shapes live as a lazy expression tree until that materialization boundary.
+
+SDF is inherently implicit and sampled, not B-rep/exact geometry. Use it with caution when precision, tolerances, or exact export matter.
 
 ```js
 return sdf.smoothUnion(sdf.sphere(10), sdf.box(15, 15, 15), { radius: 3 })

@@ -54,6 +54,17 @@ Choose the manufacturing/process cues that fit the artifact unless the user expl
 - For fixtures and tooling, choose machined, laser-cut, welded, printed, or hybrid construction based on load, repeatability, and shop realism.
 - Use printing-specific features such as slicer clearances, support strategy, layer-oriented ribs, and heat-set inserts only when the selected process includes printed parts.
 
+## Visual Style Defaults
+
+Unless the user explicitly asks for a vivid, playful, toy-like, brand-specific, or unusual colorway, default to a classic high-end product palette. The model should look expensive and credible in the first render, not generically colorful.
+
+- Prefer restrained material-driven colors: warm ivory, bone, cream, charcoal, graphite, satin black, brushed aluminum, stainless steel, brass, bronze, muted burgundy, dark green, navy, smoked translucent polymer, frosted clear, and natural wood where appropriate.
+- Use bright colors sparingly as small accents for controls, seals, indicators, warnings, or brand-neutral identity lines.
+- Match color to material/process: anodized or powder-coated metal, molded or dyed polymer, rubber/silicone, glass/acrylic, PCB/FR4, wood grain, leather/fabric, and standard hardware should each read differently.
+- Avoid one-note rainbow/neon palettes, random saturated part colors, or color groups that make a serious artifact feel like a toy unless the brief asks for that.
+- If the object normally has user-facing markings, include them as real geometry or texture-like raised/engraved features: keyboard legends, button labels, gauge ticks, icons, connector labels, alignment marks, service arrows, and scale markings. Do not leave expected labels blank.
+- Use color to clarify part boundaries and serviceability without hiding the engineering stack: seams, fasteners, gaskets, inserts, ports, and purchased components should remain legible.
+
 ## Variants Should Be Parameter-Selected
 
 If the model supports several sizes, styles, revisions, or option bundles of the same object, do not display all variants in the default scene. Add a `Param.choice` / choice parameter such as `Variant`, `Preset`, `Style`, or `Configuration`, and return only the selected variant's production geometry.

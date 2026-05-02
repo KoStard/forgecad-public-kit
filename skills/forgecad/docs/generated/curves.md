@@ -10,7 +10,6 @@ Smooth curves, lofted surfaces, swept solids, splines, and high-level product sk
 ## Contents
 
 - [Curves & Surfacing](#curves-surfacing) — `hermiteTransitionG2`, `nurbs3d`, `spline2d`, `spline3d`, `loft`, `loftAlongSpine`, `sweep`, `variableSweep`, `nurbsSurface`, `surfacePatch`, `transitionCurve`, `transitionSurface`, `connectEdges`
-- [Product Modeling](#product-modeling) — `applyMaterial`, `profileSize`, `ovalProfile`, `superEllipseProfile`, `roundedRectProfile`, `circleProfile`, `describeProfile`, `scaleProfileTo`, `scenePreset`
 - [Curve3D](#curve3d)
 - [NurbsCurve3D](#nurbscurve3d)
 - [NurbsSurface](#nurbssurface)
@@ -29,8 +28,6 @@ Smooth curves, lofted surfaces, swept solids, splines, and high-level product sk
 - [Blend](#blend)
 - [Analysis](#analysis)
 - [Product](#product)
-- [profiles](#profiles)
-- [materials](#materials)
 
 ## Functions
 
@@ -348,91 +345,6 @@ connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptio
 | `tangentB?` | `Vec3` | Explicit tangent for edge B. |
 | `flipA?` | `boolean` | Flip tangent A. |
 | `flipB?` | `boolean` | Flip tangent B. |
-
-### Product Modeling
-
-#### `applyMaterial()` — Apply a product material preset to a Shape, including color and PBR material properties.
-
-```ts
-applyMaterial(shape: Shape, preset: ProductMaterial | undefined): Shape
-```
-
-`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
-
-**`ShapeMaterialProps`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
-| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
-| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
-| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
-| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
-| `wireframe?` | `boolean` | Render as wireframe. Default: false |
-| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
-| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
-| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
-| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
-| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
-| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
-| `specularColor?` | `string` | Specular highlight tint. |
-| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
-
-#### `profileSize()` — Return the width/depth of a 2D profile from its sketch bounds.
-
-```ts
-profileSize(sketch: Sketch): { width: number; depth: number; }
-```
-
-#### `ovalProfile()` — Create a centered oval profile using full product width and depth dimensions.
-
-```ts
-ovalProfile(width: number, depth: number, options?: ProductProfileOptions): Sketch
-```
-
-`ProductProfileOptions`: `{ segments?: number }`
-
-#### `superEllipseProfile()` — Create a centered superellipse profile using full product width/depth dimensions.
-
-```ts
-superEllipseProfile(width: number, depth: number, options?: ProductSuperEllipseOptions): Sketch
-```
-
-
-**`ProductSuperEllipseOptions`** extends ProductProfileOptions
-- `exponent?: number` — Higher values produce squarer product surfaces; 2 is an ellipse.
-
-#### `roundedRectProfile()` — Create a centered rounded-rectangle product profile.
-
-```ts
-roundedRectProfile(width: number, depth: number, radius: number): Sketch
-```
-
-#### `circleProfile()` — Create a centered circular product profile from its diameter.
-
-```ts
-circleProfile(diameter: number, options?: ProductProfileOptions): Sketch
-```
-
-#### `describeProfile()` — Describe a sketch as a product profile so surface helpers can derive station dimensions.
-
-```ts
-describeProfile(sketch: Sketch, kind?: ProductProfileKind, radius?: number): ProductProfileDescriptor
-```
-
-`ProductProfileDescriptor`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number }`
-
-#### `scaleProfileTo()` — Scale an existing profile sketch to a target width and depth.
-
-```ts
-scaleProfileTo(sketch: Sketch, width: number, depth: number): Sketch
-```
-
-#### `scenePreset()` — Apply an opinionated scene preset for product, service, or mechanical review renders.
-
-```ts
-scenePreset(name: ProductScenePreset): void
-```
 
 ---
 
@@ -1439,23 +1351,20 @@ toGroup(): ShapeGroup
 - `skin(name: string): ProductSkinBuilder` — Start a named product skin builder.
 - `station(name: string): ProductStationBuilder` — Start a named cross-section station for Product.skin(...).stations(...).
 - `rail: { bezier(points: Vec3[], options?: { name?: string; }): ProductRailSpec; nurbs(points: Vec3[], options?: { degree?: number; name?: string; }): ProductRailSpec; polyline(points: Vec3[], options?: { name?: string; }): ProductRailSpec; }` — Namespaced rail builders for product skin guide rails and handle spines.
+- `profiles: { ... }` — Namespaced product profile helpers for stations, panels, trims, and openings.
+- `materials: { ... }` — Namespaced product material presets for molded plastic, rubber, metal, and transparent parts.
+- `applyMaterial(shape: Shape, preset: ProductMaterial | undefined): Shape` — Apply a product material preset to a Shape.
+- `scenePreset(name: ProductScenePreset): void` — Apply an opinionated scene preset for product review renders.
+- `ovalProfile(width: number, depth: number, options?: ProductProfileOptions): Sketch` — Create a centered oval profile from full width/depth dimensions.
+- `roundedRectProfile(width: number, depth: number, radius: number): Sketch` — Create a centered rounded-rectangle profile.
+- `circleProfile(diameter: number, options?: ProductProfileOptions): Sketch` — Create a centered circular profile from full diameter.
+- `superEllipseProfile(width: number, depth: number, options?: ProductSuperEllipseOptions): Sketch` — Create a centered superellipse profile for soft-square product sections.
+- `profileSize(sketch: Sketch): { width: number; depth: number; }` — Measure the width and depth of a 2D profile sketch.
+- `describeProfile(sketch: Sketch, kind?: ProductProfileKind, radius?: number): ProductProfileDescriptor` — Describe a custom sketch as a product profile.
+- `scaleProfileTo(sketch: Sketch, width: number, depth: number): Sketch` — Scale an existing profile sketch to a target width/depth.
 - `ref(skin: ProductSkin, query: ProductSkinRefQuery): ProductSurfaceRef` — Create an ad-hoc ProductSurfaceRef from a skin and side/u/v query.
 - `panel(name: string): ProductPanelBuilder` — Start a panel feature builder.
 - `spout(name: string): ProductSpoutBuilder` — Start a spout/nozzle feature builder.
 - `handle(name: string): ProductHandleBuilder` — Start a handle feature builder.
 - `place(detail: Shape | ShapeGroup, ref: ProductRefInput, options?: ProductAttachOptions): Shape | ShapeGroup` — Place a shape or group on a ProductSurfaceRef.
 - `landing(name: string, radius?: number, material?: ProductMaterial): Shape` — Small blended landing volume for manual structural bridges and connection proofs.
-
-### `profiles`
-
-- `oval(width: number, depth: number, options?: ProductProfileOptions): Sketch` — Create a centered oval profile using full product width and depth dimensions.
-- `superEllipse(width: number, depth: number, options?: ProductSuperEllipseOptions): Sketch` — Create a centered superellipse profile for soft square-to-oval product sections.
-- `roundedRect(width: number, depth: number, radius: number): Sketch` — Create a centered rounded-rectangle product profile.
-- `circle(diameter: number, options?: ProductProfileOptions): Sketch` — Create a centered circular product profile from its diameter.
-
-### `materials`
-
-- `mattePlastic(color?: string): ProductMaterial` — Matte molded plastic for appliance shells and consumer-product housings.
-- `softRubber(options?: ColorMaterialOptions): ProductMaterial` — Soft low-gloss rubber for grips, feet, pads, and inserts.
-- `clearPolycarbonate(options?: ClearMaterialOptions): ProductMaterial` — Transparent tinted polycarbonate for windows, lenses, and display covers.
-- `brushedSteel(options?: ColorMaterialOptions): ProductMaterial` — Brushed steel-like material for trim, soleplates, and hardware.

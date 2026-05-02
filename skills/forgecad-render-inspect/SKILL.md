@@ -94,10 +94,10 @@ Routing:
 
 ## Command Patterns
 
-Default fast bundle:
+Explicit fast bundle:
 
 ```bash
-forgecad render inspect model.forge.js /tmp/model-inspect --force --size 700
+forgecad render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,section --force --size 700
 ```
 
 Final functional check:
@@ -156,7 +156,7 @@ PNG review order:
 ## Interpretation Rules
 
 - Collision findings are positive-volume boolean overlaps. Face-touching is not a collision.
-- Connectivity includes exact boolean overlap edges plus simple bbox contact. Concave shapes can over-connect through bounding boxes.
+- Connectivity is a fast bbox-neighborhood component graph. Concave shapes can over-connect through bounding boxes; use the collisions channel for exact overlap evidence.
 - Distance is a bbox-gap metric between physical components, not exact closest surface distance.
 - Thickness is a mesh/raycast approximation. Gray or high unresolved area means the visual heatmap is incomplete, not that the model is safe.
 - Depth is a visual heatmap, not raw floating-point depth data.

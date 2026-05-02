@@ -104,8 +104,8 @@ Test-run, export pipelines, debug flags.
 - `{{SKILL_DIR}}/docs/CLI.md`
 - `{{SKILL_DIR}}/docs/guides/inspection-bundles.md`
 
-### SDF Modeling — Experimental (smooth booleans, TPMS, deformations, fromFunction)
+### SDF Modeling (smooth booleans, TPMS, deformations, fromFunction)
 
-Primitives, smooth booleans, TPMS lattices, twist/bend/displace, morph, custom functions, gotchas. Experimental — slower render, lower mesh quality than B-rep.
+Primitives, smooth booleans, TPMS lattices, twist/bend/displace, morph, custom functions, gotchas. SDF is inherently implicit and sampled, not B-rep/exact geometry; use caution for precision-critical parts and exact export workflows.
 
 - `{{SKILL_DIR}}/docs/generated/sdf.md`

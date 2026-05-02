@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeCAD Image Replicator"
+  short_description: "Build real CAD objects from images"
+  default_prompt: "Use $forgecad-image-replicator to infer the real object from these reference images and build a ForgeCAD model that holds up from all views."

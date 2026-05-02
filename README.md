@@ -2,101 +2,146 @@
 
 ![Robot Hand V2](<https://raw.githubusercontent.com/KoStard/ForgeCAD-assets/main/Robot%20Hand%20V2.gif>)
 
-Code-first parametric CAD for JavaScript/TypeScript, in the browser and CLI.
+Code-first parametric CAD for JavaScript/TypeScript, with a browser workbench, local CLI, and agent-ready modeling workflow.
 
-ForgeCAD is a multi-backend CAD system with a JavaScript/TypeScript modeling API, live parameters, constraints, assemblies, reports, and exact STEP/BREP export. Interactive browser modeling currently uses [Manifold](https://github.com/elalish/manifold) for fast geometry work, while exact export runs through CadQuery/OpenCascade and the public modeling layer stays backend-aware rather than tied to one kernel.
+ForgeCAD turns a normal `.forge.js` file into a live CAD model: parameters become sliders, scripts return shapes or assemblies, and the CLI can validate, render, inspect, and export the same model from your terminal.
 
 TypeScript is the file format. The browser is the CAD system.
 
-[**Try it live →**](https://forgecad.io) • [Docs](https://forgecad.io/docs) • [Examples](examples) • [Agent Skill](skills/forgecad/SKILL.md)
+[**Try it in the browser**](https://forgecad.io) • [Docs](https://forgecad.io/docs) • [Examples](examples) • [Agent Skill](skills/forgecad/SKILL.md) • [Open an issue](https://github.com/KoStard/ForgeCAD/issues)
 
 ## Get Started
 
+Install the CLI:
+
 ```bash
 npm install -g forgecad
-forgecad studio /path/to/your/project
 ```
 
-Or start from a blank scratch file:
+Start from the hosted starter project:
 
 ```bash
-forgecad studio --blank
+forgecad login
+forgecad project clone start-here
+cd start-here
+forgecad studio .
 ```
 
-## About This Repository
+A ForgeCAD project is a local folder linked to the hosted app by `.forgecad/project.json`. Use `forgecad project clone <slug>` to download an existing project, or run `forgecad project init` inside a folder you already want to make into a ForgeCAD project.
 
-This is ForgeCAD's **community home** — the place to file issues, follow development, explore benchmarks, and find maintained examples, docs links, and agent context.
+Explore the public examples locally:
 
-Active development happens in a private repository so we can move fast and iterate freely. This public repository is intentionally small: it keeps the user-facing examples and agent context fresh without exposing the private implementation. As the project matures, we plan to progressively open-source more components of the codebase here. If you have something specific you'd like to see opened up, [open an issue](https://github.com/KoStard/ForgeCAD/issues) — community input directly shapes what we prioritize.
+```bash
+git clone https://github.com/KoStard/ForgeCAD.git
+cd ForgeCAD
+forgecad studio examples
+forgecad run examples/products/cup.forge.js
+forgecad render 3d examples/products/cup.forge.js
+```
 
-### What lives here
+Open more than one local project at once:
 
-- **Issues & discussions** — bug reports, feature requests, and questions ([open an issue](https://github.com/KoStard/ForgeCAD/issues))
-- **LLM benchmarks** — how well do different models handle code-first CAD?
-- **Examples** — ready-to-run `.forge.js` scripts you can learn from and adapt
-- **Agent skill** — generated ForgeCAD modeling context in [`skills/forgecad/`](skills/forgecad/SKILL.md)
-- **Documentation** — available at [forgecad.io/docs](https://forgecad.io/docs)
+```bash
+forgecad studio examples path/to/another-project
+```
 
-## Your First Script
+## First Script
 
-Drop this into a `.forge.js` file:
+Inside a cloned or initialized ForgeCAD project, drop this into `starter.forge.js`:
 
 ```javascript
-const width = param("Width", 120, { min: 60, max: 220, unit: "mm" });
-const depth = param("Depth", 80, { min: 40, max: 160, unit: "mm" });
-const height = param("Height", 12, { min: 6, max: 40, unit: "mm" });
+const width = Param.number("Width", 90, { min: 50, max: 160, unit: "mm" });
+const depth = Param.number("Depth", 56, { min: 32, max: 100, unit: "mm" });
+const height = Param.number("Height", 12, { min: 6, max: 32, unit: "mm" });
+const holeRadius = Param.number("Hole Radius", 5, { min: 2, max: 10, unit: "mm" });
 
-const base = roundedRect(width, depth, 10).extrude(height).color("#5f87c6");
-const pocket = roundedRect(width - 24, depth - 24, 8)
-  .extrude(height - 3)
-  .translate(12, 12, 3);
+const base = box(width, depth, height).color("#5f87c6");
+const hole = cylinder(height * 3, holeRadius).translate(0, 0, -height);
 
-const part = base.subtract(pocket);
-
-dim([0, 0, 0], [width, 0, 0], { label: "Width" });
-dim([0, 0, 0], [0, depth, 0], { label: "Depth", offset: 14 });
-cutPlane("Center Section", [1, 0, 0], width / 2);
-
-return part;
+return {
+  "starter plate": base.subtract(hole),
+};
 ```
 
-The Forge API is globally available inside scripts — no imports required. `param(...)` values become live sliders in the UI.
-
-## Seamless AI Integration
-
-ForgeCAD is built to work cleanly with coding agents. Your CAD models are plain code, and the repository includes the context agents need to be productive immediately:
-
-- [Full API docs](https://forgecad.io/docs) explain the modeling API and workflows
-- `examples/api/` provides concrete model patterns to copy and adapt
-- Browser + CLI run the same engine, so AI-generated scripts behave consistently
-
-### Agent skill (Claude Code, Codex, OpenCode, …)
-
-Install a self-contained ForgeCAD skill for coding agents:
+Then run:
 
 ```bash
-forgecad skill install        # model-authoring docs
-forgecad skill install --dev  # + internals and coding conventions
-forgecad skill install --library  # + namespaced companion workflow skills
+forgecad run starter.forge.js
+forgecad studio .
 ```
 
-This repository also includes the generated public modeling skill at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md), with the referenced docs checked in beside it.
+## What Lives Here
 
-### Expanded skill library
+This repository is ForgeCAD's public home for:
 
-People often ask for the exact prompts and workflows used to produce ForgeCAD models. Those live in [`skills/`](skills/README.md).
+- **Issues and discussion** — bugs, feature requests, questions, and public roadmap input.
+- **Examples** — ready-to-run `.forge.js` scripts under [`examples/`](examples).
+- **Agent skills** — the generated ForgeCAD modeling skill plus companion workflows under [`skills/`](skills/README.md).
+- **Benchmarks** — examples of how current language models handle code-first CAD prompts.
+- **Docs links** — full user documentation lives at [forgecad.io/docs](https://forgecad.io/docs).
 
-The default `forgecad skill install` command stays intentionally small and installs only the core `forgecad` modeling skill. Use `forgecad skill install --library` to install the broader workflow set with namespaced skill names such as `forgecad-prepare-prompt`, `forgecad-make-a-model`, and `forgecad-lld`. You can also clone this repository to read the source prompts directly:
+Active application development currently happens in a private repository. This public repo is intentionally focused on the assets people can use directly: examples, issue tracking, agent context, and public workflow prompts. If there is a component you want opened up sooner, [file an issue](https://github.com/KoStard/ForgeCAD/issues).
 
-- build-brief preparation with [`prepare-forgecad-prompt`](skills/prepare-forgecad-prompt/SKILL.md)
-- model authoring with [`make-a-model`](skills/make-a-model/SKILL.md)
-- component discipline with [`component-model`](skills/component-model/SKILL.md)
+## Examples To Try
+
+| Area | Start here |
+| --- | --- |
+| API basics | [`examples/api/boolean-operations.forge.js`](examples/api/boolean-operations.forge.js), [`examples/api/constrained-sketch-basics.forge.js`](examples/api/constrained-sketch-basics.forge.js) |
+| Assemblies | [`examples/api/static-assembly-connectors.forge.js`](examples/api/static-assembly-connectors.forge.js), [`examples/mechanical/5-finger-robot-hand.forge.js`](examples/mechanical/5-finger-robot-hand.forge.js) |
+| Exact and surface workflows | [`examples/api/exact-surface-studio.forge.js`](examples/api/exact-surface-studio.forge.js), [`examples/exact-arc-housing.forge.js`](examples/exact-arc-housing.forge.js) |
+| Generative forms | [`examples/generative/voronoi-lampshade.forge.js`](examples/generative/voronoi-lampshade.forge.js), [`examples/api/sdf-shapes.forge.js`](examples/api/sdf-shapes.forge.js) |
+| Products | [`examples/products/chess-set.forge.js`](examples/products/chess-set.forge.js), [`examples/products/classical-piano.forge.js`](examples/products/classical-piano.forge.js) |
+| Solver cases | [`examples/constraints/`](examples/constraints), [`examples/compiler-corpus/`](examples/compiler-corpus) |
+
+## CLI Workflows
+
+| Task | Command |
+| --- | --- |
+| Clone a hosted project | `forgecad project clone <slug>` |
+| Initialize the current folder as a project | `forgecad project init "Project Name"` |
+| Open one or more local projects | `forgecad studio <project-path> [project-path ...]` |
+| Validate a script | `forgecad run file.forge.js` |
+| Render a PNG | `forgecad render 3d file.forge.js` |
+| Render an inspection bundle | `forgecad render inspect file.forge.js --channels rgb,mask` |
+| Render a section | `forgecad render section file.forge.js --plane XZ` |
+| Export STL | `forgecad export stl file.forge.js` |
+| Export STEP | `forgecad export step file.forge.js` |
+| Sweep parameters | `forgecad check params file.forge.js --samples 10` |
+
+Run `forgecad doctor` if render or exact export dependencies need checking.
+
+## AI And Agent Workflows
+
+ForgeCAD is built to work well with coding agents because CAD models are just code. The strongest loop is:
+
+```text
+agent edits .forge.js -> forgecad run -> forgecad render inspect -> iterate
+```
+
+Install the core modeling skill:
+
+```bash
+forgecad skill install
+```
+
+Install the expanded workflow library:
+
+```bash
+forgecad skill install --library
+```
+
+The expanded library includes public prompts for:
+
+- build-brief preparation with [`forgecad-prepare-prompt`](skills/forgecad-prepare-prompt/SKILL.md)
+- model authoring with [`forgecad-make-a-model`](skills/forgecad-make-a-model/SKILL.md)
+- component discipline with [`forgecad-component-model`](skills/forgecad-component-model/SKILL.md)
+- high-level and low-level design with [`forgecad-high-level-spec`](skills/forgecad-high-level-spec/SKILL.md) and [`forgecad-lld`](skills/forgecad-lld/SKILL.md)
 - render-bundle verification with [`forgecad-render-inspect`](skills/forgecad-render-inspect/SKILL.md)
 - visual prompt generation with [`forgecad-visual-spec`](skills/forgecad-visual-spec/SKILL.md)
 
-### Chat UI (Claude.ai, ChatGPT, Gemini, …)
+The generated core modeling skill is checked in at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md). The full public skill index is [`skills/README.md`](skills/README.md).
 
-Generate a single context file with all ForgeCAD API docs for any chat session:
+For chat tools without local shell access, generate a single context file:
 
 ```bash
 forgecad skill one-file ~/Desktop/forgecad-context.md
@@ -139,33 +184,25 @@ Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.for
 | `x-ai-grok-4.1-fast`<br><sub>2026-02-13 00-26-36 • v2</sub> | Make a home AC unit, showing both pieces on different sides of the wall (inside and outside). The external piece should have a fan positioned on its external face vertically. Implement whatever features/methods you are missing in the script itself for your convenience. Use the simpler primitives when unsure. | ![x-ai-grok-4.1-fast](https://raw.githubusercontent.com/KoStard/ForgeCAD-assets/main/benchmarks/x-ai-grok-4.1-fast-2026-02-13-00-26-36-v2.gif) |
 <!-- BENCHMARKS:END -->
 
-## Highlights
+## Capability Snapshot
 
-- Browser CAD IDE with Monaco editor + real-time 3D viewport
-- 2D sketch API: primitives, path builder, booleans, transforms, offsets, constraints
-- 3D API: booleans, transforms, hull, level set/SDF workflows, cut planes
-- Named shapes, face/edge references, fillet/chamfer helpers
-- Reusable part library with fasteners, tubes, brackets, threads, patterns, exploded-view helpers
-- Assembly graph API with revolute/prismatic/fixed joints and joint couplings
-- Drawing/report pipeline: dimensions, BOM, multi-view PDF generation
-- CLI tools that run the same engine as the browser runtime
-
-## CLI Workflows
-
-| Task | Command |
-| --- | --- |
-| Validate a script | `forgecad run file.forge.js` |
-| Render PNG views | `forgecad render file.forge.js` |
-| Render orbit GIF | `forgecad capture gif file.forge.js` |
-| Export sketch SVG | `forgecad export svg file.forge.js` |
-| Export exact STEP | `forgecad export step file.forge.js` |
-| Generate report PDF | `forgecad export report file.forge.js` |
-| Parameter robustness scan | `forgecad check params file.forge.js --samples 10` |
+- Browser CAD workbench with Monaco editing, live parameters, and a real-time 3D viewport.
+- Code-first modeling API for primitives, sketches, booleans, transforms, offsets, constraints, patterns, and SDF/level-set workflows.
+- Named shapes, face/edge references, fillet/chamfer helpers, geometry inspection, dimensions, BOMs, and report-oriented annotations.
+- Assembly modeling with parts, connectors, joints, coupled motion, and collision/clearance checks.
+- CLI validation, parameter sweeps, viewport renders, inspection bundles, mesh export, exact export workflows, and project sync.
+- Agent context that can be installed locally or inspected directly from this repository.
 
 ## Documentation
 
-Full documentation is available at [forgecad.io/docs](https://forgecad.io/docs).
+Full documentation is available at [forgecad.io/docs](https://forgecad.io/docs). Useful starting points:
+
+- [Welcome guide](https://forgecad.io/docs/welcome)
+- [API reference](https://forgecad.io/docs/core)
+- [CLI reference](https://forgecad.io/docs/cli)
+- [Public examples](examples)
+- [Agent skills](skills/README.md)
 
 ## License
 
-[Business Source License 1.1](LICENSE) — free for non-production use. Converts to MIT on the change date. See [LICENSE](LICENSE) for details.
+[Business Source License 1.1](LICENSE) with an additional use grant for most production use, excluding hosted or embedded use that competes with ForgeCAD's paid version. Each version converts to MIT four years after its first public distribution. See [LICENSE](LICENSE) for the exact terms.

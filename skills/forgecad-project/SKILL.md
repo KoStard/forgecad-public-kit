@@ -8,7 +8,7 @@ forgecad-public: true
 
 ## Overview
 
-**forgecad.io** is the primary platform for ForgeCAD projects. The CLI is the main way AI agents interact with it — creating projects, managing files, publishing models, and collaborating. `forgecad studio` / `forgecad dev` run the editor locally for offline work.
+**forgecad.io** is the primary platform for ForgeCAD projects. The CLI is the main way AI agents interact with it — creating projects, managing files, publishing models, and collaborating. `forgecad studio <project-path> [project-path ...]` / `forgecad dev <project-path> [project-path ...]` run the editor locally for offline work.
 
 ## Authentication
 

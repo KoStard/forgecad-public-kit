@@ -2,6 +2,7 @@
 name: forgecad-deep-dive
 description: Create a linked folder of concept one-pagers that deconstruct a ForgeCAD idea, architecture area, scientific concept, competitor capability, or future feature into a recursive concept tree. Use when the user wants a deep dive, concept book, walkthrough folder, architecture explainer, state-of-the-art analysis, or future-facing capability teardown saved under docs/temporary/projects/ or in Obsidian.
 forgecad-public: true
+forgecad-docs: false
 ---
 
 # ForgeCAD Deep Dive
