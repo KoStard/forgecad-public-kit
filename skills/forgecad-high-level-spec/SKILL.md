@@ -1,21 +1,23 @@
 ---
 name: forgecad-high-level-spec
-description: Write a high-level design document (HLD) for a model, mechanism, or assembly before detailed specification or coding. Use when starting a new design, rethinking an existing one, or when the user asks to spec out, plan, or think through a model at a high level. Works backwards from requirements — defines the problem, explores alternatives, records decisions. Produces a short document for review and iteration.
+description: Write a high-level design document (HLD) for a model, mechanism, or assembly before detailed specification or coding. Use when starting a new design, rethinking an existing one, or when the user asks to spec out, plan, or think through a model at a high level. Works backwards from requirements — defines the problem, explores alternatives, records decisions. Produces a right-sized design document for review and iteration.
 forgecad-public: true
 ---
 
 # High-Level Design (HLD)
 
-Write a short design document that works backwards from requirements. Define the problem, explore the solution space, record decisions. Stop before implementation details.
+Write a right-sized design document that works backwards from requirements. Define the problem, explore the solution space, record decisions. Include as much detail as needed for quality and shared understanding; stop before exhaustive construction details.
 
 ## Philosophy
 
 An HLD is a thinking tool, not a construction document. It should be:
 
-- **Short enough to review in 2 minutes.** If it takes longer, it's too detailed.
+- **Quality-first and right-sized.** Use whatever detail, evidence, diagrams, dimensions, and examples are needed for a good decision.
 - **Honest about what's unknown.** Open questions are features, not bugs.
 - **Opinionated about alternatives.** Don't just list options — recommend one and say why.
 - **Stable under iteration.** Easy to update after a round of feedback without rewriting everything.
+
+Brevity is a readability tool, not a success metric. Do not omit visible evidence, image-derived features, assumptions, interfaces, risks, or decision-driving dimensions just to keep the document short.
 
 The HLD exists so that the user and the agent can align on *what* to build before anyone thinks about *how* to build it. All design concerns, risks, and tradeoffs live here — not in conversation, not in the agent's head.
 
@@ -51,10 +53,10 @@ State the problem without implying a solution.
 ## Approach
 
 How does it work at a conceptual level? Describe the mechanism, structure,
-or behavior. Use an ASCII diagram — one picture replaces a paragraph.
+or behavior. Use ASCII diagrams where they make spatial relationships clearer.
 
-Keep this to the "elevator pitch" level: someone unfamiliar with the project
-should understand the basic idea in 30 seconds.
+Keep this at the architecture level, but include enough spatial and behavioral
+detail that someone unfamiliar with the project understands the concept.
 
 ## Key Interfaces
 
@@ -79,20 +81,20 @@ doesn't have a mechanical engineering background.
 | B | ... | ... |
 | C | ... | ... |
 
-For each alternative, one sentence on what it is and one on why you'd
-choose or reject it. Mark the recommended option.
+For each alternative, include enough detail to understand why it fits or loses.
+One sentence is fine only when one sentence is enough. Mark the recommended option.
 
 ## Usage Guide
 
-Work backwards from the user experience. Write a short step-by-step
-of how someone would use/assemble/operate this thing. This exposes
-gaps in the design before any code is written.
+Work backwards from the user experience. Write the step-by-step needed to show
+how someone would use/assemble/operate this thing. This exposes gaps in the
+design before any code is written.
 
 For a physical product: assembly steps, tools needed, what connects to what.
 For a mechanism: how it moves, what the user does, what happens.
 For a software component: how it's called, what it returns, error cases.
 
-Keep it short — 5-10 numbered steps max. Flag issues inline with ⚠️.
+Flag issues inline with ⚠️.
 
 ## Concerns
 
@@ -174,11 +176,11 @@ Agent writes HLD → git commit → User reviews (edits file or gives feedback)
 
 ## Writing Rules
 
-- **Short, clear, to the point.** Every section should be scannable in under 30 seconds. If a reviewer has to re-read a paragraph to understand it, rewrite it.
-- **One page max.** If it's longer, you're writing an LLD.
-- **ASCII diagrams over words.** A cross-section sketch communicates layout better than three paragraphs.
-- **No dimensions unless they drive a decision.** "The arm is 12mm long" belongs in the LLD. "The arm needs to bridge the gap between the rail and the rack" belongs in the HLD — it's a spatial relationship that drives the design.
-- **No parameter tables.** That's LLD territory.
+- **Quality first.** There is no fixed page, time, or section-length limit. Write the HLD to the depth the design deserves.
+- **Clear, not artificially terse.** If a reviewer has to re-read a paragraph to understand it, rewrite it; do not delete needed content just to make it shorter.
+- **ASCII diagrams where useful.** A cross-section sketch can communicate layout better than paragraphs, but use whichever representation makes the design clearest.
+- **Decision-driving dimensions are welcome.** Include dimensions, size envelopes, counts, interface dimensions, and proportional constraints when they clarify architecture, risks, image matching, or feasibility. Put exhaustive construction dimensions and formulas in the LLD.
+- **Tables are allowed when they improve clarity.** Use compact tables for alternatives, interfaces, requirements, feature inventories, or visible evidence. Keep full parameter catalogs in the LLD.
 - **Concerns are not rhetorical.** Every concern must be specific enough that someone can say "yes that's a real problem" or "no, here's why it's fine."
 - **Alternatives are not padding.** If there's genuinely only one way to do it, say so and skip the table.
 
@@ -194,7 +196,7 @@ The HLD must have its Decisions table filled before writing an LLD. The LLD must
 
 ## Anti-Patterns
 
-- **HLD that's actually an LLD.** If you're writing parameter tables and constraint equations, you've gone too far. Back up.
+- **HLD that's actually an LLD.** If you're exhaustively specifying every part, formula, tolerance, and fabrication step before the architecture is chosen, you've gone too far. Back up.
 - **HLD with no alternatives.** You haven't explored the solution space. Even if the answer is obvious, name what you rejected and why.
 - **Concerns that are vague worries.** "This might be hard to manufacture" — hard how? Tool access? Bending radius? Wall thickness? Tolerance stack? Support material? Be specific or don't list it.
 - **Decisions made before review.** The whole point is to align with the user before committing. Present the HLD, discuss, then decide.
