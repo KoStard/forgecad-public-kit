@@ -54,7 +54,7 @@ Reference matching is a validation step after the object exists.
    - validation views and inspection channels
 
 4. Choose the modeling structure.
-   Use a multi-file `main.forge.js` project when the object has distinct parts, repeated feature families, internals, purchased hardware, variants, or meaningful manufacturing assumptions. Keep dimensions, materials, part builders, hardware ghosts, and assembly helpers in neighboring plain `.js` files.
+   Use a multi-file `main.forge.js` project when the object has distinct parts, repeated feature families, internals, purchased hardware, variants, or meaningful manufacturing assumptions. Put renderable/importable parts and sub-assemblies in neighboring `.forge.js` files; keep only pure dimensions, materials, math helpers, and lookup tables in plain `.js` files.
 
 5. Build a coarse 3D blockout.
    Model the object, not the image. Start with the large volumes, axes, symmetry, side depth, rear form, underside, and hidden continuations. Render canonical views before doing reference-camera comparison.

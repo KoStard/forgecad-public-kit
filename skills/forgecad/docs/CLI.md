@@ -5,7 +5,7 @@ skill-order: 1
 
 # ForgeCAD CLI
 
-Run, export, render, and publish `.forge.js` models from your terminal. Everything stays in code.
+Create projects, open local studios, run, inspect, export, publish, and sync `.forge.js` models from your terminal. Core workflows are included with a free ForgeCAD account; advanced exports and rendering are Pro.
 
 ## Quick Start
 
@@ -13,34 +13,44 @@ Run, export, render, and publish `.forge.js` models from your terminal. Everythi
 # 1. Install
 npm install -g forgecad
 
-# 2. Clone a hosted project
+# 2. Sign in and create a dedicated project folder
 forgecad login
-forgecad project clone start-here
-cd start-here
+mkdir spool-adapter
+cd spool-adapter
+forgecad project init "Spool Adapter" --visibility private
 
-# 3. Run it
-forgecad run 00-start-here.forge.js
+# 3. Create a first model file
+forgecad new adapter --template part
 
-# 4. Open the editor (live reload)
-forgecad dev .
+# 4. Open the local editor
+forgecad studio .
 
-# 5. Export
-forgecad export stl 00-start-here.forge.js
+# 5. Validate, export, and push to the browser
+forgecad run adapter.forge.js
+forgecad export stl adapter.forge.js
+forgecad project push
+forgecad project open
 ```
+
+Most CLI commands require a ForgeCAD account. Use `forgecad login` for email/password accounts, `forgecad login --token` for GitHub/Google web-auth accounts, or `FORGECAD_TOKEN=fc_pat_... forgecad <command>` for CI/CD. `forgecad studio` always requires an explicit project path; use `.` for the current project.
+
+You can also start from the hosted starter project with `forgecad project clone start-here`, then `cd start-here` and `forgecad studio .`.
 
 ## Editor
 
-ForgeCAD includes a local editor with live reload. Edit a `.forge.js` file, save, and the 3D view updates instantly — parameters become interactive sliders.
+ForgeCAD includes a local editor. Open it around a dedicated project folder, edit a `.forge.js` file, save, and the 3D view updates — parameters become interactive sliders.
 
 | Command | Description |
 |---------|-------------|
-| `dev <project-path> [project-path ...]` | Start the Vite dev server with live reload. No build step required — the preferred way to run ForgeCAD during active development. |
-| `studio <project-path> [project-path ...]` | Serve the production build of the studio (requires dist/ — run `npm run build` first). |
+| `studio <project-path> [project-path ...]` | Open the installed local editor around one or more project folders. |
+| `dev <project-path> [project-path ...]` | Start the Vite dev server for ForgeCAD source development. |
 | `web` | Start a local dev server in web/playground mode (no filesystem, localStorage only). |
 | `open <project-path> [project-path ...]` | Alias for `forgecad studio`. |
 
+`forgecad studio <project-path>` is the normal installed-CLI command for users. `forgecad dev <project-path>` starts the Vite dev server and is mainly for ForgeCAD source development.
+
 <details>
-<summary>Common flags for dev / studio</summary>
+<summary>Common flags for studio / dev</summary>
 
 | Option | Description |
 |--------|-------------|
@@ -91,6 +101,7 @@ forgecad run examples/cup.forge.js --focus
 forgecad run examples/cup.forge.js --focus bracket,hinge
 forgecad run examples/cup.forge.js --hide "wall,bolt"
 forgecad run examples/cup.forge.js --connectivity
+forgecad run examples/cup.forge.js --journeys
 forgecad run examples/cup.forge.js --backend occt
 forgecad run examples/cup.forge.js --debug-imports
 forgecad run examples/cup.forge.js -p "Wall Thickness=3" -p "Body Height=200"
@@ -124,7 +135,7 @@ Render a Forge scene to PNG using the real viewport renderer.
 
 Launches a headless Chrome instance, renders the scene with the same WebGL viewport as the editor, and saves a PNG. The output path defaults to `<script-name>.png` next to the input file.
 
-Use `--focus` to isolate specific parts (hides everything else) or `--hide` to remove clutter like mock objects. The `--camera` flag accepts named views (`front`, `top`, `iso`), `azimuth:elevation` angles, or an exact `proj/pos/target/up/fov` camera spec — pass it multiple times to render several viewpoints in one run.
+Use `--focus` to isolate specific parts (hides everything else) or `--hide` to remove clutter like mock objects. The `--view` flag selects a named camera declared in `scene({ views })`. The `--camera` flag accepts built-in views (`front`, `top`, `iso`), `azimuth:elevation` angles, or an exact `proj/pos/target/up/fov` camera spec — pass `--camera` multiple times to render several viewpoints in one run.
 
 Use `--edges=<off|thin|bold>` to control the edge overlay. For a pure wireframe look, use `render wireframe` instead.
 
@@ -135,6 +146,7 @@ forgecad render 3d examples/cup.forge.js
 forgecad render 3d examples/cup.forge.js --focus
 forgecad render 3d examples/cup.forge.js --focus bracket
 forgecad render 3d examples/cup.forge.js --hide "wall,bolt"
+forgecad render 3d model.forge.js --view hero
 forgecad render 3d model.forge.js --camera 45:30
 forgecad render 3d model.forge.js --camera "proj=perspective;pos=200,-160,120;target=0,0,20;up=0,0,1;fov=38"
 forgecad render 3d model.forge.js --camera front --camera side
@@ -155,7 +167,7 @@ For bundle layout, channel encodings, and manifest semantics, see [Inspection Bu
 ```bash
 forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask
 forgecad render inspect examples/api/static-assembly-connectors.forge.js out/bench-inspect --channels collisions --focus Bench
-forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels all --hide "Bench.Slat0" --force
+forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask,collisions --hide "Bench.Slat0" --force
 ```
 
 ### `forgecad render wireframe`
@@ -232,16 +244,17 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 | `--focus <names>` | Focus: no arg hides mocks; comma-separated names shows only those |
 | `--hide <names>` | Hide comma-separated object names |
 | `--camera <front\|back\|side\|right\|top\|iso\|az:el\|az:el:dist\|spec>` | Camera preset, spherical (az:el), or full spec such as `proj=perspective;pos=x,y,z;target=x,y,z;up=x,y,z;fov=45`. Repeatable. |
+| `--view <name>` | Named camera view declared by the model with scene({ views }) |
 | `--size <px>` | Image size in pixels |
 | `--scene <json>` | Viewport scene state JSON |
 | `--background <color>` | Canvas background override |
 | `--render-mode <solid\|wireframe>` | Shaded solid (default) or wireframe only |
 | `--edges <off\|thin\|bold>` | Edge overlay preset in solid mode (default: thin) |
-| `--style <beauty\|technical>` | Presentation style (default: technical) |
+| `--render-style <classic\|studio\|fast\|glass>` | Visual render style (default: classic) |
 | `--port <n>` | Vite dev server port |
 | `--chrome-path <path>` | Chrome or Chromium executable path |
 | `--output <path>` | Output file path |
-| `--channels <all\|rgb,depth,normals,mask,connectivity,distance,collisions,thickness,section>` | Required inspection channels to emit; no default |
+| `--channels <rgb,depth,normals,mask,connectivity,distance,collisions,thickness,section>` | Required inspection channels to emit; no default |
 | `--quality <default\|live\|high>` | Mesh/render quality |
 | `--force` | Replace an existing bundle directory |
 | `--min-thickness <mm>` | Critical thickness threshold in model units |
@@ -290,22 +303,22 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 
 ## Export
 
-Export to every format you need. Free-tier formats work out of the box.
+Export to every format you need. Export actions are free to run; production outputs carry commercial-use guidance.
 
 | Command | Format | Use case |
 |---------|--------|----------|
-| `cut-list` **\[Pro\]** | Terminal | Grouped sheet-material cut list from `sheetStock()` |
+| `cut-list` **\[Production\]** | Terminal | Grouped sheet-material cut list from `sheetStock()` |
 | `export svg` | SVG | 2D vector output from sketches |
-| `export sketch-pdf` **\[Pro\]** | PDF | Sketch with dimensions and constraints |
-| `export step` **\[Pro\]** | STEP | CAD interchange (exact geometry) |
-| `export brep` **\[Pro\]** | BREP | Boundary representation |
+| `export sketch-pdf` **\[Production\]** | PDF | Sketch with dimensions and constraints |
+| `export step` **\[Production\]** | STEP | CAD interchange (exact geometry) |
+| `export brep` **\[Production\]** | BREP | Boundary representation |
 | `export 3mf` | 3MF | 3D printing (color, multi-part) |
 | `export stl` | STL | 3D printing |
-| `export gcode` **\[Pro\]** | G-code | Toolpath (scripted, not sliced) |
-| `export sdf` **\[Pro\]** | SDF package | Gazebo robot simulation |
-| `export urdf` **\[Pro\]** | URDF package | ROS / PyBullet / MuJoCo |
-| `export report` **\[Pro\]** | PDF report | Multi-view report with BOM and dimensions |
-| `export cutting-layout` **\[Pro\]** | PDF | Sheet cutting layout with cut sequence |
+| `export gcode` **\[Production\]** | G-code | Toolpath (scripted, not sliced) |
+| `export sdf` **\[Production\]** | SDF package | Gazebo robot simulation |
+| `export urdf` **\[Production\]** | URDF package | ROS / PyBullet / MuJoCo |
+| `export report` **\[Production\]** | PDF report | Multi-view report with BOM and dimensions |
+| `export cutting-layout` **\[Production\]** | PDF | Sheet cutting layout with cut sequence |
 | `link` | URL | Generate a ForgeCAD share link from a GitHub Gist URL or ID and copy it to clipboard. |
 
 ```bash
@@ -339,6 +352,7 @@ forgecad export sdf rover.forge.js --output out/forge_scout
 | `--allow-faceted` | Allow faceted fallback for closed mesh solids |
 | `--quality <default\|live\|high>` | Forge quality preset |
 | `--backend <manifold\|occt>` | Geometry backend |
+| `-o <path>` | Output file path |
 | `--dim-angle-tol <deg>` | Dimension routing tolerance in degrees |
 | `--sheet-width <mm>` | Stock sheet width in mm |
 | `--sheet-height <mm>` | Stock sheet height in mm |
@@ -348,23 +362,31 @@ forgecad export sdf rover.forge.js --output out/forge_scout
 
 ## Projects & Publishing
 
-ForgeCAD has a hosted platform at [forgecad.io](https://forgecad.io). The CLI connects your local files to it.
+ForgeCAD has a hosted platform at [forgecad.io](https://forgecad.io). The CLI connects a dedicated local project folder to it.
 
-A project is a local folder linked to the hosted app by `.forgecad/project.json`. Use `forgecad project clone <slug>` to download an existing hosted project into a local folder, or run `forgecad project init` inside a folder that should become a ForgeCAD project. Open local projects with `forgecad studio <project-path> [project-path ...]`.
+A project is a local folder linked to the hosted app by `forgecad.json`. Use `forgecad project clone <slug>` to download an existing hosted project into a local folder, or run `forgecad project init` inside a folder that should become a new ForgeCAD project. Open local projects with `forgecad studio <project-path>`.
+
+Keep the project root small and intentional. Do not run the editor from `~`, downloads, desktop, or a huge source tree. ForgeCAD scans project files such as `.forge.js`, `.js`, and `.svg`; broad roots make local workflows and AI-agent context slow and confusing.
 
 ### Get started
 
 ```bash
 forgecad login
-# or, for Google/web-auth accounts:
-forgecad login --token
-forgecad project clone start-here
-
-# or initialize the current folder as a new project:
+mkdir spool-adapter
+cd spool-adapter
 forgecad project init "Spool Adapter"
+forgecad new adapter --template part
+forgecad studio .
+
+# or clone an existing hosted project:
+forgecad project clone start-here
+cd start-here
+forgecad studio .
 ```
 
-`forgecad login --token` prompts securely for an API token from Settings > API Tokens. Use `FORGECAD_TOKEN=fc_pat_...` instead for CI/CD and one-off automation. See [Platform authentication](platform/auth.md#cli-auth-for-oauth-accounts) for why Google/web-auth accounts use API-token login in the CLI.
+`forgecad login` prompts for email/password. If your account was created through GitHub or Google, create an API token in Settings > API Tokens and run `forgecad login --token`; it prompts securely when the token is omitted. Use `FORGECAD_TOKEN=fc_pat_...` instead for CI/CD and one-off automation. See [Platform authentication](platform/auth.md#cli-auth-for-oauth-accounts) for details.
+
+`forgecad project init` creates the remote project, writes `forgecad.json`, pushes any existing local source files, and records server file IDs. `forgecad project push` syncs an already initialized project; it does not create a remote project from an arbitrary folder.
 
 ### Sync
 
@@ -389,7 +411,7 @@ Shares are live references — always the current version, not a snapshot.
 
 | Command | Description |
 |---------|-------------|
-| `login` | Authenticate with ForgeCAD (email/password or API token). |
+| `login` | Authenticate with ForgeCAD by email/password or API token. |
 | `logout` | Clear stored authentication credentials. |
 | `whoami` | Show the current user, server, and license status. |
 
@@ -456,14 +478,15 @@ Shares are live references — always the current version, not a snapshot.
 
 ## AI Integration
 
-ForgeCAD files are plain JavaScript. AI coding agents write and iterate on them directly. The CLI closes the loop.
+ForgeCAD files are plain JavaScript. AI coding agents should work inside an initialized project folder, write and iterate on local files, and use the CLI for evidence. See [AI Usage](AI/usage.md) for approved models, project-first setup, installable skills, quality prompts, and completion criteria.
 
 ```bash
-# Give your agent full ForgeCAD API knowledge
+# Install the full public ForgeCAD skill library
 forgecad skill install
 
-# Install the broader namespaced ForgeCAD workflow library too
-forgecad skill install --library
+# Target a specific local agent skill directory when needed
+forgecad skill install --target claude
+forgecad skill install --target opencode
 
 # Or export a single context file for chat UIs (Claude.ai, ChatGPT, ...)
 forgecad skill one-file ~/Desktop/forgecad-context.md
@@ -472,7 +495,7 @@ forgecad skill one-file ~/Desktop/forgecad-context.md
 forgecad skill flattened-files ~/Desktop/forgecad-skills
 ```
 
-> **Workflow:** Agent writes the model → `forgecad run` validates it → `forgecad check params` sweeps the parameter range → `forgecad export stl` ships the result. All in the terminal.
+> **Workflow:** Agent writes the model -> `forgecad run` validates it -> `forgecad render inspect` produces evidence -> `forgecad check params` sweeps the parameter range -> export ships the result. All in the terminal.
 
 ## Validation
 
@@ -540,14 +563,14 @@ forgecad check params path/to/model.forge.js --samples 12
 
 ### Licensing
 
-The CLI is free for core workflows. Advanced exports and rendering are Pro.
+The CLI is free for core workflows and exports. Production outputs are free to run; Pro covers commercial use. High-value render and capture tools require Pro.
 
-| Free | Pro |
-|------|-----|
-| `run`, `dev`, `studio`, `render 3d`, `export stl`, `export 3mf`, `export svg`, `check params`, `check suite` | `render hq`, `capture gif`, `capture mp4`, `cut-list`, `export sketch-pdf`, `export step`, `export brep`, `export gcode`, `export sdf`, `export urdf`, `export report`, `export cutting-layout` |
+| Free | Production outputs | Pro |
+|------|--------------------|-----|
+| `run`, `dev`, `studio`, `render 3d`, `export stl`, `export 3mf`, `export svg`, `check params`, `check suite` | `cut-list`, `export sketch-pdf`, `export step`, `export brep`, `export gcode`, `export sdf`, `export urdf`, `export report`, `export cutting-layout` are free to run; Pro covers commercial use. | `render hq`, `capture gif`, `capture mp4` |
 
 ```bash
-forgecad license                    # Check status
-forgecad license activate           # Activate Pro
+forgecad license                    # Check signed-in account status
+forgecad license activate           # Activate Pro for the signed-in account
 forgecad license deactivate         # Remove license
 ```

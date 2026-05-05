@@ -19,11 +19,15 @@ Cut planes, exploded views, joint animations, and scene configuration.
 
 #### `scene()` — Configure the scene environment for the current script execution.
 
-Controls camera position, lighting rig, background color or gradient, atmospheric fog, environment maps, post-processing effects, and capture parameters for the `forgecad capture` command. Multiple calls merge — later values override earlier ones on a per-key basis, so you can split configuration across multiple `scene()` calls.
+Controls camera position, named render views, optional model journeys, lighting rig, background color or gradient, atmospheric fog, environment maps, post-processing effects, and capture parameters for the `forgecad capture` command. Multiple calls merge — later values override earlier ones on a per-key basis, so you can split configuration across multiple `scene()` calls.
 
 When `lights` is specified, **all** default lights are removed. You must include your own ambient light or the scene will be fully dark.
 
 Setting `camera.position` overrides auto-framing — the viewport will no longer auto-fit the geometry on script reload.
+
+Named render views let scripts check in repeatable cameras next to the model code. The canonical shape is `{ camera: { position, target } }`, and a direct camera shorthand `{ position, target }` is also accepted. Use the canonical shape when you may add view metadata later. Use it from the CLI with `forgecad render 3d model.forge.js --view hero`.
+
+Model journeys let scripts check in a compact guided path through named objects. Each journey has ordered `steps`; each step can name a `focus` target by object name/tree path, provide a caption, and optionally provide an explicit camera. In the viewer, journeys are opt-in: they appear as a small Explore control and do not move the camera until the user starts them. Use `forgecad run model.forge.js --journeys` or `--journeys-json` to inspect resolved targets.
 
 Post-processing effects (`bloom`, `vignette`, `grain`) work in the browser viewport only. The CLI applies camera, lights, background, fog, and `toneMappingExposure` but skips shader effects.
 
@@ -33,6 +37,22 @@ All numeric values accept `param()` expressions.
 scene({
   background: { top: '#000814', bottom: '#001d3d' },
   camera: { position: [160, -120, 100], target: [0, 0, 50], fov: 52 },
+  views: {
+    hero: {
+      camera: { position: [180, -140, 90], target: [0, 0, 25], up: [0, 0, 1], fov: 38 },
+    },
+    side: { position: [240, 0, 70], target: [0, 0, 25], fov: 34 },
+  },
+  journeys: {
+    grandTour: {
+      title: 'Grand Tour',
+      startsAt: 'overview',
+      steps: [
+        { id: 'overview', focus: 'Solar System', caption: 'Start with the whole model.' },
+        { id: 'earth', focus: 'Earth', caption: 'Fit and inspect Earth.' },
+      ],
+    },
+  },
   lights: [
     { type: 'ambient', color: '#001233', intensity: 0.08 },
     { type: 'point', position: [120, -80, 130], color: '#00f5d4', intensity: 4, distance: 400, decay: 1 },
@@ -59,11 +79,37 @@ scene(options: SceneOptions): void
 | Option | Type | Description |
 |--------|------|-------------|
 | `capture?` | `SceneCaptureConfig` | Default capture parameters for `forgecad capture` — CLI flags override these. |
-| `background?`, `camera?`, `lights?`, `environment?`, `fog?`, `postProcessing?`, `ground?` | | — |
+| `background?`, `camera?`, `views?`, `journeys?`, `lights?`, `environment?`, `fog?`, `postProcessing?`, `ground?` | | — |
 
 `SceneBackgroundGradient`: `{ top: string, bottom: string }`
 
 **`SceneCameraConfig`**: `position?: [ number, number, number ]`, `target?: [ number, number, number ]`, `up?: [ number, number, number ]`, `fov?: number`, `type?: "perspective" | "orthographic"`
+
+**`SceneJourneyConfig`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `title?` | `string` | Viewer-facing journey title. Defaults to the journey id. |
+| `startsAt?` | `string` | Optional starting step id. Defaults to the first step. |
+| `behavior?` | `"opt-in" \| "auto"` | Whether the viewer should offer or auto-open the journey. First slice supports opt-in. |
+| `steps` | `SceneJourneyStepConfig[]` | Ordered journey spine. Branches can be added later without changing this core contract. |
+| `valid?` | `boolean` | True unless any journey or step diagnostic has level "error". |
+| `diagnostics?` | `SceneJourneyDiagnostic[]` | Whole-journey diagnostics, including unresolved startsAt and step target diagnostics. |
+
+**`SceneJourneyStepConfig`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `id` | `string` | Stable step id used by viewer links and Next/Back state. |
+| `title?` | `string` | Viewer-facing title. Defaults to the step id. |
+| `focus?` | `string` | Object name or slash-separated tree path to focus. |
+| `caption?` | `string` | Short optional viewer caption. |
+| `camera?` | `SceneViewCameraConfig` | Optional explicit camera for this step. When omitted, the viewer fits `focus`. |
+| `resolvedFocusId?` | `string \| null` | Resolved object id after script execution, when `focus` matched exactly one object. |
+| `resolvedFocusPath?` | `string \| null` | Resolved object tree path or name after script execution. |
+| `diagnostics?` | `SceneJourneyDiagnostic[]` | Resolution diagnostics for this step. |
+
+`SceneJourneyDiagnostic`: `{ level: SceneJourneyDiagnosticLevel, message: string, stepId?: string, suggestions?: string[] }`
 
 **`SceneLightConfig`**
 

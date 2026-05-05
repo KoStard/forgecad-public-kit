@@ -15,7 +15,8 @@ All new `.forge.js` files go under the date-based directory structure:
 ```
 YYYY/MM/DD/file.forge.js          — single-file model
 YYYY/MM/DD/folder/main.forge.js   — multi-file project entry point
-YYYY/MM/DD/folder/*.js            — shared helpers, constants, parts, assemblies
+YYYY/MM/DD/folder/parts/*.forge.js — standalone/importable model parts
+YYYY/MM/DD/folder/lib/*.js        — pure helpers/constants only, no geometry return
 ```
 
 Use today's date for the directory. Use the user's current ForgeCAD project when one is available; otherwise use a clearly named local model folder.
@@ -25,8 +26,9 @@ Use today's date for the directory. Use the user's current ForgeCAD project when
 - Use kebab-case for file and folder names: `parametric-lego.forge.js`
 - Use descriptive names that communicate what the model is
 - For any multi-file project, name the runnable ForgeCAD entry point `main.forge.js`
-- If a model needs shared helpers, put them in a subfolder as plain `.js` files (not `.forge.js`)
-- Do not create multiple `.forge.js` files in the same project folder unless they are intentionally separate runnable models
+- Put renderable/importable parts and sub-assemblies in separate `.forge.js` files when splitting is justified; each should be standalone-runnable and importable with `require('./parts/name.forge.js', params)`.
+- Use plain `.js` files only for pure constants, math helpers, tables, or formatting code that does not construct and return ForgeCAD geometry.
+- Do not create multiple `.forge.js` files merely for organization; split only for reusable parts, large self-contained components, or independent sub-assemblies.
 
 ## Workflow
 
@@ -34,14 +36,15 @@ Use today's date for the directory. Use the user's current ForgeCAD project when
 2. Create the directory — `mkdir -p YYYY/MM/DD/[folder]` as needed.
 3. Write the model — create the `.forge.js` file(s) following ForgeCAD conventions:
    - Declare `param()` / `boolParam()` for all tunable dimensions
-   - If the model is split across files, use `main.forge.js` as the only primary `.forge.js` entry point and import helpers/parts from neighboring plain `.js` modules
+   - If the model is split across files, use `main.forge.js` as the primary entry point, import renderable parts from neighboring `.forge.js` files, and keep only pure helpers/constants in plain `.js` modules
    - When there are multiple versions of the same object, expose the version as a choice parameter and render one selected version at a time
    - Use clear variable names
    - Build any implied internal structure as real geometry, even when it will be hidden in the final view
    - Make final mating geometry physically plausible: parts may touch, clear each other, or be boolean-joined, but should not unintentionally pass through each other
    - Return the final geometry (single shape, array, or named objects array)
+   - Avoid expensive global edge treatment on repeated decorative geometry: do not call `fillet(shape, r)` or `chamfer(shape, r)` on every edge of large unioned/repeated parts unless the render/run loop proves it is fast enough. Prefer simpler primitive profiles, lower segment counts, or targeted edge selectors.
 4. Validate — run `forgecad run <file>` to check for errors. For multi-file projects, always validate `main.forge.js`.
-5. Verify geometry — render the result and run `forgecad render inspect` with the relevant/all channels for the task (see Render-Verify Loop below). For multi-file projects, render and inspect `main.forge.js`.
+5. Verify geometry — render the result and run `forgecad render inspect` with the relevant channels for the task (see Render-Verify Loop below). For multi-file projects, render and inspect `main.forge.js`.
 
 ## Manufacturing Process Is Not Assumed
 
@@ -118,10 +121,10 @@ Then read the PNG(s) to inspect visually. Single camera → single file. Multipl
 
 ### Structured inspection bundles
 
-After the normal PNG render, run `forgecad render inspect` and read both the channel PNGs and `manifest.json`. Final acceptance for a functional or manufactured model should use all channels unless the request is purely decorative; for any multi-part final build, the `collisions` channel is mandatory:
+After the normal PNG render, run `forgecad render inspect` and read both the channel PNGs and `manifest.json`. Keep inspection bundles targeted to the current risk; for any multi-part final build, the `collisions` channel is mandatory:
 
 ```bash
-forgecad render inspect model.forge.js /tmp/model-inspect --channels all --force --size 900
+forgecad render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,collisions --force --size 700
 ```
 
 For faster iteration, request the channels that match the current risk:
@@ -161,7 +164,7 @@ forgecad render inspect model.forge.js /tmp/model-thickness --channels thickness
 - After adding hidden/internal geometry that a surface render cannot prove
 - After adding or moving mating parts, ghosts, connectors, holes, pockets, or clearances
 - After adding thin walls, ribs, slots, snap features, bosses, or screw holes
-- Before final delivery, with `--channels all`, and with thresholds appropriate to the model
+- Before final delivery, with the channels that match the remaining risks, and with thresholds appropriate to the model
 
 ### Ghost parts for fit verification
 
@@ -287,6 +290,32 @@ scene({
     toneMappingExposure: 1.3,
   },
 });
+```
+
+### Named render views
+
+For models that need repeatable review, docs, or hero renders, declare named views inside
+`scene({ views })`. The canonical form wraps each camera in `{ camera: ... }`; direct camera
+shorthand is accepted by the runtime, but the wrapped form is the clearest prompt/example shape.
+
+```js
+scene({
+  camera: { position: [430, -540, 340], target: [0, 30, 125], fov: 38 },
+  views: {
+    hero: {
+      camera: { position: [430, -540, 340], target: [0, 30, 125], up: [0, 0, 1], fov: 38 },
+    },
+    side: {
+      camera: { position: [700, 0, 180], target: [0, 30, 100], up: [0, 0, 1], fov: 32 },
+    },
+  },
+});
+```
+
+Render one later with:
+
+```bash
+forgecad render 3d model.forge.js --view hero
 ```
 
 ### Lighting principles

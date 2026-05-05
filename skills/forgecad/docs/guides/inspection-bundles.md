@@ -33,9 +33,9 @@ forgecad render inspect model.forge.js --channels thickness --min-thickness 1.2 
 The default output directory is `<script-name>-inspect/` next to the input file.
 Pass `--force` to replace an existing bundle directory.
 
-There are no default channels. Pass `--channels` every time, either as a
-comma-separated subset or as `--channels all` when you intentionally want every
-implemented channel.
+There are no default channels. Pass `--channels` every time as a
+comma-separated subset. Keep bundles targeted to the current question so heavy
+analyses do not run unnecessarily.
 
 `--focus` and `--hide` use the same object-name filtering semantics as
 `forgecad run` and `forgecad render 3d`. A bare `--focus` hides mock objects;
@@ -86,13 +86,13 @@ model-inspect/
         ...
 ```
 
-Use `--channels all` for every implemented channel, including the more expensive
-connectivity, collisions, and thickness analyses, or pass a smaller
-comma-separated subset:
+Use targeted channel groups for expensive analyses instead of running every
+implemented channel in one bundle:
 
 ```bash
 forgecad render inspect model.forge.js --channels depth,normals
-forgecad render inspect model.forge.js --channels all
+forgecad render inspect model.forge.js --channels rgb,mask,collisions
+forgecad render inspect model.forge.js --channels rgb,section,thickness
 ```
 
 Supported channels are `rgb`, `depth`, `normals`, `mask`, `connectivity`,

@@ -21,7 +21,8 @@ Author or modify ForgeCAD models, sketches, assemblies, and CLI workflows. Prefe
 
 ### Import and Composition
 
-- `require("./file.forge.js", { Param: value })` for any model file, with optional param overrides.
+- Always include the extension in relative imports: `require("./file.forge.js", { Param: value })` for model files and `require("./helpers.js")` for plain helper modules. Do not write extensionless imports such as `require("./file")`; ForgeCAD resolves project imports by exact path.
+- ForgeCAD APIs are injected globals in `.forge.js` files. Use `bom()`, `box()`, `scene()`, `Shape`, etc. directly; do not destructure those names from helpers with patterns like `const { bom } = require("./bom.js")`. If a helper file is needed, import it under a project-specific name such as `const bomHelpers = require("./bom.js")`.
 - For static multi-part models, connectors + `matchTo()` are the default way to assemble touching parts.
 - Top-level scripts can return `Assembly` or `SolvedAssembly` directly. Do not call `.toGroup()` just to render an assembly; use `.toGroup()` only when you need `ShapeGroup` composition, transforms, or named-child lookup.
 - `importSvgSketch()` for SVG files (file format loader, not a module import).

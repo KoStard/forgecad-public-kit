@@ -157,7 +157,7 @@ By the end of this skill, there should be:
    - purchased-part boundary
    - validation standard
    - variant-selection policy when multiple versions of the same object are requested
-   - file-organization policy: if the implementation needs multiple files, the runnable ForgeCAD entry point must be `main.forge.js`, with helpers/parts/constants in neighboring plain `.js` modules
+   - file-organization policy: if the implementation needs multiple files, the runnable ForgeCAD entry point must be `main.forge.js`; renderable parts/sub-assemblies belong in neighboring `.forge.js` files, while plain `.js` files are only for pure helpers/constants
    - explicit uncertainty policy
 
 8. Emit one master prompt.

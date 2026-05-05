@@ -1,4 +1,0 @@
-interface:
-  display_name: "ForgeCAD Deep Dive"
-  short_description: "Build linked concept deep dives"
-  default_prompt: "Use $forgecad-deep-dive to create a linked folder of one-pagers that deconstruct a ForgeCAD concept, architecture area, or future capability."

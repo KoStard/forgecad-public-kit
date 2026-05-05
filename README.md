@@ -27,7 +27,19 @@ cd start-here
 forgecad studio .
 ```
 
-A ForgeCAD project is a local folder linked to the hosted app by `.forgecad/project.json`. Use `forgecad project clone <slug>` to download an existing project, or run `forgecad project init` inside a folder you already want to make into a ForgeCAD project.
+A ForgeCAD project is a dedicated local folder linked to the hosted app by `forgecad.json`. Use `forgecad project clone <slug>` to download an existing project, or run `forgecad project init` inside a folder you want to make into a new ForgeCAD project.
+
+Create a new project locally:
+
+```bash
+mkdir spool-adapter
+cd spool-adapter
+forgecad project init "Spool Adapter" --visibility private
+forgecad new adapter --template part
+forgecad studio .
+```
+
+Do not point `forgecad studio` at your home directory, downloads folder, desktop, or a huge source tree. It requires an explicit project path; use `.` for the current project folder.
 
 Explore the public examples locally:
 
@@ -98,7 +110,7 @@ Active application development currently happens in a private repository. This p
 | Task | Command |
 | --- | --- |
 | Clone a hosted project | `forgecad project clone <slug>` |
-| Initialize the current folder as a project | `forgecad project init "Project Name"` |
+| Create a new hosted project from the current folder | `forgecad project init "Project Name"` |
 | Open one or more local projects | `forgecad studio <project-path> [project-path ...]` |
 | Validate a script | `forgecad run file.forge.js` |
 | Render a PNG | `forgecad render 3d file.forge.js` |
@@ -107,6 +119,8 @@ Active application development currently happens in a private repository. This p
 | Export STL | `forgecad export stl file.forge.js` |
 | Export STEP | `forgecad export step file.forge.js` |
 | Sweep parameters | `forgecad check params file.forge.js --samples 10` |
+
+`forgecad project init` creates the remote project, writes `forgecad.json`, and uploads local source files. `forgecad project push` syncs an already initialized project; it does not create a remote project from a random folder.
 
 Run `forgecad doctor` if render or exact export dependencies need checking.
 
@@ -118,19 +132,23 @@ ForgeCAD is built to work well with coding agents because CAD models are just co
 agent edits .forge.js -> forgecad run -> forgecad render inspect -> iterate
 ```
 
-Install the core modeling skill:
+The full setup, approved model list, installed skills, flattened skill files, and completion criteria are in the [AI Usage guide](https://forgecad.io/docs/ai-usage).
+
+Install the ForgeCAD public skill library:
 
 ```bash
 forgecad skill install
 ```
 
-Install the expanded workflow library:
+That installs the core `forgecad` skill plus public workflow skills such as `forgecad-make-a-model`, `forgecad-render-inspect`, and `forgecad-lld` into the known global skill directories for generic agents, Claude Code, Codex, and OpenCode. Use `--target` when you want to update only one agent location:
 
 ```bash
-forgecad skill install --library
+forgecad skill install --target claude    # ~/.claude/skills
+forgecad skill install --target opencode  # ~/.config/opencode/skills
+forgecad skill install --target codex     # ~/.codex/skills
 ```
 
-The expanded library includes public prompts for:
+The library includes public prompts for:
 
 - build-brief preparation with [`forgecad-prepare-prompt`](skills/forgecad-prepare-prompt/SKILL.md)
 - model authoring with [`forgecad-make-a-model`](skills/forgecad-make-a-model/SKILL.md)
@@ -141,6 +159,14 @@ The expanded library includes public prompts for:
 
 The generated core modeling skill is checked in at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md). The full public skill index is [`skills/README.md`](skills/README.md).
 
+Start the agent inside the initialized project folder and require command evidence:
+
+```text
+Use the ForgeCAD skills. Work in this project folder. Build real ForgeCAD
+geometry, validate with forgecad run, render or inspect the result, run
+parameter checks when relevant, and push with forgecad project push when done.
+```
+
 For chat tools without local shell access, generate a single context file:
 
 ```bash
@@ -149,6 +175,8 @@ forgecad skill one-file ~/Desktop/forgecad-context.md
 
 <!-- BENCHMARKS:START -->
 ## LLM Benchmarks
+
+Historical benchmark archive only. These rows are not recommendations and are not the approved model list. For current supported AI workflows, use the approved models in the [AI Usage guide](https://forgecad.io/docs/ai-usage).
 
 Latest benchmark iterations from `ForgeCADBenchmark/results/*` (`version_{n}.forge.js` with highest `n` per run folder).
 

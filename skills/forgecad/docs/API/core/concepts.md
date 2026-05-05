@@ -12,6 +12,24 @@ const width = param("Width", 50, { min: 20, max: 100, unit: "mm" });
 return box(width, 30, 10);
 ```
 
+## Injected Runtime Names
+
+ForgeCAD API functions and classes are injected into every `.forge.js` script. Use them directly; do not import or destructure ForgeCAD API names from helper files.
+
+```javascript
+// BAD — `bom` and `bomToCsv` are already built-in runtime names.
+const { bom, bomToCsv } = require("./bom.js");
+
+// GOOD — use the built-in directly.
+bom(4, "M4 bolt");
+
+// GOOD — keep project helpers under their own local name.
+const bomHelpers = require("./bom.js");
+bomHelpers.addFasteners(...);
+```
+
+Top-level declarations such as `const bom = ...`, `let scene = ...`, or `class Shape {}` collide with the injected runtime names. If you need a local helper, choose a project-specific name like `projectBom`, `sceneConfig`, or `makeShape`.
+
 ## Execution Model
 
 - Scripts re-execute on every parameter change (400ms debounce)
@@ -23,6 +41,8 @@ Top-level assembly scripts can return an unsolved `Assembly` directly; ForgeCAD 
 ### Metadata Object Return
 
 A script can return a plain object whose values include renderable geometry alongside non-renderable metadata. All renderable entries (Shape, Sketch, ShapeGroup, Assembly, SolvedAssembly, SdfShape, or Array of named objects) are rendered; non-renderable entries are silently skipped. This is useful for multi-file projects where a part needs to publish interface data (bolt positions, dimensions) to other files:
+
+When importing project files, include the full extension in every relative path: `require('./motor-mount.forge.js')` for model files and `require('./helpers.js')` for plain helper modules. ForgeCAD resolves project imports by exact path and does not infer `.forge.js` or `.js` from `require('./motor-mount')`.
 
 ```javascript
 // motor-mount.forge.js — renders standalone, exports metadata via require()

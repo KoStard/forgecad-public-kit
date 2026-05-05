@@ -23,6 +23,7 @@ BOM entries are accumulated during script execution and exported alongside the m
 - `quantity` must be a finite number `>= 0`. A quantity of `0` is silently ignored (useful for conditional scripting with `param()`-driven counts).
 - `unit` defaults to `"pieces"` when omitted or empty.
 - The assembly `solved.bom()` / `solved.bomCsv()` API is separate and covers per-part assembly metadata; this function is for free-form purchased-item annotation.
+- `bom()` is injected into every `.forge.js` script. Call it directly; do not write `const { bom } = require(...)`, because top-level declarations named `bom` collide with the built-in runtime name.
 
 ```ts
 const tubeLen = param("Tube Length", 1200, { min: 300, max: 4000, unit: "mm" });

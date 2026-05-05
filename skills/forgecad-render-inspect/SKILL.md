@@ -38,19 +38,19 @@ Routing:
    Use `/tmp/<model-name>-inspect` by default so generated PNGs do not dirty the repo. Use a project output directory only when the user wants a persistent artifact.
 
 3. Pick the channel set.
-   Use the table below. For final verification of a functional, manufactured, multi-part, or internal model, prefer `--channels all`.
+   Use the table below. Prefer small targeted channel sets; broad stress checks should still list explicit channels.
 
 4. Run the command.
    In the ForgeCAD repo, prefer the built CLI when you want the current checkout:
 
    ```bash
-   node dist-cli/forgecad.js render inspect model.forge.js /tmp/model-inspect --channels all --force --size 900
+   node dist-cli/forgecad.js render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,collisions --force --size 700
    ```
 
    Outside the ForgeCAD repo, use the installed CLI:
 
    ```bash
-   forgecad render inspect model.forge.js /tmp/model-inspect --channels all --force --size 900
+   forgecad render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,collisions --force --size 700
    ```
 
    If the model may not execute, run `forgecad run model.forge.js` first. If imports are suspect, add `--debug-imports` to the run command.
@@ -86,7 +86,7 @@ Routing:
 | Quick orientation and object naming | `rgb,mask` |
 | Hidden internals, cavities, pockets, screw paths, captured components | `rgb,mask,section` |
 | Multi-part interference, fit checks, ghost parts, moving clearances | `rgb,mask,collisions` |
-| Final multi-part mechanical or manufactured model | `all` |
+| Final multi-part mechanical or manufactured model | `rgb,mask,collisions` plus `section`, `thickness`, `connectivity`, or `distance` only when those risks apply |
 | Printability, shell walls, ribs, bosses, snaps, slots | `rgb,section,thickness` |
 | Floating parts, accidental fusion, connected solids | `rgb,mask,connectivity` |
 | Air gaps between physical components | `rgb,mask,distance` |
@@ -100,10 +100,10 @@ Explicit fast bundle:
 forgecad render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,section --force --size 700
 ```
 
-Final functional check:
+Final fit/interference check:
 
 ```bash
-forgecad render inspect model.forge.js /tmp/model-inspect --channels all --force --size 900
+forgecad render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,collisions --force --size 700
 ```
 
 Collision-focused isolation:
@@ -121,13 +121,13 @@ forgecad render inspect model.forge.js /tmp/model-thickness --channels rgb,secti
 Hide known clutter or mock geometry:
 
 ```bash
-forgecad render inspect model.forge.js /tmp/model-inspect --channels all --hide "Fixture Ghost,Debug Envelope" --force
+forgecad render inspect model.forge.js /tmp/model-inspect --channels rgb,mask,collisions --hide "Fixture Ghost,Debug Envelope" --force
 ```
 
 Use bare `--focus` to hide mock objects while keeping real scene objects:
 
 ```bash
-forgecad render inspect model.forge.js /tmp/model-real --focus --channels all --force
+forgecad render inspect model.forge.js /tmp/model-real --focus --channels rgb,mask,collisions --force
 ```
 
 ## Reading Results

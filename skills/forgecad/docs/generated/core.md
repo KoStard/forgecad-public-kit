@@ -414,6 +414,8 @@ coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
 
 When importing a `.forge.js` file, the return value is what the script returns. If the script returns a metadata object (e.g. `{ shape: myShape, bolts: {...} }`), the caller receives the full object — renderable values and metadata together.
 
+**Path rule:** Always include the file extension in relative imports: use `require("./part.forge.js")` for model files and `require("./helpers.js")` for plain helper modules. ForgeCAD does not apply Node-style extension inference, so `require("./part")` will not find `part.forge.js` or `part.js`.
+
 **Parameter scoping:** Parameters declared in required files are automatically namespaced with a `"filename#N / "` prefix (e.g. `"bracket.forge.js#1 / Width"`). This prevents collisions when multiple files declare same-named params. Each file's params appear as separate sliders.
 
 **Parameter overrides:** When passing overrides, use the bare param name (not the scoped name). Overrides are type-checked — unrecognized keys throw an error with typo suggestions.
