@@ -18,9 +18,11 @@ Smooth curves, lofted surfaces, swept solids, splines, and high-level product sk
 - [QuinticHermiteCurve3D](#quintichermitecurve3d)
 - [ProductSkin](#productskin)
 - [ProductSurfaceRef](#productsurfaceref)
+- [ProductSurfaceBuilder](#productsurfacebuilder)
 - [ProductSkinBuilder](#productskinbuilder)
 - [ProductStationBuilder](#productstationbuilder)
 - [ProductPanelBuilder](#productpanelbuilder)
+- [ProductRibbonBuilder](#productribbonbuilder)
 - [ProductSpoutBuilder](#productspoutbuilder)
 - [ProductHandleBuilder](#producthandlebuilder)
 - [ProductHandleFeature](#producthandlefeature)
@@ -901,11 +903,30 @@ integrate(...details: Shape[]): Shape
 diagnostics(): ProductSkinDiagnostics
 ```
 
+**`ProductSkinDiagnostics`**: `representation: ProductSkinRepresentation`, `lowering: string[]`, `warnings: string[]`, `stationNames: string[]`, `railNames: string[]`
+
+**`ProductSkinRepresentation`** — Reported lowering mode for ProductSkin and conformal feature diagnostics.
+
+`"exact" | "sampled" | "mixed" | "fallback"`
+
 #### `uv()` — Create a side/u/v surface-ref query on this skin.
 
 ```ts
 uv(side: ProductSkinSide, u?: number, v?: number): ProductSkinRefQuery
 ```
+
+**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
+
+`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
+
+**`ProductSkinRefQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
+| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
+| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
+| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
 
 #### `ref()` — Resolve a named ref published with Product.skin().refs(...).
 
@@ -919,17 +940,31 @@ ref(name: string): ProductSurfaceRef
 curveOnSurface(name: string, points: Array<Partial<ProductSkinRefQuery> & { side: ProductSkinSide; }>): ProductSurfaceRef[]
 ```
 
+#### `surface()` — Create a fluent surface helper for refs and conformal features on one side of this skin.
+
+Use this when several refs or ribbons share the same skin side; side-local helpers keep path points concise and make it harder to mix sides accidentally.
+
+```ts
+surface(side: ProductSkinSide): ProductSurfaceBuilder
+```
+
 #### `stationAt()` — Interpolate center, width, and depth at a normalized v or absolute axis value.
 
 ```ts
-stationAt(vOrAxis: number): { center: Vec3; width: number; depth: number; dWidth: number; dDepth: number; axisValue: number; }
+stationAt(vOrAxis: number): { ... }
 ```
+
+**`ProductProfileKind`**
+
+`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
 
 #### `frame()` — Build a local surface frame from a side/u/v query.
 
 ```ts
 frame(query: ProductSkinRefQuery): ProductSurfaceFrame
 ```
+
+**`ProductSurfaceFrame`**: `point: Vec3`, `normal: Vec3`, `tangentU: Vec3`, `tangentV: Vec3`, `matrix: Mat4`, `skin: string`, `representation: ProductSkinRepresentation`
 
 ### `ProductSurfaceRef`
 
@@ -947,6 +982,25 @@ frame(query: ProductSkinRefQuery): ProductSurfaceFrame
 frame(overrides?: Partial<ProductSkinRefQuery>): ProductSurfaceFrame
 ```
 
+**`ProductSkinRefQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
+| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
+| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
+| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
+
+**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
+
+`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
+
+**`ProductSurfaceFrame`**: `point: Vec3`, `normal: Vec3`, `tangentU: Vec3`, `tangentV: Vec3`, `matrix: Mat4`, `skin: string`, `representation: ProductSkinRepresentation`
+
+**`ProductSkinRepresentation`** — Reported lowering mode for ProductSkin and conformal feature diagnostics.
+
+`"exact" | "sampled" | "mixed" | "fallback"`
+
 #### `with()` — Return a copy of this ref with side/u/v/offset overrides.
 
 ```ts
@@ -959,11 +1013,97 @@ with(overrides: Partial<ProductSkinRefQuery>): ProductSurfaceRef
 attach(detail: Shape | ShapeGroup, options?: ProductAttachOptions): Shape | ShapeGroup
 ```
 
+`ProductAttachOptions`: `{ offset?: number, inset?: number }`
+
 #### `querySpec()` — Return the serializable side/u/v query behind this ref.
 
 ```ts
 querySpec(): ProductSkinRefQuery
 ```
+
+### `ProductSurfaceBuilder`
+
+Fluent helper bound to one ProductSkin side for refs and side-local conformal features.
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `side` | `ProductSkinSide` | — |
+
+**Methods:**
+
+#### `ref()` — Create a ref on this skin side.
+
+```ts
+ref(u?: number, v?: number, offset?: number): ProductSurfaceRef
+```
+
+#### `uv()` — Create a side/u/v query on this skin side.
+
+```ts
+uv(u?: number, v?: number, offset?: number): ProductSkinRefQuery
+```
+
+**`ProductSkinRefQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
+| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
+| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
+| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
+
+**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
+
+`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
+
+#### `ribbon()` — Start a conformal ribbon on this skin side.
+
+Path points use side-local `u`/`v` coordinates; this builder supplies the side. The returned ProductRibbonBuilder is already bound to the source skin and can be further configured before build(). Use `widthSamples` >= 3 when the ribbon must visibly wrap over curved product sections instead of behaving like a flat strip.
+
+```ts
+ribbon(name: string, points: ProductSurfacePathPoint[], options?: ProductRibbonBuildOptions): ProductRibbonBuilder
+```
+
+**`ProductSurfacePathPoint`**
+- `u?: number` — Across-side parameter on the bound side. Defaults to 0.5.
+- `v?: number` — Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5.
+- `offset?: number` — Positive distance away from the surface along the resolved normal.
+
+**`ProductRibbonBuildOptions`** — Options shared by Product.ribbon() builders and Product.surface(...).ribbon(...).
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `width?` | `number` | Width across the surface in millimeters. |
+| `thickness?` | `number` | Solid thickness outward from the source surface in millimeters. |
+| `offset?` | `number` | Positive clearance between the source surface and the ribbon's inner face. |
+| `samples?` | `number` | Samples along the ribbon path. Higher values bend more smoothly. |
+| `widthSamples?` | `number` | Samples across the ribbon width. Use 3+ to visibly wrap over curved cross-sections. |
+| `resolution?` | `number` | Tessellation resolution passed to the lowered NURBS surface. |
+| `material?` | `ProductMaterial` | Apply a product material preset to the ribbon. |
+| `color?` | `string` | Apply a simple color override. |
+
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
 
 ### `ProductSkinBuilder`
 
@@ -981,11 +1121,23 @@ querySpec(): ProductSkinRefQuery
 axis(axis: ProductSkinAxis): this
 ```
 
+**`ProductSkinAxis`** — Primary world axis used to order ProductSkin loft stations.
+
+`"X" | "Y" | "Z"`
+
 #### `stations()` — Set named cross-section stations for the product skin.
 
 ```ts
 stations(stations: Array<ProductStationBuilder | ProductStationSpec>): this
 ```
+
+`ProductStationSpec`: `{ name: string, center: Vec3, profile: ProductStationProfile, crown?: number }`
+
+`ProductStationProfile`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number, exponent?: number }`
+
+**`ProductProfileKind`**
+
+`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
 
 #### `rails()` — Attach guide rails as ProductSkin IR metadata and diagnostics.
 
@@ -993,11 +1145,30 @@ stations(stations: Array<ProductStationBuilder | ProductStationSpec>): this
 rails(rails: Record<string, ProductRailSpec>): this
 ```
 
+`ProductRailSpec`: `{ kind: ProductRailKind, points: Vec3[], degree?: number, name?: string }`
+
+**`ProductRailKind`**
+
+`"bezier" | "nurbs" | "polyline"`
+
 #### `ref()` — Publish a named semantic surface ref on the skin.
 
 ```ts
 ref(name: string, query: ProductSkinRefQuery): this
 ```
+
+**`ProductSkinRefQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
+| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
+| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
+| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
+
+**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
+
+`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
 
 #### `refs()` — Publish multiple named semantic surface refs on the skin.
 
@@ -1016,6 +1187,27 @@ uv(side: ProductSkinSide, u?: number, v?: number): ProductSkinRefQuery
 ```ts
 material(material: ProductMaterial): this
 ```
+
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
 
 #### `color()` — Apply a simple color override to the lowered skin.
 
@@ -1087,6 +1279,8 @@ oval(width: number, depth: number, options?: { segments?: number; }): this
 superEllipse(width: number, depth: number, options?: ProductStationSuperEllipseOptions): this
 ```
 
+`ProductStationSuperEllipseOptions`: `{ segments?: number, exponent?: number }`
+
 #### [`roundedRect()`](/docs/sketch#roundedrect) — Use a rounded-rectangle cross-section with the given corner radius.
 
 ```ts
@@ -1116,6 +1310,14 @@ crown(amount: number): this
 ```ts
 toSpec(): ProductStationSpec
 ```
+
+`ProductStationSpec`: `{ name: string, center: Vec3, profile: ProductStationProfile, crown?: number }`
+
+`ProductStationProfile`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number, exponent?: number }`
+
+**`ProductProfileKind`**
+
+`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
 
 ### `ProductPanelBuilder`
 
@@ -1157,6 +1359,27 @@ thickness(thickness: number): this
 material(material: ProductMaterial): this
 ```
 
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
+
 #### `color()` — Apply a simple color override to the panel.
 
 ```ts
@@ -1173,6 +1396,202 @@ build(): Shape
 
 ```ts
 attachTo(ref: ProductRefInput, options?: ProductPanelAttachOptions): Shape
+```
+
+**`ProductRefInput`**
+
+`ProductSurfaceRef`
+
+`ProductAttachOptions`: `{ offset?: number, inset?: number }`
+
+`ProductPanelAttachOptions`: `{ at?: Partial<ProductSkinRefQuery>, thickness?: number, material?: ProductMaterial, color?: string }`
+
+**`ProductSkinRefQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
+| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
+| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
+| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
+
+**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
+
+`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
+
+### `ProductRibbonBuilder`
+
+Builder for thin trim, label, grip, and split-line features that bend with a ProductSkin surface.
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `on()` — Follow a ProductSkin with side/u/v path queries or refs.
+
+This is the highest-fidelity mode because every interpolated sample is resolved through ProductSkin.frame(), so the ribbon bends along the selected side as station width/depth changes. All query path points must stay on one side; split side transitions into separate ribbons.
+
+```ts
+on(skin: ProductSkin, points: ProductRibbonPathPoint[], options?: ProductRibbonBuildOptions): this
+```
+
+**`ProductRibbonPathPoint`** — Path point for Product.ribbon().on(...): either a side/u/v query or a resolved surface ref.
+
+`ProductSkinRefQuery | ProductSurfaceRef`
+
+**`ProductSkinRefQuery`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
+| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
+| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
+| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
+
+**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
+
+`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
+
+**`ProductRibbonBuildOptions`** — Options shared by Product.ribbon() builders and Product.surface(...).ribbon(...).
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `width?` | `number` | Width across the surface in millimeters. |
+| `thickness?` | `number` | Solid thickness outward from the source surface in millimeters. |
+| `offset?` | `number` | Positive clearance between the source surface and the ribbon's inner face. |
+| `samples?` | `number` | Samples along the ribbon path. Higher values bend more smoothly. |
+| `widthSamples?` | `number` | Samples across the ribbon width. Use 3+ to visibly wrap over curved cross-sections. |
+| `resolution?` | `number` | Tessellation resolution passed to the lowered NURBS surface. |
+| `material?` | `ProductMaterial` | Apply a product material preset to the ribbon. |
+| `color?` | `string` | Apply a simple color override. |
+
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
+
+#### `fromRefs()` — Follow explicit surface refs.
+
+Useful for named refs or paths assembled elsewhere. The builder resolves each ref frame and interpolates between those frames; use on(skin, points) when you need full skin-side sampling between sparse control points.
+
+```ts
+fromRefs(points: ProductSurfaceRef[], options?: ProductRibbonBuildOptions): this
+```
+
+#### `width()` — Set ribbon width in millimeters.
+
+```ts
+width(width: number): this
+```
+
+#### `thickness()` — Set solid thickness outward from the source surface in millimeters.
+
+```ts
+thickness(thickness: number): this
+```
+
+#### `offset()` — Set positive clearance between the source surface and the ribbon's inner face.
+
+```ts
+offset(offset: number): this
+```
+
+#### `samples()` — Set samples along the path.
+
+```ts
+samples(samples: number): this
+```
+
+#### `widthSamples()` — Set samples across the width. Use 3+ to bend over curved cross-sections.
+
+```ts
+widthSamples(samples: number): this
+```
+
+#### `resolution()` — Set NURBS tessellation resolution.
+
+```ts
+resolution(resolution: number): this
+```
+
+#### `material()` — Apply a product material preset.
+
+```ts
+material(material: ProductMaterial): this
+```
+
+#### `color()` — Apply a simple color override.
+
+```ts
+color(color: string): this
+```
+
+#### `build()` — Build a conformal ribbon as a thin NURBS surface solid.
+
+```ts
+build(options?: ProductRibbonBuildOptions): Shape
+```
+
+#### `buildWithDiagnostics()` — Build a conformal ribbon and return surface-feature diagnostics.
+
+Use this while validating API usage or model fidelity; diagnostics report sampling counts, side-span clamping, lowering mode, and warnings that should be visible in reviews.
+
+```ts
+buildWithDiagnostics(options?: ProductRibbonBuildOptions): ProductRibbonResult
+```
+
+**`ProductRibbonResult`** — Shape plus diagnostics returned by ProductRibbonBuilder.buildWithDiagnostics().
+- `shape: Shape` — Lowered conformal ribbon shape.
+- `diagnostics: ProductRibbonDiagnostics` — Sampling and lowering diagnostics for the returned shape.
+
+**`ProductRibbonDiagnostics`** — Diagnostics describing how a conformal ribbon was sampled and lowered.
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Ribbon shape name. |
+| `skin?` | `string` | Source skin name when the ribbon follows a ProductSkin directly. |
+| `side?` | `ProductSkinSide` | Source skin side when all path points are on one semantic side. |
+| `pathPointCount` | `number` | Number of control path points supplied before interpolation. |
+| `width` | `number` | Final ribbon width in millimeters. |
+| `thickness` | `number` | Final ribbon solid thickness in millimeters. |
+| `offset` | `number` | Final normal offset from the source surface in millimeters. |
+| `samples` | `number` | Final sample count along the ribbon path. |
+| `widthSamples` | `number` | Final sample count across the ribbon width. |
+| `resolution` | `number` | NURBS tessellation resolution used for the lowered surface. |
+| `lowering` | `"nurbsSurface"` | Lowering primitive used for the ribbon shape. |
+| `expectedFidelity` | `ProductSkinRepresentation` | Expected fidelity inherited from the source skin/ref sampling mode. |
+| `clampedUCount` | `number` | Number of generated width samples clamped to the valid side span. |
+| `maxUClampDistance` | `number` | Largest absolute u-distance lost to side-span clamping. |
+| `warnings` | `string[]` | Non-fatal sampling and lowering warnings. |
+
+**`ProductSkinRepresentation`** — Reported lowering mode for ProductSkin and conformal feature diagnostics.
+
+`"exact" | "sampled" | "mixed" | "fallback"`
+
+#### `diagnostics()` — Return diagnostics from the most recent build, if this builder has been built.
+
+```ts
+diagnostics(): ProductRibbonDiagnostics | undefined
 ```
 
 ### `ProductSpoutBuilder`
@@ -1197,6 +1616,14 @@ from(ref: ProductSurfaceRef): this
 sections(sections: Array<Sketch | ProductStationBuilder | ProductStationSpec>): this
 ```
 
+`ProductStationSpec`: `{ name: string, center: Vec3, profile: ProductStationProfile, crown?: number }`
+
+`ProductStationProfile`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number, exponent?: number }`
+
+**`ProductProfileKind`**
+
+`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
+
 #### `projection()` — Set the projection length along the source ref normal.
 
 ```ts
@@ -1215,6 +1642,27 @@ edgeLength(value: number): this
 material(material: ProductMaterial): this
 ```
 
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
+
 #### `color()` — Apply a simple color override to the spout.
 
 ```ts
@@ -1232,6 +1680,8 @@ build(): Shape
 ```ts
 attach(options?: ProductAttachOptions): Shape
 ```
+
+`ProductAttachOptions`: `{ offset?: number, inset?: number }`
 
 ### `ProductHandleBuilder`
 
@@ -1255,6 +1705,12 @@ between(upper: ProductSurfaceRef, lower: Vec3): this
 spine(points: Vec3[] | ProductRailSpec): this
 ```
 
+`ProductRailSpec`: `{ kind: ProductRailKind, points: Vec3[], degree?: number, name?: string }`
+
+**`ProductRailKind`**
+
+`"bezier" | "nurbs" | "polyline"`
+
 #### `grip()` — Set the grip cross-section profile.
 
 ```ts
@@ -1266,6 +1722,27 @@ grip(profile: Sketch): this
 ```ts
 material(material: ProductMaterial): this
 ```
+
+`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
+
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
 
 #### `padMaterial()` — Apply a product material preset to handle landing pads.
 
@@ -1363,7 +1840,9 @@ toGroup(): ShapeGroup
 - `describeProfile(sketch: Sketch, kind?: ProductProfileKind, radius?: number): ProductProfileDescriptor` — Describe a custom sketch as a product profile.
 - `scaleProfileTo(sketch: Sketch, width: number, depth: number): Sketch` — Scale an existing profile sketch to a target width/depth.
 - `ref(skin: ProductSkin, query: ProductSkinRefQuery): ProductSurfaceRef` — Create an ad-hoc ProductSurfaceRef from a skin and side/u/v query.
+- `surface(skin: ProductSkin, side: ProductSkinSide): ProductSurfaceBuilder` — Create a fluent surface helper for refs and conformal features on one side of a skin. Equivalent to skin.surface(side), useful when writing in Product.* namespace style.
 - `panel(name: string): ProductPanelBuilder` — Start a panel feature builder.
+- `ribbon(name: string): ProductRibbonBuilder` — Start a conformal ribbon/trim builder for details that should bend with a ProductSkin. Call .on(skin, points) for side/u/v sampling or .fromRefs(points) for explicit surface refs, then configure width, thickness, offset, sampling, material, and color before build().
 - `spout(name: string): ProductSpoutBuilder` — Start a spout/nozzle feature builder.
 - `handle(name: string): ProductHandleBuilder` — Start a handle feature builder.
 - `place(detail: Shape | ShapeGroup, ref: ProductRefInput, options?: ProductAttachOptions): Shape | ShapeGroup` — Place a shape or group on a ProductSurfaceRef.

@@ -9,13 +9,45 @@ Cut planes, exploded views, joint animations, and scene configuration.
 
 ## Contents
 
-- [Viewport & Runtime](#viewport-runtime) — `scene`, `viewConfig`, `explodeView`, `jointsView`, `cutPlane`, `mock`, `showLabels`, `highlight`
+- [Viewport & Runtime](#viewport-runtime) — `Viewport.label`, `scene`, `viewConfig`, `explodeView`, `jointsView`, `cutPlane`, `mock`, `showLabels`, `highlight`
 - [RouteBuilder](#routebuilder)
 - [route](#route)
 
 ## Functions
 
 ### Viewport & Runtime
+
+#### `Viewport.label()` — Add a render-only viewport label at a world-space point.
+
+`Viewport.label()` is for explanatory text that helps a viewer understand the model. It does not create sketches, meshes, B-rep topology, exported text, or face labels, so it stays off the OCCT path. Use [`text2d()`](/docs/sketch#text2d) only when the letters should become manufactured geometry, such as raised lettering, engraved serial numbers, or exported nameplates.
+
+Labels are collected during script execution and rendered by the viewport as lightweight overlay annotations. They are ignored by exports and do not appear in `objects`.
+
+```js
+Viewport.label('Bearing bore', [0, 0, 18], {
+  color: '#f8fafc',
+  background: '#0f172acc',
+  offset: [0, 0, 8],
+  anchor: 'bottom',
+});
+
+return box(40, 30, 12);
+```
+
+```ts
+Viewport.label(text: string, at: [ number, number, number ], options?: RenderLabelOptions): void
+```
+
+**`RenderLabelOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `color?` | `string` | Text color as any CSS color string. |
+| `background?` | `string` | Background color as any CSS color string. Use `'transparent'` for no pill background. |
+| `size?` | `number` | Font size in CSS pixels. Defaults to 12. |
+| `offset?` | `[ number, number, number ]` | Additional world-space offset from `at`. |
+| `anchor?` | `RenderLabelAnchor` | Which point of the label box is anchored to `at`. Defaults to `'center'`. |
+| `alwaysOnTop?` | `boolean` | When false, the label is hidden when occluded by scene geometry. Defaults to true. |
 
 #### `scene()` — Configure the scene environment for the current script execution.
 

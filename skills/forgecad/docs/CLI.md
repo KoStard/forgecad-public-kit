@@ -87,7 +87,7 @@ The primary validation command. Runs your script with the real geometry kernel (
 
 Intra-group pairs (same assembly group) and mock-to-mock pairs are skipped. If a part passes through a boolean-subtracted hole, no collision is reported — the material is gone.
 
-**Spatial analysis** — reports directional relationships and gap distances between nearby objects (e.g. `bracket is ABOVE base (gap: 5mm)`). When no issues are found: `(no collisions, all objects well-separated)`.
+**Spatial analysis** — reports directional relationships and gap distances between nearby objects (e.g. `bracket is ABOVE base (gap: 5mm)`). Exact pairwise collision intersections run by default only for bounded scenes; use `--spatial exact` for exhaustive collision checks or `--spatial off` to skip this section.
 
 **Physical connectivity** — pass `--connectivity` to list physically connected components across visible objects. Overlapping or touching bboxes are joined within `--connectivity-tolerance` (default `0.05` model units); use collision inspection for exact positive-volume overlaps. This helps answer whether the model is one continuous assembly or several separate islands.
 

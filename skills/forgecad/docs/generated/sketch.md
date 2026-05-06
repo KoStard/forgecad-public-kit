@@ -299,6 +299,8 @@ loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype.Font
 
 The Sketch origin is at the left end of the text baseline by default. Use `align` and `baseline` options to adjust placement. Text is rendered using the bundled Inter font by default, or any TTF/OTF/WOFF font you provide.
 
+`text2d()` creates real geometry. For non-exported explanatory labels in the viewport, prefer `Viewport.label()` so the text stays off the geometry and OCCT compile paths.
+
 Alignment reference table:
 
 | `align`    | `baseline`   | Origin                              |

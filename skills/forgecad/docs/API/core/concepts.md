@@ -95,6 +95,12 @@ Shapes carry semantic face labels through their lifecycle. The flow is:
 
 You resolve labels to geometry with `.face(name)` or `.face(query)` — see the Shape class docs for the full query API. Operations like `.pocket()`, `.boss()`, `.hole()`, and `faceProfile()` all consume face references.
 
+## Text vs Viewport Labels
+
+Use `text2d()` only when the letters are part of the model: raised text, engraving, cut labels, serial plates, exported markings, or geometry that should survive into STL/STEP output. `text2d()` builds filled sketch geometry from font outlines, so it can make exact/OCCT workflows slower.
+
+Use `Viewport.label(text, [x, y, z], options)` when the goal is to explain the model in the viewport. Render labels are annotations only: they do not create meshes, do not export, do not enter the B-rep path, and do not add face labels.
+
 ## SDF Modeling
 
 For organic shapes, smooth blending, TPMS lattices, and surface deformations. Return `SdfShape` values directly, or return a plain object/array tree of SDF leaves, for native raymarch preview. Use `.toShape()` or `toShape(...)` only when you need mesh-backed CAD/export behavior. See [sdf-primitives.md](sdf-primitives.md).
