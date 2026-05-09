@@ -5,6 +5,7 @@ import {
   runScript,
   build3mfBuffer,
   buildBinaryStl,
+  validateMeshExportObjects,
   type MeshExportObject,
 } from '../src/forge/headless';
 import { initKernel, setActiveBackend, type ActiveBackend } from '../src/forge/kernel';
@@ -17,6 +18,7 @@ interface ParsedArgs {
   outputPath?: string;
   quality?: 'default' | 'live' | 'high';
   backend?: ActiveBackend;
+  validate?: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -24,6 +26,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let outputPath: string | undefined;
   let quality: 'default' | 'live' | 'high' | undefined;
   let backend: ActiveBackend | undefined;
+  let validate = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -51,6 +54,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       i += 1;
       continue;
     }
+    if (arg === '--validate') {
+      validate = true;
+      continue;
+    }
     if (arg.startsWith('--')) {
       throw new Error(`Unknown flag: ${arg}`);
     }
@@ -62,7 +69,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     throw new Error('Usage: forgecad export <3mf|stl> <script.forge.js> [--output path] [--quality default|live|high] [--backend manifold|occt]');
   }
 
-  return { scriptPath, outputPath, quality, backend };
+  return { scriptPath, outputPath, quality, backend, validate };
 }
 
 function defaultOutputPath(scriptPath: string, format: MeshFormat): string {
@@ -83,11 +90,27 @@ function extractMeshObjects(result: ReturnType<typeof runScript>): MeshExportObj
     }));
 }
 
+function printMeshValidationReports(reports: ReturnType<typeof validateMeshExportObjects>): void {
+  console.log('  Mesh validation:');
+  reports.forEach((report) => {
+    console.log(
+      `    ${report.name}: ${report.vertices.toLocaleString()} vertices, ` +
+      `${report.triangles.toLocaleString()} triangles, ` +
+      `${report.connectedComponents.toLocaleString()} component(s), ` +
+      `${report.nonManifoldEdges.toLocaleString()} non-manifold edge(s)`,
+    );
+    report.issues.forEach((issue) => {
+      const prefix = issue.severity === 'error' ? 'ERROR' : 'WARN';
+      console.log(`      ${prefix} ${issue.code}: ${issue.message}`);
+    });
+  });
+}
+
 export async function runMeshExportCli(
   format: MeshFormat,
   argv: string[],
 ): Promise<void> {
-  const { scriptPath, outputPath, quality, backend } = parseArgs(argv);
+  const { scriptPath, outputPath, quality, backend, validate } = parseArgs(argv);
   const code = (await import('fs')).readFileSync(resolve(scriptPath), 'utf-8');
   const { allFiles, fileName, readBinaryFile } = collectProjectFiles(scriptPath);
 
@@ -105,6 +128,18 @@ export async function runMeshExportCli(
   if (meshObjects.length === 0) {
     console.error('No 3D shapes found in the script output.');
     process.exit(2);
+  }
+
+  const validationReports = validate ? validateMeshExportObjects(meshObjects) : [];
+  const validationFailures = validationReports.flatMap((report) =>
+    report.issues
+      .filter((issue) => issue.severity === 'error')
+      .map((issue) => `${report.name}: ${issue.message}`),
+  );
+  if (validationFailures.length > 0) {
+    printMeshValidationReports(validationReports);
+    console.error(`Mesh validation failed:\n${validationFailures.map((failure) => `  - ${failure}`).join('\n')}`);
+    process.exit(3);
   }
 
   const target = resolve(outputPath ?? defaultOutputPath(scriptPath, format));
@@ -130,4 +165,7 @@ export async function runMeshExportCli(
   console.log(`✓ Exported ${format.toUpperCase()} to ${target}`);
   console.log(`  ${meshObjects.length} object(s)${quality ? ` [quality: ${quality}]` : ''}`);
   stats.forEach((line) => console.log(line));
+  if (validate) {
+    printMeshValidationReports(validationReports);
+  }
 }

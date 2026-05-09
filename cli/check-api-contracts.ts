@@ -24,6 +24,7 @@ import {
   intersection2d,
   hull2d,
   runScript,
+  validateMeshExportObject,
   constrainedSketch,
   sketchRegions,
   sketchRegion,
@@ -159,6 +160,29 @@ function checkBooleanErrors(): void {
   assert.throws(
     () => union2d([plate, undefined as unknown as ReturnType<typeof rect>]),
     /union2d\(\) argument 2: expected a Sketch, got undefined/,
+  );
+}
+
+function checkMeshExportValidation(): void {
+  const connected = validateMeshExportObject({
+    name: 'connected box',
+    shape: box(10, 10, 10, true),
+  });
+  assert.equal(connected.connectedComponents, 1, 'single box should export as one connected component');
+  assert.equal(connected.nonManifoldEdges, 0, 'single box should not have non-manifold edges');
+  assert.deepEqual(connected.issues, [], 'single box should pass mesh export validation');
+
+  const disconnected = validateMeshExportObject({
+    name: 'disconnected union',
+    shape: union(
+      box(10, 10, 10, true),
+      box(10, 10, 10, true).translate(30, 0, 0),
+    ),
+  });
+  assert.equal(disconnected.connectedComponents, 2, 'disjoint union should remain detectable as disconnected mesh components');
+  assert(
+    disconnected.issues.some((issue) => issue.code === 'mesh.disconnected_components' && issue.severity === 'error'),
+    'disjoint union should fail mesh export validation',
   );
 }
 
@@ -506,6 +530,7 @@ export async function runCheckApiContractsCli(): Promise<void> {
   checkTrackedShapeInterop();
   checkSketchBooleanForms();
   checkBooleanErrors();
+  checkMeshExportValidation();
   checkEdgeFinishSubsetErrors();
   checkSheetMetalApiContracts();
   checkSandboxBindings();

@@ -13,6 +13,28 @@ export interface ThreeMfExportOptions {
   description?: string;
 }
 
+export interface MeshExportValidationIssue {
+  severity: 'warning' | 'error';
+  code:
+    | 'mesh.no_triangles'
+    | 'mesh.degenerate_triangle'
+    | 'mesh.duplicate_triangle'
+    | 'mesh.non_manifold_edge'
+    | 'mesh.disconnected_components';
+  message: string;
+}
+
+export interface MeshExportValidationReport {
+  name: string;
+  triangles: number;
+  vertices: number;
+  connectedComponents: number;
+  nonManifoldEdges: number;
+  degenerateTriangles: number;
+  duplicateTriangles: number;
+  issues: MeshExportValidationIssue[];
+}
+
 interface RGB {
   r: number;
   g: number;
@@ -59,6 +81,137 @@ function toRGB555(colorHex: string): number {
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (v: number) => v.toString(16).padStart(2, '0').toUpperCase();
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function vertexKey(mesh: ReturnType<Shape['getMesh']>, index: number): string {
+  const offset = index * mesh.numProp;
+  return `${mesh.vertProperties[offset]},${mesh.vertProperties[offset + 1]},${mesh.vertProperties[offset + 2]}`;
+}
+
+function triangleAreaSquared(mesh: ReturnType<Shape['getMesh']>, i0: number, i1: number, i2: number): number {
+  const a = i0 * mesh.numProp;
+  const b = i1 * mesh.numProp;
+  const c = i2 * mesh.numProp;
+  const abx = mesh.vertProperties[b] - mesh.vertProperties[a];
+  const aby = mesh.vertProperties[b + 1] - mesh.vertProperties[a + 1];
+  const abz = mesh.vertProperties[b + 2] - mesh.vertProperties[a + 2];
+  const acx = mesh.vertProperties[c] - mesh.vertProperties[a];
+  const acy = mesh.vertProperties[c + 1] - mesh.vertProperties[a + 1];
+  const acz = mesh.vertProperties[c + 2] - mesh.vertProperties[a + 2];
+  const nx = aby * acz - abz * acy;
+  const ny = abz * acx - abx * acz;
+  const nz = abx * acy - aby * acx;
+  return nx * nx + ny * ny + nz * nz;
+}
+
+function countConnectedComponents(vertexCount: number, adjacency: Map<number, Set<number>>): number {
+  const seen = new Set<number>();
+  let components = 0;
+
+  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+    if (seen.has(vertex)) continue;
+    components += 1;
+    const stack = [vertex];
+    seen.add(vertex);
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const next of adjacency.get(current) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        stack.push(next);
+      }
+    }
+  }
+
+  return components;
+}
+
+export function validateMeshExportObject(obj: MeshExportObject): MeshExportValidationReport {
+  const mesh = obj.shape.getMesh();
+  const vertexCount = Math.floor(mesh.vertProperties.length / mesh.numProp);
+  const edgeUse = new Map<string, number>();
+  const triangleUse = new Set<string>();
+  const adjacency = new Map<number, Set<number>>();
+  let degenerateTriangles = 0;
+  let duplicateTriangles = 0;
+
+  const addEdge = (a: number, b: number): void => {
+    const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+    edgeUse.set(key, (edgeUse.get(key) ?? 0) + 1);
+    if (!adjacency.has(a)) adjacency.set(a, new Set());
+    if (!adjacency.has(b)) adjacency.set(b, new Set());
+    adjacency.get(a)!.add(b);
+    adjacency.get(b)!.add(a);
+  };
+
+  for (let tri = 0; tri < mesh.numTri; tri += 1) {
+    const i0 = mesh.triVerts[tri * 3];
+    const i1 = mesh.triVerts[tri * 3 + 1];
+    const i2 = mesh.triVerts[tri * 3 + 2];
+
+    if (i0 === i1 || i1 === i2 || i2 === i0 || triangleAreaSquared(mesh, i0, i1, i2) <= 1e-18) {
+      degenerateTriangles += 1;
+    }
+
+    const triangleKey = [vertexKey(mesh, i0), vertexKey(mesh, i1), vertexKey(mesh, i2)].sort().join('|');
+    if (triangleUse.has(triangleKey)) duplicateTriangles += 1;
+    triangleUse.add(triangleKey);
+
+    addEdge(i0, i1);
+    addEdge(i1, i2);
+    addEdge(i2, i0);
+  }
+
+  const nonManifoldEdges = [...edgeUse.values()].filter((count) => count !== 2).length;
+  const connectedComponents = countConnectedComponents(vertexCount, adjacency);
+  const issues: MeshExportValidationIssue[] = [];
+
+  if (mesh.numTri === 0) {
+    issues.push({ severity: 'error', code: 'mesh.no_triangles', message: 'mesh has no triangles' });
+  }
+  if (degenerateTriangles > 0) {
+    issues.push({
+      severity: 'error',
+      code: 'mesh.degenerate_triangle',
+      message: `${degenerateTriangles.toLocaleString()} degenerate triangle(s)`,
+    });
+  }
+  if (duplicateTriangles > 0) {
+    issues.push({
+      severity: 'warning',
+      code: 'mesh.duplicate_triangle',
+      message: `${duplicateTriangles.toLocaleString()} duplicate triangle(s)`,
+    });
+  }
+  if (nonManifoldEdges > 0) {
+    issues.push({
+      severity: 'error',
+      code: 'mesh.non_manifold_edge',
+      message: `${nonManifoldEdges.toLocaleString()} non-manifold edge(s)`,
+    });
+  }
+  if (connectedComponents > 1) {
+    issues.push({
+      severity: 'error',
+      code: 'mesh.disconnected_components',
+      message: `${connectedComponents.toLocaleString()} disconnected component(s)`,
+    });
+  }
+
+  return {
+    name: obj.name,
+    triangles: mesh.numTri,
+    vertices: vertexCount,
+    connectedComponents,
+    nonManifoldEdges,
+    degenerateTriangles,
+    duplicateTriangles,
+    issues,
+  };
+}
+
+export function validateMeshExportObjects(objects: MeshExportObject[]): MeshExportValidationReport[] {
+  return objects.map(validateMeshExportObject);
 }
 
 /**

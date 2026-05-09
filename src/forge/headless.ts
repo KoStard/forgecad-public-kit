@@ -151,8 +151,13 @@ export type {
   ReportGenerationResult,
 } from './report';
 
-export { build3mfBuffer, buildBinaryStl } from './exportMesh';
-export type { MeshExportObject, ThreeMfExportOptions } from './exportMesh';
+export { build3mfBuffer, buildBinaryStl, validateMeshExportObjects, validateMeshExportObject } from './exportMesh';
+export type {
+  MeshExportObject,
+  ThreeMfExportOptions,
+  MeshExportValidationIssue,
+  MeshExportValidationReport,
+} from './exportMesh';
 
 /**
  * Initialize the geometry kernel. Must be called once before using any forge API.
