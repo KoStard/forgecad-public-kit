@@ -16,7 +16,7 @@ They are temporary engineering anchors used only when the user has not provided 
 
 Use these across families before translating into numbers:
 
-- manufacturing posture: infer unless specified; common values are `production-realistic`, `prototype-realistic`, `printable`, and `visual-CAD`
+- manufacturing posture: default to `manufacture-realistic prototype` unless specified; common override values are `production-realistic`, `prototype-realistic`, `printable`, and `visual-CAD`
 - duty level: `light-duty`, `general-duty`, `sturdy-duty`
 - scale level: `compact`, `medium`, `large`
 - cost posture: `cheapest`, `balanced`, `performance-first`
@@ -28,6 +28,8 @@ Never take a number from one family and silently reuse it for another.
 Do not use 3D printing as the universal default.
 Choose the process stack from the artifact family, load path, scale, safety expectations, material properties, quantity/iteration needs, and operating story.
 Only use print defaults when the user explicitly requested printing or the selected process stack includes printed parts.
+
+The default posture is `manufacture-realistic prototype`: a credible prototype build candidate with real materials, real purchased parts, plausible fabrication routes, serviceable interfaces, and validation checks. It should be manufacturable enough for a prototype review, but it should not claim final production tooling, certification, or release readiness unless the user asks for that stronger bar.
 
 Examples:
 
@@ -274,7 +276,7 @@ Do not make rideable load paths printed by default.
 
 ### Family Questions
 
-- Is this a visual/product CAD study, a prototype-realistic build candidate, or a specifically printable toy/model?
+- Is this a visual/product CAD study, a manufacture-realistic prototype build candidate, or a specifically printable toy/model?
 - Is it for child-scale, adult-scale, display-scale, or cargo/utility scale?
 - Does it need steering, braking, folding, suspension, or only static product form?
 
@@ -288,7 +290,7 @@ Do not make rideable load paths printed by default.
 
 `general-duty`
 
-- adult product form or prototype-realistic scooter/bike/cart architecture
+- adult product form or manufacture-realistic prototype scooter/bike/cart architecture
 - aluminum or steel tube/frame members, machined or cast fork/dropout-like features, wood/composite/aluminum deck where appropriate
 - urethane/rubber wheels, real bearings, axles, fasteners, spacers, grip tape, grips, and purchased brake/steering hardware where appropriate
 

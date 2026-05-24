@@ -27,6 +27,8 @@ cd start-here
 forgecad studio .
 ```
 
+`forgecad login` guides you through email/password or API-token sign-in. Choose API token for GitHub/Google accounts.
+
 A ForgeCAD project is a dedicated local folder linked to the hosted app by `forgecad.json`. Use `forgecad project clone <slug>` to download an existing project, or run `forgecad project init` inside a folder you want to make into a new ForgeCAD project.
 
 Create a new project locally:
@@ -114,7 +116,7 @@ Active application development currently happens in a private repository. This p
 | Open one or more local projects | `forgecad studio <project-path> [project-path ...]` |
 | Validate a script | `forgecad run file.forge.js` |
 | Render a PNG | `forgecad render 3d file.forge.js` |
-| Render an inspection bundle | `forgecad render inspect file.forge.js --channels rgb,mask` |
+| Inspect a model | `forgecad inspect collisions file.forge.js` |
 | Render a section | `forgecad render section file.forge.js --plane XZ` |
 | Export STL | `forgecad export stl file.forge.js` |
 | Export STEP | `forgecad export step file.forge.js` |
@@ -129,7 +131,7 @@ Run `forgecad doctor` if render or exact export dependencies need checking.
 ForgeCAD is built to work well with coding agents because CAD models are just code. The strongest loop is:
 
 ```text
-agent edits .forge.js -> forgecad run -> forgecad render inspect -> iterate
+agent edits .forge.js -> forgecad run -> forgecad inspect <evidence> -> iterate
 ```
 
 The full setup, approved model list, installed skills, flattened skill files, and completion criteria are in the [AI Usage guide](https://forgecad.io/docs/ai-usage).
@@ -140,12 +142,12 @@ Install the ForgeCAD public skill library:
 forgecad skill install
 ```
 
-That installs the core `forgecad` skill plus public workflow skills such as `forgecad-make-a-model`, `forgecad-render-inspect`, and `forgecad-lld` into the known global skill directories for generic agents, Claude Code, Codex, and OpenCode. Use `--target` when you want to update only one agent location:
+That installs the core `forgecad` skill plus public workflow skills such as `forgecad-make-a-model`, `forgecad-render-inspect`, and `forgecad-lld` into `~/.agents/skills`. Use `--target` when you want to update a different agent location:
 
 ```bash
 forgecad skill install --target claude    # ~/.claude/skills
-forgecad skill install --target opencode  # ~/.config/opencode/skills
 forgecad skill install --target codex     # ~/.codex/skills
+forgecad skill install --target opencode  # ~/.config/opencode/skills
 ```
 
 The library includes public prompts for:

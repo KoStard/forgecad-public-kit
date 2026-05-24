@@ -12,6 +12,8 @@ The reference image is evidence. It is not the deliverable.
 
 The deliverable is a real parametric object that remains believable from front, back, side, top, bottom, and reference camera views. A model that matches one image but falls apart from other angles has failed, even if the comparison board looks close.
 
+If a reference image is cutaway, sectioned, exploded, partly hidden, or transparent, treat that as evidence about the complete object. Do not make the default ForgeCAD result a permanently cutaway or exploded display unless the user explicitly asked for a teaching/display model. Build the closed artifact first, then use ForgeCAD viewer/inspection tools to recreate explanatory views.
+
 ## Required Companion Skills
 
 - Use `forgecad` for API docs, model authoring, and renderer behavior.
@@ -51,7 +53,7 @@ Reference matching is a validation step after the object exists.
    - inferred hidden-side geometry
    - expected canonical front, back, left, right, top, and bottom forms
    - required internal, interface, or fit geometry
-   - validation views and inspection channels
+   - validation views and inspection evidence
 
 4. Choose the modeling structure.
    Use a multi-file `main.forge.js` project when the object has distinct parts, repeated feature families, internals, purchased hardware, variants, or meaningful manufacturing assumptions. Put renderable/importable parts and sub-assemblies in neighboring `.forge.js` files; keep only pure dimensions, materials, math helpers, and lookup tables in plain `.js` files.
@@ -80,7 +82,7 @@ Reference matching is a validation step after the object exists.
    When multiple images are attached, do not choose one as the target and ignore the rest. Assign each image a camera, evidence list, and confidence level. Optimize one shared geometry against the whole set. If an image is decorative, distorted, or contradictory, state how it was weighted.
 
 10. Inspect the final object.
-   Run `forgecad run`, render the reference comparison boards, render canonical views, and use `forgecad render inspect` with relevant channels. For multi-part, mechanical, internal, or fit-sensitive models, include collisions and section views.
+   Run `forgecad run`, render the reference comparison boards, render canonical views, and use targeted `forgecad inspect <evidence>` commands. For multi-part, mechanical, internal, or fit-sensitive models, include `inspect collisions` and `inspect sections`, but keep the delivered model as the complete closed artifact.
 
 ## Renderer Camera Support
 
@@ -145,7 +147,7 @@ A successful result:
 - includes internal, interface, purchased, or hardware geometry when the artifact calls for it
 - passes `forgecad run`
 - includes final reference comparison boards and canonical renders
-- includes inspection results for the risk channels that matter
+- includes inspection results for the risk evidence that matters
 
 A result fails if it only works from the original camera.
 

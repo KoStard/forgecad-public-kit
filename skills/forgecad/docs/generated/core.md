@@ -18,12 +18,13 @@ skill-order: 100
 - [Grouping & Local Coordinates](#grouping-local-coordinates) — `group`
 - [Section & Projection](#section-projection) — `intersectWithPlane`, `faceProfile`, `projectToPlane`
 - [Transforms](#transforms) — `composeChain`
-- [Backend Runtime](#backend-runtime) — `initKernel`, `setActiveBackend`, `activateBackend`, `getActiveBackend`
-- [Verification](#verification) — `spec`
+- [Verification](#verification) — `verify.that`, `verify.equal`, `verify.notEqual`, `verify.greaterThan`, `verify.lessThan`, `verify.inRange`, `verify.centersCoincide`, `verify.connectorDistance`, `verify.physicalComponentCount`, `verify.intentionalOverlap`, `verify.notColliding`, `verify.minClearance`, `verify.clearanceBetween`, `verify.parallel`, `verify.perpendicular`, `verify.coplanar`, `verify.faceAt`, `verify.sameDirection`, `verify.isEmpty`, `verify.notEmpty`, `verify.volumeApprox`, `verify.areaApprox`, `verify.boundingBoxSize`, `verify.edgeContinuity`, `verify.noTinyEdges`, `verify.noSliverFaces`, `verify.noSelfIntersection`, `spec`
 - [Shape](#shape) — Appearance, Face Topology, Edge Topology, Transforms, Booleans & Cutting, Features, Placement, Connectors, References, Measurement
 - [Transform](#transform)
 - [ShapeGroup](#shapegroup) — Children, Transforms, Placement, Connectors, References
 - [SurfacePattern](#surfacepattern)
+- [Pattern2D](#pattern2d)
+- [Pattern2DBuilder](#pattern2dbuilder)
 - [ShapeRef](#shaperef)
 - [ANCHOR3D_NAMES](#anchor3d-names)
 - [verify](#verify)
@@ -120,9 +121,11 @@ intersection(...inputs: ShapeOperandInput[]): Shape
 
 ### Edge Features
 
-#### `fillet()` — Apply fillets (rounded edges) to one or more edges of a shape.
+#### `fillet()` — Apply experimental fillets (rounded edges) to one or more edges of a shape.
 
-Works on both straight and curved edges. Supports OCCT and Manifold backends. When using OCCT, all edges are filleted in a single kernel operation for best quality. When using Manifold, edges are filleted sequentially.
+**Experimental**: fillets are still backend-sensitive. The Manifold backend is known to produce incorrect results for some edge-finish cases, and the OCCT backend can be very slow, especially with broad edge selections. Prefer targeted edge selectors and inspect the result before treating it as production-ready geometry.
+
+Edge selections compile into backend operations; unsupported selections fail as explicit kernel gaps instead of using TypeScript geometry fallbacks.
 
 The `edges` parameter is flexible:
 
@@ -148,9 +151,11 @@ fillet(myShape, 3, edges)
 fillet(shape: Shape, radius: number, edges?: EdgeSelector, segments?: number): Shape
 ```
 
-#### `chamfer()` — Apply chamfers (beveled edges) to one or more edges of a shape.
+#### `chamfer()` — Apply experimental chamfers (beveled edges) to one or more edges of a shape.
 
-Produces a 45° bevel at the specified `size` (distance from edge). Works on both straight and curved edges. Supports OCCT and Manifold backends.
+**Experimental**: chamfers are still backend-sensitive. The Manifold backend is known to produce incorrect results for some edge-finish cases, and the OCCT backend can be very slow, especially with broad edge selections. Prefer targeted edge selectors and inspect the result before treating it as production-ready geometry.
+
+Produces a 45° bevel at the specified `size` (distance from edge). Edge selections compile into backend operations; unsupported selections fail as explicit kernel gaps instead of using TypeScript geometry fallbacks.
 
 The `edges` parameter accepts the same options as `fillet()`: inline `EdgeQuery`, pre-selected `EdgeSegment`/`EdgeSegment[]`, or `undefined` (all sharp edges).
 
@@ -170,7 +175,7 @@ chamfer(shape: Shape, size: number, edges?: EdgeSelector): Shape
 
 Adds a taper angle to the vertical faces of a solid so that it can be extracted from a mold. The neutral plane is the Z position where the draft angle is zero — faces above and below are tapered symmetrically. Typical values for injection molding are 1–5°.
 
-Requires the OCCT backend. Throws on Manifold.
+Truck supports vertical-prism solids with Z-axis pull directions. OCCT uses its native draft operation when available. Manifold throws.
 
 ```ts
 // Add 3° draft to a box for injection molding
@@ -327,7 +332,7 @@ mirrorCopy(shape: Shape, normal: [ number, number, number ]): Shape
 
 #### `selectEdges()` — Select all edges from a shape that match the given query.
 
-Extracts sharp edges from the mesh (dihedral angle > 1°), applies all filters in the query, and returns the matching `EdgeSegment[]`. When `near` is specified the results are sorted closest-first.
+Uses the active kernel's native topology query when available (Truck), otherwise extracts sharp edges from the mesh (dihedral angle > 1°), applies all filters in the query, and returns the matching `EdgeSegment[]`. When `near` is specified the results are sorted closest-first.
 
 Works on any shape — primitives, booleans, shells, and imported meshes. Use this when tracked topology is unavailable (e.g. after a difference or on imported geometry). For simpler cases, pass an `EdgeQuery` directly to `fillet()` or `chamfer()` instead of calling `selectEdges` separately.
 
@@ -477,7 +482,7 @@ importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch
 importMesh(fileName: string, options?: { scale?: number; center?: boolean; }): Shape
 ```
 
-#### `importStep()` — Import a STEP file (.step, .stp) as an exact OCCT-backed Shape. Preserves NURBS curves, B-spline surfaces, and exact topology. Requires `setActiveBackend('occt')`.
+#### `importStep()` — Import a STEP file (.step, .stp) as an exact OCCT-backed Shape. Preserves NURBS curves, B-spline surfaces, and exact topology. Requires running with the OCCT backend.
 
 ```ts
 importStep(fileName: string): Shape
@@ -613,17 +618,20 @@ Param.list<T extends Record<string, number | boolean | string>>(name: string, de
 
 Unlike union(), child colors and individual identities are preserved. Children can be plain shapes, named descriptors ({ name, shape/sketch/group }), or nested groups. The returned ShapeGroup supports all Shape transforms (translate, rotate, etc.).
 
+Named descriptors can include `tags` for viewport organization. Tags do not affect geometry; they let the command palette hide, show only, or focus all objects with the same tag.
+
 **Local coordinate pattern:** Build child parts at the origin (local coordinates), then group and translate once to place the whole assembly. This eliminates the error-prone pattern of manually adding parent offsets to every sub-part.
 
 ```js
-// BAD — every sub-part repeats the parent's global offset
-const unitX = 0, unitY = -18, unitZ = 70;
-const body = roundedBox(100, 20, 32, 4).translate(unitX, unitY, unitZ);
-const panel = box(98, 2, 18).translate(unitX, unitY - 12, unitZ + 4);
-const louver = box(88, 2, 6).translate(unitX, unitY - 14, unitZ - 11);
+const body = roundedBox(100, 20, 32, 4);
+const panel = box(98, 2, 18).translate(0, -12, 4);
+const louver = box(88, 2, 6).translate(0, -14, -11);
+const indoorUnit = group(
+  { name: 'Body', shape: body },
+  { name: 'Panel', tags: 'cover', shape: panel },
+  { name: 'Louver', tags: ['cover', 'moving'], shape: louver },
+).translate(0, -18, 70);
 ```
-
-// GOOD — build at origin, group, translate once const body = roundedBox(100, 20, 32, 4); const panel = box(98, 2, 18).translate(0, -12, 4); const louver = box(88, 2, 6).translate(0, -14, -11); const indoorUnit = group( { name: 'Body', shape: body }, { name: 'Panel', shape: panel }, { name: 'Louver', shape: louver }, ).translate(0, -18, 70);
 
 ```ts
 group(...items: GroupInput[]): ShapeGroup
@@ -659,33 +667,208 @@ projectToPlane(shape: Shape, plane: PlaneSpec): Sketch
 composeChain(...steps: TransformInput[]): Transform
 ```
 
-### Backend Runtime
-
-#### `initKernel()`
-
-```ts
-initKernel(): Promise<unknown>
-```
-
-#### `setActiveBackend()`
-
-```ts
-setActiveBackend(backend: ActiveBackend): void
-```
-
-#### `activateBackend()` — Set the active backend and ensure its WASM module is initialized. Call this instead of `setActiveBackend` when you're about to execute code — it guarantees the backend is ready, not just selected.
-
-```ts
-activateBackend(backend: ActiveBackend): Promise<void>
-```
-
-#### `getActiveBackend()`
-
-```ts
-getActiveBackend(): ActiveBackend
-```
-
 ### Verification
+
+#### `verify.that()` — Custom predicate check.
+
+```ts
+verify.that(label: string, check: () => boolean, message?: string): void
+```
+
+#### `verify.equal()` — Check that two numbers are approximately equal (within tolerance).
+
+```ts
+verify.equal(label: string, actual: number, expected: number, tolerance?: number, message?: string): void
+```
+
+#### `verify.notEqual()` — Check that two numbers are NOT equal (differ by more than tolerance).
+
+```ts
+verify.notEqual(label: string, actual: number, unexpected: number, tolerance?: number, message?: string): void
+```
+
+#### `verify.greaterThan()` — Check that actual > min.
+
+```ts
+verify.greaterThan(label: string, actual: number, min: number, message?: string): void
+```
+
+#### `verify.lessThan()` — Check that actual < max.
+
+```ts
+verify.lessThan(label: string, actual: number, max: number, message?: string): void
+```
+
+#### `verify.inRange()` — Check that min <= actual <= max.
+
+```ts
+verify.inRange(label: string, actual: number, min: number, max: number, message?: string): void
+```
+
+#### `verify.centersCoincide()` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
+
+```ts
+verify.centersCoincide(label: string, a: ShapeLike, b: ShapeLike, tolerance?: number): void
+```
+
+`ShapeLike`: `{ min: number[], max: number[] }`
+
+#### `verify.connectorDistance()` — Check the distance between two named connectors on a shape or group.
+
+Use this when connectors + `matchTo()` define a static assembly interface. It proves the mate at runtime, unlike a plain source-level connector declaration. The common case is `expected = 0`, meaning the two connector origins should coincide after placement.
+
+```ts
+verify.connectorDistance("leg is seated", bench, "Rail.leg_0", "Leg0.head", 0, 0.01);
+```
+
+```ts
+verify.connectorDistance(label: string, target: ConnectorDistanceLike, connectorA: string, connectorB: string, expected?: number, tolerance?: number): void
+```
+
+#### `verify.physicalComponentCount()` — Declare the expected physical connectivity component count for the returned visible model.
+
+Use this for generated mechanical models that should have a clear component graph: one connected fixture, a purchased part plus a removable cartridge, a root assembly plus named intentional ghosts, and so on. `forgecad inspect mechanical-integrity` resolves the returned visible objects with the same physical-connectivity analysis used in the quality gate and fails if the actual component count differs.
+
+This catches the common generated-CAD failure where a script returns a visually plausible artifact but the handle, screw, washer, cover, or terminal block is actually a separate island.
+
+```ts
+verify.physicalComponentCount("vise is one connected installed assembly", 1);
+```
+
+```ts
+verify.physicalComponentCount(label: string, expected: number): void
+```
+
+#### `verify.intentionalOverlap()` — Declare that two visible objects intentionally overlap because the overlap is real manufacturing intent.
+
+Use this only for overlaps that a mechanical reviewer would accept as actual matter sharing volume: welded/fused regions, overmolded inserts, potted electronics, cast-in hardware, or deliberately bonded laminations. This is not a shortcut for screws without holes, shafts without bores, covers without pockets, or parts placed with collision as a positioning hack.
+
+`forgecad inspect mechanical-integrity --collisions` only honors this declaration when both shapes are returned as visible objects and the exact collision report finds that same object pair. Unused or non-visible declarations fail the quality gate so annotations cannot hide unrelated collisions.
+
+```ts
+verify.intentionalOverlap("rubber grip is overmolded on handle", rubberGrip, handleCore, "overmolded insert");
+```
+
+```ts
+verify.intentionalOverlap(label: string, a: ShapeLike, b: ShapeLike, reason: string): void
+```
+
+#### `verify.notColliding()` — Check that two shapes do not collide (minGap > 0).
+
+```ts
+verify.notColliding(label: string, a: ShapeLike, b: ShapeLike, searchLength?: number): void
+```
+
+#### `verify.minClearance()` — Check that a minimum clearance gap exists between two shapes.
+
+```ts
+verify.minClearance(label: string, a: ShapeLike, b: ShapeLike, minGap: number, searchLength?: number): void
+```
+
+#### `verify.clearanceBetween()` — Check that the clearance gap between two shapes is inside an allowed range.
+
+Use this for seated and retained interfaces where a part must be close enough to be mechanically accountable, but must not collide beyond the allowed minimum. It catches both failure modes that make generated CAD look fake: parts floating away from their receiver, and parts intersecting their receiver because the pocket, bore, or running clearance was not modeled.
+
+For contact, use a narrow range such as `[-0.01, 0.05]` to tolerate tiny numerical noise. For a running fit, use the intended clearance band.
+
+Manifold-backed shapes use exact min-gap distance. Other backends use a mesh-derived min-gap check and say so in the verification message; keep `forgecad inspect mechanical-integrity --collisions` in the acceptance gate for positive-volume interference.
+
+```ts
+verify.clearanceBetween("cover is seated on gasket", cover, gasket, -0.01, 0.05);
+verify.clearanceBetween("carriage runs inside rail", carriage, rail, 0.2, 0.5);
+```
+
+```ts
+verify.clearanceBetween(label: string, a: ShapeLike, b: ShapeLike, minGap: number, maxGap: number, searchLength?: number): void
+```
+
+#### `verify.parallel()` — Check that two face normals are parallel (within toleranceDeg degrees).
+
+```ts
+verify.parallel(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void
+```
+
+`FaceRefLike`: `{ normal: [ number, number, number ], center: [ number, number, number ] }`
+
+#### `verify.perpendicular()` — Check that two face normals are perpendicular (within toleranceDeg degrees).
+
+```ts
+verify.perpendicular(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void
+```
+
+#### `verify.coplanar()` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.
+
+```ts
+verify.coplanar(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number, toleranceMm?: number): void
+```
+
+#### `verify.faceAt()` — Check that a face center lies at a specific position (within toleranceMm).
+
+```ts
+verify.faceAt(label: string, face: FaceRefLike, expectedPos: [ number, number, number ], toleranceMm?: number): void
+```
+
+#### `verify.sameDirection()` — Check that two face normals point in the same direction (not antiparallel). Stricter than parallel — both |angle| AND sign must match.
+
+```ts
+verify.sameDirection(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void
+```
+
+#### `verify.isEmpty()` — Check that a shape is empty.
+
+```ts
+verify.isEmpty(label: string, shape: ShapeLike, message?: string): void
+```
+
+#### `verify.notEmpty()` — Check that a shape is NOT empty.
+
+```ts
+verify.notEmpty(label: string, shape: ShapeLike, message?: string): void
+```
+
+#### `verify.volumeApprox()` — Check that a shape's volume is approximately equal to expected (mm³).
+
+```ts
+verify.volumeApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void
+```
+
+#### `verify.areaApprox()` — Check that a shape's surface area is approximately equal to expected (mm²).
+
+```ts
+verify.areaApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void
+```
+
+#### `verify.boundingBoxSize()` — Check that a shape's bounding box has approximately the given size.
+
+```ts
+verify.boundingBoxSize(label: string, shape: ShapeLike, expectedSize: [ number, number, number ], tolerance?: number): void
+```
+
+#### `verify.edgeContinuity()` — Check that every sampled seam on a shape meets a requested continuity threshold.
+
+```ts
+verify.edgeContinuity(label: string, shape: ShapeLike, options?: EdgeContinuityThresholds): void
+```
+
+**`EdgeContinuityThresholds`**: `continuity?: SurfaceContinuity`, `samples?: number`, `positionTolerance?: number`, `tangentToleranceDeg?: number`, `curvatureTolerance?: number`
+
+#### `verify.noTinyEdges()` — Check that a shape has no tiny edges below the requested threshold.
+
+```ts
+verify.noTinyEdges(label: string, shape: ShapeLike, threshold?: number): void
+```
+
+#### `verify.noSliverFaces()` — Check that a shape has no sliver faces below the requested score threshold.
+
+```ts
+verify.noSliverFaces(label: string, shape: ShapeLike, threshold?: number): void
+```
+
+#### `verify.noSelfIntersection()` — Best-effort exact-shape validity guard for self-intersections or broken B-Rep topology.
+
+```ts
+verify.noSelfIntersection(label: string, shape: ShapeLike): void
+```
 
 #### `spec()` — Create a named, reusable bundle of verification checks.
 
@@ -1670,6 +1853,82 @@ color(hex: string): ShapeGroup
 | `body` | `string` | Function body: receives (u, v) in surface mm, returns height displacement. |
 | `constants` | `Record<string, number>` | Named constants injected into the function. |
 
+### `Pattern2D`
+
+#### `add()` — Add this pattern to one or more patterns or constant height offsets.
+
+```ts
+add(...patterns: Pattern2DInput[]): Pattern2D
+```
+
+#### `subtract()` — Subtract another pattern or constant height offset from this pattern.
+
+```ts
+subtract(pattern: Pattern2DInput): Pattern2D
+```
+
+#### `multiply()` — Multiply this pattern by one or more patterns or numeric scale factors.
+
+```ts
+multiply(...patterns: Pattern2DInput[]): Pattern2D
+```
+
+#### `min()` — Keep the lower height between this pattern and one or more other patterns.
+
+```ts
+min(...patterns: Pattern2DInput[]): Pattern2D
+```
+
+#### `max()` — Keep the higher height between this pattern and one or more other patterns.
+
+```ts
+max(...patterns: Pattern2DInput[]): Pattern2D
+```
+
+#### `clamp()` — Limit pattern height to the inclusive `[min, max]` range in millimeters.
+
+```ts
+clamp(min: number, max: number): Pattern2D
+```
+
+#### `abs()` — Convert negative heights to positive heights.
+
+```ts
+abs(): Pattern2D
+```
+
+#### `negate()` — Flip the pattern height sign.
+
+```ts
+negate(): Pattern2D
+```
+
+### `Pattern2DBuilder`
+
+#### `constant()` — Create a constant-height pattern in millimeters.
+
+```ts
+constant(value?: number): Pattern2D
+```
+
+#### `sineWave()` — Create a sinusoidal wave pattern in UV space.
+
+```ts
+sineWave(options: Pattern2DSineWaveOptions): Pattern2D
+```
+
+#### `stripes()` — Create recessed stripe bands in UV space.
+
+```ts
+stripes(options: Pattern2DStripesOptions): Pattern2D
+```
+
+#### `overUnderWeave()` — Create an over-under woven relief pattern in UV space.
+
+```ts
+overUnderWeave(options: Pattern2DOverUnderWeaveOptions): Pattern2D
+```
+
 ### `ShapeRef`
 
 A first-class reference path over a shape's semantic faces and face relationships.
@@ -1801,8 +2060,12 @@ toString(): string
 - `lessThan(label: string, actual: number, max: number, message?: string): void` — Check that actual < max.
 - `inRange(label: string, actual: number, min: number, max: number, message?: string): void` — Check that min <= actual <= max.
 - `centersCoincide(label: string, a: ShapeLike, b: ShapeLike, tolerance?: number): void` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
+- `connectorDistance(label: string, target: ConnectorDistanceLike, connectorA: string, connectorB: string, expected?: number, tolerance?: number): void` — Check the distance between two named connectors on a shape or group. Use this when connectors + `matchTo()` define a static assembly interface. It proves the mate at runtime, unlike a plain source-level connector declaration. The common case is `expected = 0`, meaning the two connector origins should coincide after placement. **Example** ```ts verify.connectorDistance("leg is seated", bench, "Rail.leg_0", "Leg0.head", 0, 0.01); ```
+- `physicalComponentCount(label: string, expected: number): void` — Declare the expected physical connectivity component count for the returned visible model. **Details** Use this for generated mechanical models that should have a clear component graph: one connected fixture, a purchased part plus a removable cartridge, a root assembly plus named intentional ghosts, and so on. `forgecad inspect mechanical-integrity` resolves the returned visible objects with the same physical-connectivity analysis used in the quality gate and fails if the actual component count differs. This catches the common generated-CAD failure where a script returns a visually plausible artifact but the handle, screw, washer, cover, or terminal block is actually a separate island. **Example** ```ts verify.physicalComponentCount("vise is one connected installed assembly", 1); ```
+- `intentionalOverlap(label: string, a: ShapeLike, b: ShapeLike, reason: string): void` — Declare that two visible objects intentionally overlap because the overlap is real manufacturing intent. **Details** Use this only for overlaps that a mechanical reviewer would accept as actual matter sharing volume: welded/fused regions, overmolded inserts, potted electronics, cast-in hardware, or deliberately bonded laminations. This is not a shortcut for screws without holes, shafts without bores, covers without pockets, or parts placed with collision as a positioning hack. `forgecad inspect mechanical-integrity --collisions` only honors this declaration when both shapes are returned as visible objects and the exact collision report finds that same object pair. Unused or non-visible declarations fail the quality gate so annotations cannot hide unrelated collisions. **Example** ```ts verify.intentionalOverlap("rubber grip is overmolded on handle", rubberGrip, handleCore, "overmolded insert"); ```
 - `notColliding(label: string, a: ShapeLike, b: ShapeLike, searchLength?: number): void` — Check that two shapes do not collide (minGap > 0).
 - `minClearance(label: string, a: ShapeLike, b: ShapeLike, minGap: number, searchLength?: number): void` — Check that a minimum clearance gap exists between two shapes.
+- `clearanceBetween(label: string, a: ShapeLike, b: ShapeLike, minGap: number, maxGap: number, searchLength?: number): void` — Check that the clearance gap between two shapes is inside an allowed range. **Details** Use this for seated and retained interfaces where a part must be close enough to be mechanically accountable, but must not collide beyond the allowed minimum. It catches both failure modes that make generated CAD look fake: parts floating away from their receiver, and parts intersecting their receiver because the pocket, bore, or running clearance was not modeled. For contact, use a narrow range such as `[-0.01, 0.05]` to tolerate tiny numerical noise. For a running fit, use the intended clearance band. Manifold-backed shapes use exact min-gap distance. Other backends use a mesh-derived min-gap check and say so in the verification message; keep `forgecad inspect mechanical-integrity --collisions` in the acceptance gate for positive-volume interference. **Example** ```ts verify.clearanceBetween("cover is seated on gasket", cover, gasket, -0.01, 0.05); verify.clearanceBetween("carriage runs inside rail", carriage, rail, 0.2, 0.5); ```
 - `parallel(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals are parallel (within toleranceDeg degrees).
 - `perpendicular(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals are perpendicular (within toleranceDeg degrees).
 - `coplanar(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number, toleranceMm?: number): void` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.

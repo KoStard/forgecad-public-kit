@@ -1,12 +1,12 @@
-# ForgeCAD Manufacturing-Aware Master Prompt
+# ForgeCAD Manufacture-Realistic Prototype Master Prompt
 
 Fill the placeholders and return the finished prompt as one block.
 
 ```text
-You are producing a ForgeCAD build-ready physical artifact package, not a concept sketch.
+You are producing a ForgeCAD manufacture-realistic prototype package, not a concept sketch.
 
 Treat this as a serious product-team prototype assignment.
-The goal is to produce a credible internal engineering package for a real build candidate, not a generic maker example.
+The goal is to produce a credible internal engineering package for a real prototype build candidate, not a generic maker example.
 Use the specific operating story below to drive engineering choices; do not flatten it into a vague domain label.
 
 Target artifact:
@@ -25,6 +25,7 @@ Specific operating story:
 - benchmark class / public comparison anchor, if useful: {benchmark_class}
 
 Chosen intake classification:
+- output posture: manufacture-realistic prototype unless the user explicitly selected another posture
 - artifact family: {artifact_family}
 - duty level: {duty_level}
 - scale level: {scale_level}
@@ -46,11 +47,16 @@ Hard constraints:
 - if the mechanism has moving parts, use a real `assembly()` from iteration 1
 - define real joints, limits, axes, and intended operating ranges
 - choose manufacturing/processes that fit the artifact, load path, scale, safety expectations, and operating story
+- default to manufacture-realistic prototype: real prototype materials, fabrication cues, purchased parts, assembly logic, serviceability, and validation without pretending to be production-certified or release-ready
 - do not assume FDM, 3D printing, or "printable" unless the user explicitly asked for it or the chosen process stack includes printed parts
 - include realistic process-appropriate clearances and mechanically honest interfaces
 - include manufactured, printed, and purchased parts only where each is an honest choice
 - include a BOM that is concrete enough to buy and assemble from
 - prefer metal shafts, bearings, fasteners, inserts, pins, tubes, sheet goods, castings, molded parts, machined parts, or composite/wood members where they are the honest choice
+- model the physical artifact, not an educational diagram
+- do not add explanatory text labels, floating callouts, arrows, legends, coordinate axes, section-title plaques, or part-name slabs to CAD geometry unless the user explicitly asks for a teaching or presentation view
+- include product markings only when they would exist on the real artifact, such as serial plates, connector labels, gauge ticks, keyboard legends, alignment marks, scale marks, warning marks, service arrows, branding, or molded icons
+- keep real markings sparse, process-appropriate, and light enough that text geometry does not dominate runtime or exact export behavior
 - do not hide uncertainty; choose defaults and continue
 - do not claim the user works for a named company unless the user explicitly said so
 - if an organization/team name appears only in the operating story, treat it as a design scenario, not as a factual claim about the user
@@ -60,7 +66,7 @@ Acceptable final states:
 1. `BUILD-READY`
 2. `BEST-EFFORT BUILD CANDIDATE`
 
-`BUILD-READY` means the output is specific enough that a competent builder could start fabricating, machining, printing, buying parts, assembling, and testing immediately without inventing missing details.
+`BUILD-READY` means the output is specific enough that a competent builder could start fabricating, machining, printing selected printed parts, buying parts, assembling, and testing the prototype immediately without inventing missing details.
 
 `BEST-EFFORT BUILD CANDIDATE` means you still provide the strongest concrete design possible, but you explicitly name the smallest unavoidable validation loop that remains.
 
@@ -73,6 +79,7 @@ Non-negotiable rules:
 - If the user's wording is physically confused, normalize it and proceed.
 - Do not import numeric assumptions from unrelated artifact families.
 - Do not ask follow-up questions unless the architecture would materially change and no safe assumption bundle exists.
+- Do not make the CAD understandable by labeling every part; make the part boundaries, hardware, interfaces, and materials physically legible.
 
 Required outputs:
 
@@ -100,7 +107,7 @@ Required outputs:
 - Specify the actuator class, approximate required torque/force, transmission approach, and why they fit the chosen profile.
 
 6. Manufacturing package
-- For each critical part: material, manufacturing process, setup/orientation/tooling/finish assumptions, serviceability notes, and features sensitive to process accuracy.
+- For each critical part: material, manufacturing process, prototype setup/orientation/tooling/finish assumptions, serviceability notes, and features sensitive to process accuracy.
 - If the selected process includes printed parts, include print orientation, likely support strategy, and print-sensitive features for those parts.
 
 7. Bill of materials

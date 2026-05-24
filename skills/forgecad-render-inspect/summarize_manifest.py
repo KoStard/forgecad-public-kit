@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # ///
 
-"""Summarize a ForgeCAD render inspect manifest."""
+"""Summarize a ForgeCAD inspection manifest."""
 
 from __future__ import annotations
 
@@ -41,9 +41,13 @@ def dimensions(scene: dict[str, Any]) -> str:
     return " x ".join(fmt_num(v, 1) for v in size)
 
 
-def channel_keys(manifest: dict[str, Any]) -> list[str]:
-    channels = manifest.get("channels") or {}
-    return sorted(channels.keys())
+def evidence_keys(manifest: dict[str, Any]) -> list[str]:
+    bundle = manifest.get("bundle") or {}
+    emitted = bundle.get("evidenceEmitted")
+    if isinstance(emitted, list) and emitted:
+        return [str(item) for item in emitted]
+    evidence = manifest.get("evidence") or {}
+    return sorted(evidence.keys())
 
 
 def object_names(manifest: dict[str, Any]) -> list[str]:
@@ -69,7 +73,8 @@ def print_header(manifest_path: Path, manifest: dict[str, Any]) -> None:
     if generator.get("forgecadVersion"):
         print(f"Version:  {generator['forgecadVersion']}")
     print(f"Source:   {source.get('entryFile', 'unknown')}")
-    print(f"Channels: requested={bundle.get('channelsRequested', [])} emitted={bundle.get('channelsEmitted', channel_keys(manifest))}")
+    requested = bundle.get("evidenceRequested") or evidence_keys(manifest)
+    print(f"Evidence: requested={requested} emitted={evidence_keys(manifest)}")
     print(f"Filters:  {bundle.get('filters', {})}")
     print(f"Scene:    objects={len(scene.get('objects') or [])} size={dimensions(scene)} volume={fmt_num(scene.get('volume'), 1)}")
     names = object_names(manifest)
@@ -79,8 +84,8 @@ def print_header(manifest_path: Path, manifest: dict[str, Any]) -> None:
         print(f"Objects:  {preview}{suffix}")
 
 
-def print_collisions(channels: dict[str, Any]) -> None:
-    collisions = channels.get("collisions")
+def print_collisions(evidence: dict[str, Any]) -> None:
+    collisions = evidence.get("collisions")
     if not isinstance(collisions, dict):
         return
     findings = collisions.get("collisions") or []
@@ -100,8 +105,8 @@ def print_collisions(channels: dict[str, Any]) -> None:
         print(f"  warning: {warning}")
 
 
-def print_thickness(channels: dict[str, Any]) -> None:
-    thickness = channels.get("thickness")
+def print_thickness(evidence: dict[str, Any]) -> None:
+    thickness = evidence.get("thickness")
     if not isinstance(thickness, dict):
         return
     objects = thickness.get("objects") or []
@@ -136,8 +141,8 @@ def print_thickness(channels: dict[str, Any]) -> None:
         print(f"  warning: {warning}")
 
 
-def print_connectivity(channels: dict[str, Any]) -> None:
-    connectivity = channels.get("connectivity")
+def print_connectivity(evidence: dict[str, Any]) -> None:
+    connectivity = evidence.get("connectivity")
     if not isinstance(connectivity, dict):
         return
     components = connectivity.get("components") or []
@@ -157,8 +162,8 @@ def print_connectivity(channels: dict[str, Any]) -> None:
         print(f"  warning: {warning}")
 
 
-def print_distance(channels: dict[str, Any]) -> None:
-    distance = channels.get("distance")
+def print_distance(evidence: dict[str, Any]) -> None:
+    distance = evidence.get("distance")
     if not isinstance(distance, dict):
         return
     objects = [obj for obj in distance.get("objects") or [] if isinstance(obj, dict)]
@@ -184,11 +189,11 @@ def print_distance(channels: dict[str, Any]) -> None:
         print(f"  warning: {warning}")
 
 
-def print_sections(channels: dict[str, Any]) -> None:
-    section = channels.get("section")
-    if not isinstance(section, dict):
+def print_sections(evidence: dict[str, Any]) -> None:
+    sections = evidence.get("sections")
+    if not isinstance(sections, dict):
         return
-    planes = section.get("planes") or {}
+    planes = sections.get("planes") or {}
     print("")
     print("Sections:")
     for plane_name in ("xy", "xz", "yz"):
@@ -212,30 +217,30 @@ def main() -> None:
     args = parser.parse_args()
 
     manifest_path, manifest = load_manifest(args.manifest_or_bundle)
-    channels = manifest.get("channels") or {}
+    evidence = manifest.get("evidence") or {}
 
     if args.json:
         scene = manifest.get("scene") or {}
         summary = {
             "manifest": str(manifest_path),
             "source": (manifest.get("source") or {}).get("entryFile"),
-            "channels": channel_keys(manifest),
+            "evidence": evidence_keys(manifest),
             "objectCount": len(scene.get("objects") or []),
             "dimensions": dimensions(scene),
             "volume": scene.get("volume"),
-            "collisionCount": (channels.get("collisions") or {}).get("collisionCount"),
-            "connectivityComponents": (channels.get("connectivity") or {}).get("componentCount"),
-            "distanceMaxRootDistance": (channels.get("distance") or {}).get("maxRootDistance"),
+            "collisionCount": (evidence.get("collisions") or {}).get("collisionCount"),
+            "connectivityComponents": (evidence.get("connectivity") or {}).get("componentCount"),
+            "distanceMaxRootDistance": (evidence.get("distance") or {}).get("maxRootDistance"),
         }
         print(json.dumps(summary, indent=2))
         return
 
     print_header(manifest_path, manifest)
-    print_collisions(channels)
-    print_thickness(channels)
-    print_connectivity(channels)
-    print_distance(channels)
-    print_sections(channels)
+    print_collisions(evidence)
+    print_thickness(evidence)
+    print_connectivity(evidence)
+    print_distance(evidence)
+    print_sections(evidence)
 
 
 if __name__ == "__main__":

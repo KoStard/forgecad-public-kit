@@ -1,12 +1,12 @@
 ---
 name: forgecad-prepare-prompt
-description: Turn a fuzzy physical product, mechanism, or CAD artifact request into a concrete ForgeCAD build brief and a single master prompt for the modeling pass. Use when the engineering brief is incomplete, manufacturing/process choice is underspecified, or the work needs a specific operating story to avoid generic toy solutions.
+description: Turn a fuzzy physical product, mechanism, or CAD artifact request into a concrete manufacture-realistic prototype ForgeCAD build brief and a single master prompt for the modeling pass. Use when the engineering brief is incomplete, manufacturing/process choice is underspecified, or the work needs a specific operating story to avoid generic toy solutions.
 forgecad-public: true
 ---
 
 # Prepare ForgeCAD Prompt
 
-Use this skill before modeling when the user wants something physically real, manufacturing-aware, and buildable, but their request sounds like:
+Use this skill before modeling when the user wants something physically real, manufacturing-aware, and buildable as a manufacture-realistic prototype, but their request sounds like:
 
 - "make me a robot gripper"
 - "design a real mechanism"
@@ -24,6 +24,10 @@ Do not assume FDM, 3D printing, "printable", or plastic parts unless the user ex
 Choose the manufacturing/process stack from the artifact family, load path, scale, safety expectations, material properties, production intent, and operating story.
 For example: scooters, bikes, skateboards, and rideable vehicles usually point toward metal/composite frames, wood/composite decks, urethane/rubber wheels, bearings, brakes, and standard hardware; furniture often points toward wood, sheet goods, tube, metal brackets, or conventional joinery; enclosures may point toward injection molding, sheet metal, CNC, or printing depending on quantity and ruggedness; fixtures may be machined, laser-cut, welded, printed, or hybrid.
 If the user asks for "printable", "3D printed", "laser cut", "CNC", or another process, honor that process while still warning when it is unsafe or dishonest for the duty.
+
+The default output posture is **manufacture-realistic prototype** unless the user asks for a different posture.
+This means a serious prototype build candidate with real manufacturing cues, purchased-part boundaries, assembly logic, and validation loops. It is stronger than a visual concept or hobby sketch, but it does not claim final production tooling, certification, rider safety, medical compliance, or release-ready DFM.
+Use `production-realistic` only when the user wants production intent, `printable` only when printing is actually the selected process, and `visual-CAD` only for visual/form studies.
 
 Do not let the modeling prompt sound like a casual hobby sketch when the requested artifact belongs to a serious product domain.
 Give the model a specific operating story: a named company or lab, named program, named prototype/revision, review moment, test setting, and concrete reason the part matters.
@@ -61,12 +65,14 @@ By the end of this skill, there should be:
 - an artifact family classification
 - an assumption bundle with units
 - a clear build profile and manufacturing/process stack
+- a stated output posture, defaulting to manufacture-realistic prototype unless the user chose otherwise
 - a specific operating story
 - a motion / load / size target
 - a BOM boundary
 - a validation boundary
 - a variant-selection policy when the artifact has multiple sizes/styles/revisions
 - a file-organization policy, including `main.forge.js` as the entry point for multi-file projects
+- an artifact-first policy that forbids explanatory in-model text/callouts unless the user explicitly wants a teaching or presentation view
 - one ready-to-copy master prompt for the modeling pass
 
 ## Workflow
@@ -123,8 +129,9 @@ By the end of this skill, there should be:
 
 4. Choose manufacturing/process posture.
    Treat process selection as part of the brief.
-   Use `production-realistic`, `prototype-realistic`, `printable`, `visual-CAD`, or a more specific process such as `sheet-metal`, `CNC-machined`, `laser-cut`, `welded tube`, `injection-molded`, `cast`, or `hybrid purchased-hardware`.
-   Default to the posture that is honest for the artifact rather than the easiest CAD surface to make.
+   Default to `manufacture-realistic prototype`.
+   Use `production-realistic`, `prototype-realistic`, `printable`, `visual-CAD`, or a more specific process such as `sheet-metal`, `CNC-machined`, `laser-cut`, `welded tube`, `injection-molded`, `cast`, or `hybrid purchased-hardware` only when the brief justifies that more specific posture.
+   Choose the posture that is honest for the artifact rather than the easiest CAD surface to make.
 
 5. Pick qualitative levers, not raw numbers.
    Start from:
@@ -140,7 +147,7 @@ By the end of this skill, there should be:
    - for a gripper: object style, opening band, cost/performance posture
    - for a table: use style, span band, load style
    - for an enclosure: electronics size, ruggedness, cooling posture
-   - for an underspecified product: production-realistic, prototype-realistic, printable, or visual-CAD posture
+   - for an underspecified product: manufacture-realistic prototype, production-realistic, printable, or visual-CAD posture
 
 7. Convert choices into an engineering brief.
    The brief must include:
@@ -150,6 +157,7 @@ By the end of this skill, there should be:
    - production reason
    - test setting
    - what generic output would miss
+   - output posture, defaulting to manufacture-realistic prototype unless changed by the user
    - intended objects / loads
    - rough size envelope
    - motion style and degrees of freedom
@@ -183,7 +191,7 @@ Good:
 - "Which target feels closest: a light desk demo, a useful hobby tool, or a sturdier bench mechanism?"
 - "Will it mostly handle soft/light things, mixed household parts, or rigid/tool-like objects?"
 - "Should we bias for cheapest parts, balanced practicality, or stronger hardware?"
-- "Should this be production-realistic, prototype-realistic, printable, or just a visual CAD study?"
+- "Should this be a manufacture-realistic prototype, production-realistic, printable, or just a visual CAD study?"
 - "Is this more like a gripper, a fixture, an enclosure, a chassis, or furniture?"
 - "Will the table mostly hold decor, laptop-and-books, or workshop abuse?"
 
@@ -200,6 +208,7 @@ If the user says "I don't know" or gives only a broad goal:
 - infer the nearest artifact family from the request
 - invent a specific operating story for the artifact
 - infer the manufacturing/process stack from the artifact family and operating story
+- default the output posture to `manufacture-realistic prototype`
 - choose `general-duty`
 - choose `medium`
 - choose `balanced`

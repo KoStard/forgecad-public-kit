@@ -144,7 +144,12 @@ robotExport(options: RobotExportOptions): CollectedRobotExport
 
 `AssemblyPartDef`: `{ name: string, part: AssemblyPart, base: Transform, metadata?: PartMetadata }`
 
-**`PartMetadata`**: `material?: string`, `process?: string`, `tolerance?: string`, `qty?: number`, `notes?: string`, `densityKgM3?: number`, `massKg?: number`
+**`PartMetadata`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `tags?` | `string \| readonly string[]` | Viewport organization tags applied to scene objects produced from this part. |
+| `material?`, `process?`, `tolerance?`, `qty?`, `notes?`, `densityKgM3?`, `massKg?` | | — |
 
 **`AssemblyJointDef`**: `name: string`, `type: JointType`, `parent: string`, `child: string`, `frame: Transform`, `axis: Vec3`, `min?: number`, `max?: number`, `defaultValue: number`, `unit?: string`, `effort?: number`, `velocity?: number`, `damping?: number`, `friction?: number`, `connectorRefs?: JointConnectorRefs`
 

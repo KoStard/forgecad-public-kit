@@ -34,7 +34,7 @@ Top-level declarations such as `const bom = ...`, `let scene = ...`, or `class S
 
 - Scripts re-execute on every parameter change (400ms debounce)
 - Geometry operations are **immutable** — shapes, sketches, groups, imported assemblies, and wood boards return new values instead of modifying in place
-- Must return one of: `Shape`, `Sketch`, `ShapeGroup`, `Assembly`, `SolvedAssembly`, `SdfShape`, `Array` of renderables, `Array` of `{ name, shape?, sketch?, group?, color? }`, or a **metadata object** (see below)
+- Must return one of: `Shape`, `Sketch`, `ShapeGroup`, `Assembly`, `SolvedAssembly`, `SdfShape`, `Array` of renderables, `Array` of `{ name, tags?, shape?, sketch?, group?, color? }`, or a **metadata object** (see below)
 
 Top-level assembly scripts can return an unsolved `Assembly` directly; ForgeCAD solves it at default joint values for display. Return `assembly.solve(state)` when you want a specific pose. Do not call `.toGroup()` just to make an assembly render — use `.toGroup()` only when you specifically need `ShapeGroup` composition, group-style transforms, or named-child lookup.
 
@@ -67,6 +67,16 @@ return {
 };
 ```
 
+Named return objects and named `group(...)` children can include `tags`. Tags are viewport metadata: they do not affect geometry, exports, face labels, or BOM rows, but the command palette can hide, show only, or focus every object with a selected tag.
+
+```javascript
+return [
+  { name: 'Base Plate', tags: ['printed', 'structural'], shape: base },
+  { name: 'M4 Bolt A', tags: 'fastener', shape: boltA },
+  { name: 'M4 Bolt B', tags: 'fastener', shape: boltB },
+];
+```
+
 ## Coordinate System
 
 Z-up right-handed: X = left/right, Y = forward/back, Z = up/down.
@@ -97,9 +107,11 @@ You resolve labels to geometry with `.face(name)` or `.face(query)` — see the 
 
 ## Text vs Viewport Labels
 
-Use `text2d()` only when the letters are part of the model: raised text, engraving, cut labels, serial plates, exported markings, or geometry that should survive into STL/STEP output. `text2d()` builds filled sketch geometry from font outlines, so it can make exact/OCCT workflows slower.
+Default to no explanatory text inside CAD geometry. A ForgeCAD model should represent the physical artifact, not a labeled teaching diagram. Explain the design through file names, named return objects, comments, BOM entries, inspection bundles, and companion docs.
 
-Use `Viewport.label(text, [x, y, z], options)` when the goal is to explain the model in the viewport. Render labels are annotations only: they do not create meshes, do not export, do not enter the B-rep path, and do not add face labels.
+Use `text2d()` only when the letters are part of the real object: raised branding, engraving, serial plates, keyboard legends, gauge ticks, connector labels, service arrows, scale markings, or exported manufacturing markings. `text2d()` builds filled sketch geometry from font outlines, so it can make exact/OCCT workflows slower.
+
+Use `Viewport.label(text, [x, y, z], options)` only for temporary review, debug, tutorial, or explicitly requested presentation views. Render labels are annotations only: they do not create meshes, do not export, do not enter the B-rep path, and do not add face labels. Do not use viewport labels to compensate for unclear geometry in the final model.
 
 ## SDF Modeling
 

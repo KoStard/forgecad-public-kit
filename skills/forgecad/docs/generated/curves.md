@@ -9,7 +9,8 @@ Smooth curves, lofted surfaces, swept solids, splines, and high-level product sk
 
 ## Contents
 
-- [Curves & Surfacing](#curves-surfacing) — `hermiteTransitionG2`, `nurbs3d`, `spline2d`, `spline3d`, `loft`, `loftAlongSpine`, `sweep`, `variableSweep`, `nurbsSurface`, `surfacePatch`, `transitionCurve`, `transitionSurface`, `connectEdges`
+- [Curves & Surfacing](#curves-surfacing) — `Loft.station`, `Loft.leftRail`, `Loft.rightRail`, `Loft.frontRail`, `Loft.backRail`, `Loft.centerRail`, `Loft.pathOnXz`, `Loft.pathOnYz`, `Loft.pathOnXy`, `Loft.withGuideRails`, `hermiteTransitionG2`, `nurbs3d`, `spline2d`, `spline3d`, `loft`, `loftAlongSpine`, `sweep`, `variableSweep`, `nurbsSurface`, `surfacePatch`, `transitionCurve`, `transitionSurface`, `connectEdges`
+- [Surface Members](#surface-members) — `surfaceBand`, `SurfaceBody`
 - [Curve3D](#curve3d)
 - [NurbsCurve3D](#nurbscurve3d)
 - [NurbsSurface](#nurbssurface)
@@ -26,14 +27,111 @@ Smooth curves, lofted surfaces, swept solids, splines, and high-level product sk
 - [ProductSpoutBuilder](#productspoutbuilder)
 - [ProductHandleBuilder](#producthandlebuilder)
 - [ProductHandleFeature](#producthandlefeature)
+- [CylinderCarrier](#cylindercarrier)
+- [PlaneCarrier](#planecarrier)
+- [ProductSkinCarrier](#productskincarrier)
+- [SurfacePath](#surfacepath)
+- [SurfacePathBuilder](#surfacepathbuilder)
+- [SurfaceBand](#surfaceband)
+- [SurfaceBodyBuilder](#surfacebodybuilder)
+- [SurfaceMemberBuilder](#surfacememberbuilder)
+- [SurfaceJoinBuilder](#surfacejoinbuilder)
+- [CounterboreBuilder](#counterborebuilder)
+- [RoundedSlotBuilder](#roundedslotbuilder)
 - [Surface](#surface)
 - [Blend](#blend)
 - [Analysis](#analysis)
 - [Product](#product)
+- [Carrier](#carrier)
+- [SurfaceMembers](#surfacemembers)
+- [Slot](#slot)
+- [Counterbore](#counterbore)
+- [Ribs](#ribs)
 
 ## Functions
 
 ### Curves & Surfacing
+
+#### `Loft.station()` — Create a loft station from a 2D profile and an axis position.
+
+```ts
+Loft.station(profile: Sketch, position: number): LoftStation
+```
+
+`LoftStation`: `{ profile: Sketch, position: number }`
+
+#### `Loft.leftRail()` — Create a guide rail that constrains the section-local negative-X side.
+
+```ts
+Loft.leftRail(path: LoftGuideRailPath): LoftGuideRail
+```
+
+`LoftGuideRail`: `{ side: LoftGuideRailSide, path: LoftGuideRailPath }`
+
+#### `Loft.rightRail()` — Create a guide rail that constrains the section-local positive-X side.
+
+```ts
+Loft.rightRail(path: LoftGuideRailPath): LoftGuideRail
+```
+
+#### `Loft.frontRail()` — Create a guide rail that constrains the section-local positive-Y side.
+
+```ts
+Loft.frontRail(path: LoftGuideRailPath): LoftGuideRail
+```
+
+#### `Loft.backRail()` — Create a guide rail that constrains the section-local negative-Y side.
+
+```ts
+Loft.backRail(path: LoftGuideRailPath): LoftGuideRail
+```
+
+#### `Loft.centerRail()` — Create a guide rail that moves section centers along the loft.
+
+```ts
+Loft.centerRail(path: LoftGuideRailPath): LoftGuideRail
+```
+
+#### `Loft.pathOnXz()` — Place a 2D guide path onto the XZ plane.
+
+The path's first coordinate becomes X and its second coordinate becomes Z. Use this for left/right silhouette rails authored with [`path()`](/docs/sketch#path) or [`constrainedSketch()`](/docs/sketch#constrainedsketch).
+
+```ts
+Loft.pathOnXz(path: LoftPath2D, y?: number): Vec3[]
+```
+
+#### `Loft.pathOnYz()` — Place a 2D guide path onto the YZ plane.
+
+The path's first coordinate becomes Y and its second coordinate becomes Z. Use this for front/back crown rails authored with [`path()`](/docs/sketch#path) or [`constrainedSketch()`](/docs/sketch#constrainedsketch).
+
+```ts
+Loft.pathOnYz(path: LoftPath2D, x?: number): Vec3[]
+```
+
+#### `Loft.pathOnXy()` — Place a 2D guide path onto the XY plane.
+
+The path's first coordinate becomes X and its second coordinate becomes Y. Use this when lofting along X or Y and a rail lives in a horizontal sketch plane.
+
+```ts
+Loft.pathOnXy(path: LoftPath2D, z?: number): Vec3[]
+```
+
+#### `Loft.withGuideRails()` — Loft through profile stations while forcing generated sections to follow guide rails.
+
+Stations define the cross-section family. Guide rails define the side or center paths the loft must pass through. With opposite side rails, the section is scaled to touch both rails. With one side rail, the section keeps its interpolated size unless a center rail is also present.
+
+```ts
+Loft.withGuideRails(stations: LoftStation[], rails: LoftGuideRail[], options?: LoftWithGuideRailsOptions): Shape
+```
+
+**`LoftOptions`**
+- `edgeLength?: number` — Marching-grid edge length for level-set meshing. Smaller = finer.
+- `boundsPadding?: number` — Optional extra bounds padding.
+
+**`LoftWithGuideRailsOptions`** extends LoftOptions
+- `axis?: LoftAxis` — Primary station axis. Default Z.
+- `samples?: number` — Number of generated loft stations including ends. Default scales with station count.
+- `railSamples?: number` — Number of points sampled from curve-backed rails before axis interpolation. Default 64.
 
 #### `hermiteTransitionG2()` — Create a quintic Hermite transition curve between two edge endpoints (G2 continuity).
 
@@ -122,10 +220,6 @@ Performance note: loft is significantly heavier than primitive/extrude/revolve. 
 ```ts
 loft(profiles: Sketch[], heights: number[], options?: LoftOptions): Shape
 ```
-
-**`LoftOptions`**
-- `edgeLength?: number` — Marching-grid edge length for level-set meshing. Smaller = finer.
-- `boundsPadding?: number` — Optional extra bounds padding.
 
 #### `loftAlongSpine()` — Loft between multiple profiles positioned along an arbitrary 3D spine curve.
 
@@ -222,7 +316,32 @@ nurbsSurface(controlGrid: Vec3[][], options?: NurbsSurfaceOptions): Shape
 | `knotsV?` | `number[]` | Knot vector in V direction (default: uniform clamped). |
 | `thickness?` | `number` | Sheet thickness — if > 0, thickens the surface into a solid (default 0 = surface only). |
 | `resolution?` | `number` | Tessellation resolution — points per direction (default 32). |
-| `approximate?` | `boolean` | Explicit opt-in for sampled fallback paths on non-exact backends. |
+| `domain?` | `SurfaceDomainOptions` | Optional rectangular parameter domain in normalized [0, 1] U/V space. |
+| `trim?` | `SurfaceTrimOptions` | Optional polygonal or NURBS-curve UV trim loops. Truck and OCCT support open trimmed surfaces; Manifold supports sampled thickened trimmed solids. |
+| `tessellation?` | `SurfaceTessellationOptions` | Optional Truck kernel tessellation controls for render mesh generation. |
+| `approximate?` | `boolean` | Explicit opt-in for sampled approximation paths on non-exact backends. |
+
+**`SurfaceDomainOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `uMin?` | `number` | Lower U parameter bound in normalized surface space (default 0). |
+| `uMax?` | `number` | Upper U parameter bound in normalized surface space (default 1). |
+| `vMin?` | `number` | Lower V parameter bound in normalized surface space (default 0). |
+| `vMax?` | `number` | Upper V parameter bound in normalized surface space (default 1). |
+
+**`SurfaceTrimOptions`**
+- `outer: SurfaceTrimLoopInput` — Outer trim loop in normalized post-domain UV space.
+- `holes?: SurfaceTrimLoopInput[]` — Optional hole loops in normalized post-domain UV space.
+
+**`SurfaceTessellationOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `mode?` | `"uniform" \| "adaptive"` | `uniform` uses resolution directly; `adaptive` lets the Truck kernel refine open sheets from chord error. |
+| `tolerance?` | `number` | Target chord-error tolerance in model units for adaptive Truck tessellation. |
+| `minResolution?` | `number` | Minimum adaptive samples per direction. |
+| `maxResolution?` | `number` | Maximum adaptive samples per direction. Defaults to `resolution` when omitted. |
 
 #### `surfacePatch()` — Create a smooth surface patch from 4 boundary curves (Coons patch).
 
@@ -348,6 +467,39 @@ connectEdges(edgeA: EdgeSegment, edgeB: EdgeSegment, options?: ConnectEdgesOptio
 | `flipA?` | `boolean` | Flip tangent A. |
 | `flipB?` | `boolean` | Flip tangent B. |
 
+### Surface Members
+
+#### `surfaceBand()`
+
+```ts
+surfaceBand<C extends SurfaceCoordinate>(path: SurfacePath<C> | SurfacePathBuilder<C>, width: WidthProfile, cap?: SurfaceBandCap): SurfaceBand<C>
+```
+
+#### `SurfaceBody()` — Start a surface-member body builder for straps, inlays, guards, braces, cuffs, and similar physical members that live on a carrier surface.
+
+```js
+const carrier = Carrier.cylinder('guard-envelope').diameter(84).height(36).clearance(2);
+const guard = SurfaceBody('simple-guard')
+  .carrier(carrier)
+  .member('left-strut')
+  .band()
+  .path(carrier.path().from({ angle: -132, z: 6 }).to({ angle: -58, z: 18 }))
+  .section({ width: 5.5, thickness: 2.8, edgeRadius: 0.6 })
+  .member('right-strut')
+  .mirrorOf('left-strut')
+  .member('front-hoop')
+  .band()
+  .path(carrier.path().around({ z: 18, fromAngle: -58, toAngle: 58 }))
+  .section({ width: 6.2, thickness: 3, edgeRadius: 0.7 })
+  .join('left-strut', 'front-hoop').blend({ radius: 3.2 })
+  .join('right-strut', 'front-hoop').blend({ radius: 3.2 })
+  .build();
+```
+
+```ts
+SurfaceBody(name: string): SurfaceBodyBuilder
+```
+
 ---
 
 ## Classes
@@ -458,6 +610,7 @@ toPolyline(samples?: number): Vec3[]
 | `degreeV` | `number` | — |
 | `nU` | `number` | — |
 | `nV` | `number` | — |
+| `domain` | `SurfaceDomainCompilePlan` | — |
 
 **Methods:**
 
@@ -745,6 +898,21 @@ path().moveTo(0,0).lineTo(10,0).lineTo(10,5).mirror('x').close()
 mirror(axis: "x" | "y" | [ number, number ]): this
 ```
 
+#### `toPolyline()` — Return the open path as a sampled 2D polyline.
+
+This is for construction geometry such as guide rails, measured centerlines, and curve-driven helpers where the authored path should stay open instead of becoming a filled sketch or stroked profile.
+
+```ts
+const rail = path()
+  .moveTo(24, 0)
+  .bezierTo(32, 44, 28, 92, 18, 120)
+  .toPolyline();
+```
+
+```ts
+toPolyline(): [ number, number ][]
+```
+
 #### `closeOffset()` — Close the path and return an offset version of the filled Sketch. Positive delta expands outward, negative shrinks inward.
 
 ```ts
@@ -897,18 +1065,6 @@ with(...children: GroupInput[]): ShapeGroup
 integrate(...details: Shape[]): Shape
 ```
 
-#### `diagnostics()` — Return lowering representation, station names, rail names, and warnings.
-
-```ts
-diagnostics(): ProductSkinDiagnostics
-```
-
-**`ProductSkinDiagnostics`**: `representation: ProductSkinRepresentation`, `lowering: string[]`, `warnings: string[]`, `stationNames: string[]`, `railNames: string[]`
-
-**`ProductSkinRepresentation`** — Reported lowering mode for ProductSkin and conformal feature diagnostics.
-
-`"exact" | "sampled" | "mixed" | "fallback"`
-
 #### `uv()` — Create a side/u/v surface-ref query on this skin.
 
 ```ts
@@ -964,7 +1120,7 @@ stationAt(vOrAxis: number): { ... }
 frame(query: ProductSkinRefQuery): ProductSurfaceFrame
 ```
 
-**`ProductSurfaceFrame`**: `point: Vec3`, `normal: Vec3`, `tangentU: Vec3`, `tangentV: Vec3`, `matrix: Mat4`, `skin: string`, `representation: ProductSkinRepresentation`
+`ProductSurfaceFrame`: `{ point: Vec3, normal: Vec3, tangentU: Vec3, tangentV: Vec3, matrix: Mat4, skin: string }`
 
 ### `ProductSurfaceRef`
 
@@ -981,25 +1137,6 @@ frame(query: ProductSkinRefQuery): ProductSurfaceFrame
 ```ts
 frame(overrides?: Partial<ProductSkinRefQuery>): ProductSurfaceFrame
 ```
-
-**`ProductSkinRefQuery`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
-| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
-| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
-| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
-
-**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
-
-`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
-
-**`ProductSurfaceFrame`**: `point: Vec3`, `normal: Vec3`, `tangentU: Vec3`, `tangentV: Vec3`, `matrix: Mat4`, `skin: string`, `representation: ProductSkinRepresentation`
-
-**`ProductSkinRepresentation`** — Reported lowering mode for ProductSkin and conformal feature diagnostics.
-
-`"exact" | "sampled" | "mixed" | "fallback"`
 
 #### `with()` — Return a copy of this ref with side/u/v/offset overrides.
 
@@ -1045,18 +1182,11 @@ ref(u?: number, v?: number, offset?: number): ProductSurfaceRef
 uv(u?: number, v?: number, offset?: number): ProductSkinRefQuery
 ```
 
-**`ProductSkinRefQuery`**
+#### `frame()` — Resolve a point/frame on this surface using the builder's side.
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
-| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
-| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
-| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
-
-**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
-
-`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
+```ts
+frame(query?: Partial<ProductSkinRefQuery>): ProductSurfaceFrame
+```
 
 #### `ribbon()` — Start a conformal ribbon on this skin side.
 
@@ -1066,7 +1196,7 @@ Path points use side-local `u`/`v` coordinates; this builder supplies the side. 
 ribbon(name: string, points: ProductSurfacePathPoint[], options?: ProductRibbonBuildOptions): ProductRibbonBuilder
 ```
 
-**`ProductSurfacePathPoint`**
+**`ProductSurfacePathPoint`** — Side-local path point for Product.surface(side).ribbon(...); the surface helper supplies `side`.
 - `u?: number` — Across-side parameter on the bound side. Defaults to 0.5.
 - `v?: number` — Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5.
 - `offset?: number` — Positive distance away from the surface along the resolved normal.
@@ -1135,11 +1265,7 @@ stations(stations: Array<ProductStationBuilder | ProductStationSpec>): this
 
 `ProductStationProfile`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number, exponent?: number }`
 
-**`ProductProfileKind`**
-
-`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
-
-#### `rails()` — Attach guide rails as ProductSkin IR metadata and diagnostics.
+#### `rails()` — Attach named guide rails for product-skin construction and downstream surface references.
 
 ```ts
 rails(rails: Record<string, ProductRailSpec>): this
@@ -1156,19 +1282,6 @@ rails(rails: Record<string, ProductRailSpec>): this
 ```ts
 ref(name: string, query: ProductSkinRefQuery): this
 ```
-
-**`ProductSkinRefQuery`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
-| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
-| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
-| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
-
-**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
-
-`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
 
 #### `refs()` — Publish multiple named semantic surface refs on the skin.
 
@@ -1188,27 +1301,6 @@ uv(side: ProductSkinSide, u?: number, v?: number): ProductSkinRefQuery
 material(material: ProductMaterial): this
 ```
 
-`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
-
-**`ShapeMaterialProps`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
-| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
-| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
-| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
-| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
-| `wireframe?` | `boolean` | Render as wireframe. Default: false |
-| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
-| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
-| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
-| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
-| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
-| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
-| `specularColor?` | `string` | Specular highlight tint. |
-| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
-
 #### `color()` — Apply a simple color override to the lowered skin.
 
 ```ts
@@ -1221,7 +1313,7 @@ color(color: string): this
 edgeLength(value: number): this
 ```
 
-#### `wall()` — Records a target wall thickness; v1 keeps exterior skin lowering sampled and reports wall as a diagnostic.
+#### `wall()` — Record intended wall thickness for product design metadata. Use explicit shelling when the model needs real inner-wall geometry.
 
 ```ts
 wall(thickness: number): this
@@ -1299,7 +1391,7 @@ circle(diameter: number, options?: { segments?: number; }): this
 custom(sketch: Sketch, width: number, depth: number): this
 ```
 
-#### `crown()` — Stores a semantic crown amount for diagnostics and future rail solving.
+#### `crown()` — Set the station crown amount for soft product-section intent.
 
 ```ts
 crown(amount: number): this
@@ -1310,14 +1402,6 @@ crown(amount: number): this
 ```ts
 toSpec(): ProductStationSpec
 ```
-
-`ProductStationSpec`: `{ name: string, center: Vec3, profile: ProductStationProfile, crown?: number }`
-
-`ProductStationProfile`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number, exponent?: number }`
-
-**`ProductProfileKind`**
-
-`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
 
 ### `ProductPanelBuilder`
 
@@ -1359,27 +1443,6 @@ thickness(thickness: number): this
 material(material: ProductMaterial): this
 ```
 
-`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
-
-**`ShapeMaterialProps`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
-| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
-| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
-| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
-| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
-| `wireframe?` | `boolean` | Render as wireframe. Default: false |
-| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
-| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
-| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
-| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
-| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
-| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
-| `specularColor?` | `string` | Specular highlight tint. |
-| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
-
 #### `color()` — Apply a simple color override to the panel.
 
 ```ts
@@ -1402,22 +1465,8 @@ attachTo(ref: ProductRefInput, options?: ProductPanelAttachOptions): Shape
 
 `ProductSurfaceRef`
 
-`ProductAttachOptions`: `{ offset?: number, inset?: number }`
 
 `ProductPanelAttachOptions`: `{ at?: Partial<ProductSkinRefQuery>, thickness?: number, material?: ProductMaterial, color?: string }`
-
-**`ProductSkinRefQuery`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
-| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
-| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
-| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
-
-**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
-
-`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
 
 ### `ProductRibbonBuilder`
 
@@ -1442,53 +1491,6 @@ on(skin: ProductSkin, points: ProductRibbonPathPoint[], options?: ProductRibbonB
 **`ProductRibbonPathPoint`** — Path point for Product.ribbon().on(...): either a side/u/v query or a resolved surface ref.
 
 `ProductSkinRefQuery | ProductSurfaceRef`
-
-**`ProductSkinRefQuery`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `side` | `ProductSkinSide` | Side of the product skin. `front` is the minimum axis cap, `rear`/`back` is the maximum axis cap. |
-| `u?` | `number` | Across-side parameter for side refs. Defaults to 0.5. |
-| `v?` | `number` | Along-axis parameter, 0 at the first cap and 1 at the rear/back cap. Defaults to 0.5. |
-| `offset?` | `number` | Positive distance away from the surface along the resolved normal. |
-
-**`ProductSkinSide`** — Semantic side of a ProductSkin. `back` is accepted as an alias for `rear`.
-
-`"left" | "right" | "top" | "bottom" | "front" | "rear" | "back"`
-
-**`ProductRibbonBuildOptions`** — Options shared by Product.ribbon() builders and Product.surface(...).ribbon(...).
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `width?` | `number` | Width across the surface in millimeters. |
-| `thickness?` | `number` | Solid thickness outward from the source surface in millimeters. |
-| `offset?` | `number` | Positive clearance between the source surface and the ribbon's inner face. |
-| `samples?` | `number` | Samples along the ribbon path. Higher values bend more smoothly. |
-| `widthSamples?` | `number` | Samples across the ribbon width. Use 3+ to visibly wrap over curved cross-sections. |
-| `resolution?` | `number` | Tessellation resolution passed to the lowered NURBS surface. |
-| `material?` | `ProductMaterial` | Apply a product material preset to the ribbon. |
-| `color?` | `string` | Apply a simple color override. |
-
-`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
-
-**`ShapeMaterialProps`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
-| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
-| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
-| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
-| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
-| `wireframe?` | `boolean` | Render as wireframe. Default: false |
-| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
-| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
-| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
-| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
-| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
-| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
-| `specularColor?` | `string` | Specular highlight tint. |
-| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
 
 #### `fromRefs()` — Follow explicit surface refs.
 
@@ -1552,48 +1554,6 @@ color(color: string): this
 build(options?: ProductRibbonBuildOptions): Shape
 ```
 
-#### `buildWithDiagnostics()` — Build a conformal ribbon and return surface-feature diagnostics.
-
-Use this while validating API usage or model fidelity; diagnostics report sampling counts, side-span clamping, lowering mode, and warnings that should be visible in reviews.
-
-```ts
-buildWithDiagnostics(options?: ProductRibbonBuildOptions): ProductRibbonResult
-```
-
-**`ProductRibbonResult`** — Shape plus diagnostics returned by ProductRibbonBuilder.buildWithDiagnostics().
-- `shape: Shape` — Lowered conformal ribbon shape.
-- `diagnostics: ProductRibbonDiagnostics` — Sampling and lowering diagnostics for the returned shape.
-
-**`ProductRibbonDiagnostics`** — Diagnostics describing how a conformal ribbon was sampled and lowered.
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `name` | `string` | Ribbon shape name. |
-| `skin?` | `string` | Source skin name when the ribbon follows a ProductSkin directly. |
-| `side?` | `ProductSkinSide` | Source skin side when all path points are on one semantic side. |
-| `pathPointCount` | `number` | Number of control path points supplied before interpolation. |
-| `width` | `number` | Final ribbon width in millimeters. |
-| `thickness` | `number` | Final ribbon solid thickness in millimeters. |
-| `offset` | `number` | Final normal offset from the source surface in millimeters. |
-| `samples` | `number` | Final sample count along the ribbon path. |
-| `widthSamples` | `number` | Final sample count across the ribbon width. |
-| `resolution` | `number` | NURBS tessellation resolution used for the lowered surface. |
-| `lowering` | `"nurbsSurface"` | Lowering primitive used for the ribbon shape. |
-| `expectedFidelity` | `ProductSkinRepresentation` | Expected fidelity inherited from the source skin/ref sampling mode. |
-| `clampedUCount` | `number` | Number of generated width samples clamped to the valid side span. |
-| `maxUClampDistance` | `number` | Largest absolute u-distance lost to side-span clamping. |
-| `warnings` | `string[]` | Non-fatal sampling and lowering warnings. |
-
-**`ProductSkinRepresentation`** — Reported lowering mode for ProductSkin and conformal feature diagnostics.
-
-`"exact" | "sampled" | "mixed" | "fallback"`
-
-#### `diagnostics()` — Return diagnostics from the most recent build, if this builder has been built.
-
-```ts
-diagnostics(): ProductRibbonDiagnostics | undefined
-```
-
 ### `ProductSpoutBuilder`
 
 **Properties:**
@@ -1616,14 +1576,6 @@ from(ref: ProductSurfaceRef): this
 sections(sections: Array<Sketch | ProductStationBuilder | ProductStationSpec>): this
 ```
 
-`ProductStationSpec`: `{ name: string, center: Vec3, profile: ProductStationProfile, crown?: number }`
-
-`ProductStationProfile`: `{ sketch: Sketch, width: number, depth: number, kind: ProductProfileKind, radius?: number, exponent?: number }`
-
-**`ProductProfileKind`**
-
-`"oval" | "roundedRect" | "circle" | "superEllipse" | "custom"`
-
 #### `projection()` — Set the projection length along the source ref normal.
 
 ```ts
@@ -1642,27 +1594,6 @@ edgeLength(value: number): this
 material(material: ProductMaterial): this
 ```
 
-`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
-
-**`ShapeMaterialProps`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
-| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
-| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
-| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
-| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
-| `wireframe?` | `boolean` | Render as wireframe. Default: false |
-| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
-| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
-| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
-| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
-| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
-| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
-| `specularColor?` | `string` | Specular highlight tint. |
-| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
-
 #### `color()` — Apply a simple color override to the spout.
 
 ```ts
@@ -1680,8 +1611,6 @@ build(): Shape
 ```ts
 attach(options?: ProductAttachOptions): Shape
 ```
-
-`ProductAttachOptions`: `{ offset?: number, inset?: number }`
 
 ### `ProductHandleBuilder`
 
@@ -1705,12 +1634,6 @@ between(upper: ProductSurfaceRef, lower: Vec3): this
 spine(points: Vec3[] | ProductRailSpec): this
 ```
 
-`ProductRailSpec`: `{ kind: ProductRailKind, points: Vec3[], degree?: number, name?: string }`
-
-**`ProductRailKind`**
-
-`"bezier" | "nurbs" | "polyline"`
-
 #### `grip()` — Set the grip cross-section profile.
 
 ```ts
@@ -1722,27 +1645,6 @@ grip(profile: Sketch): this
 ```ts
 material(material: ProductMaterial): this
 ```
-
-`ProductMaterial`: `{ color?: string, material?: ShapeMaterialProps }`
-
-**`ShapeMaterialProps`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
-| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
-| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
-| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
-| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
-| `wireframe?` | `boolean` | Render as wireframe. Default: false |
-| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
-| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
-| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
-| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
-| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
-| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
-| `specularColor?` | `string` | Specular highlight tint. |
-| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
 
 #### `padMaterial()` — Apply a product material preset to handle landing pads.
 
@@ -1792,18 +1694,738 @@ toShape(): Shape
 toGroup(): ShapeGroup
 ```
 
+### `CylinderCarrier`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+| `kind` | `"cylinder"` | — |
+
+**Methods:**
+
+#### `diameter()`
+
+```ts
+diameter(value: number): this
+```
+
+#### `radius()`
+
+```ts
+radius(value: number): this
+```
+
+#### `height()`
+
+```ts
+height(value: number): this
+```
+
+#### `clearance()`
+
+```ts
+clearance(value: number): this
+```
+
+#### `center()`
+
+```ts
+center(point: Vec3): this
+```
+
+#### [`path()`](/docs/sketch#path)
+
+```ts
+path(): SurfacePathBuilder<CylinderSurfaceCoordinate>
+```
+
+#### `anchor()`
+
+```ts
+anchor(angle: number, z?: number, options?: { offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `front()`
+
+```ts
+front(options?: { z?: number; offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `back()`
+
+```ts
+back(options?: { z?: number; offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `left()`
+
+```ts
+left(options?: { z?: number; offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `right()`
+
+```ts
+right(options?: { z?: number; offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `top()`
+
+```ts
+top(options?: { angle?: number; offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `bottom()`
+
+```ts
+bottom(options?: { angle?: number; offset?: number; }): SurfaceAnchor<CylinderSurfaceCoordinate>
+```
+
+#### `pointAt()`
+
+```ts
+pointAt(coordinate: CylinderSurfaceCoordinate): Vec3
+```
+
+#### `mirrorPoint()`
+
+```ts
+mirrorPoint(point: Vec3): Vec3
+```
+
+#### `normalAt()`
+
+```ts
+normalAt(coordinate: CylinderSurfaceCoordinate): Vec3
+```
+
+#### `tangentAt()`
+
+```ts
+tangentAt(coordinate: CylinderSurfaceCoordinate, tangentHint?: Vec3): Vec3
+```
+
+#### `frameAt()`
+
+```ts
+frameAt(coordinate: CylinderSurfaceCoordinate, tangentHint?: Vec3): SurfaceFrame
+```
+
+#### `bounds()`
+
+```ts
+bounds(): SurfaceBounds
+```
+
+#### `offset()`
+
+```ts
+offset(distance: number): CylinderCarrier
+```
+
+#### `mirrorCoordinate()`
+
+```ts
+mirrorCoordinate(coordinate: CylinderSurfaceCoordinate): CylinderSurfaceCoordinate
+```
+
+#### `radiusValueWithClearance()`
+
+```ts
+radiusValueWithClearance(): number
+```
+
+### `PlaneCarrier`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+| `kind` | `"plane"` | — |
+
+**Methods:**
+
+#### `size()`
+
+```ts
+size(width: number, height: number): this
+```
+
+#### `origin()`
+
+```ts
+origin(point: Vec3): this
+```
+
+#### `normal()`
+
+```ts
+normal(normal: Vec3): this
+```
+
+#### [`path()`](/docs/sketch#path)
+
+```ts
+path(): SurfacePathBuilder<PlaneSurfaceCoordinate>
+```
+
+#### `anchor()`
+
+```ts
+anchor(x?: number, y?: number, options?: { offset?: number; }): SurfaceAnchor<PlaneSurfaceCoordinate>
+```
+
+#### `left()`
+
+```ts
+left(options?: { y?: number; offset?: number; }): SurfaceAnchor<PlaneSurfaceCoordinate>
+```
+
+#### `right()`
+
+```ts
+right(options?: { y?: number; offset?: number; }): SurfaceAnchor<PlaneSurfaceCoordinate>
+```
+
+#### `top()`
+
+```ts
+top(options?: { x?: number; offset?: number; }): SurfaceAnchor<PlaneSurfaceCoordinate>
+```
+
+#### `bottom()`
+
+```ts
+bottom(options?: { x?: number; offset?: number; }): SurfaceAnchor<PlaneSurfaceCoordinate>
+```
+
+#### `pointAt()`
+
+```ts
+pointAt(coordinate: PlaneSurfaceCoordinate): Vec3
+```
+
+#### `mirrorPoint()`
+
+```ts
+mirrorPoint(point: Vec3): Vec3
+```
+
+#### `normalAt()`
+
+```ts
+normalAt(): Vec3
+```
+
+#### `tangentAt()`
+
+```ts
+tangentAt(coordinate: PlaneSurfaceCoordinate, tangentHint?: Vec3): Vec3
+```
+
+#### `frameAt()`
+
+```ts
+frameAt(coordinate: PlaneSurfaceCoordinate, tangentHint?: Vec3): SurfaceFrame
+```
+
+#### `bounds()`
+
+```ts
+bounds(): SurfaceBounds
+```
+
+#### `offset()`
+
+```ts
+offset(distance: number): PlaneCarrier
+```
+
+#### `mirrorCoordinate()`
+
+```ts
+mirrorCoordinate(coordinate: PlaneSurfaceCoordinate): PlaneSurfaceCoordinate
+```
+
+### `ProductSkinCarrier`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `skin` | `ProductSkin` | — |
+| `name` | `string` | — |
+| `kind` | `"productSkin"` | — |
+
+**Methods:**
+
+#### `surface()`
+
+```ts
+surface(side: ProductSkinSide): ProductSkinCarrier
+```
+
+#### [`path()`](/docs/sketch#path)
+
+```ts
+path(): SurfacePathBuilder<ProductSkinSurfaceCoordinate>
+```
+
+`ProductSkinSurfaceCoordinate`: `{ kind?: "productSkin", side?: ProductSkinSide, u?: number, v?: number, offset?: number }`
+
+#### `sideTransition()` — Return matching side-local coordinates for an explicit split-member transition.
+
+Each SurfacePath still stays on one ProductSkin side. Use this helper to create one member ending on `from`, another starting on `to`, then join named anchors. The helper validates normalized `v`, non-empty names, adjacency, and physical coincidence before returning anchors.
+
+```ts
+sideTransition(fromSide: ProductSkinSide, toSide: ProductSkinSide, input?: ProductSkinSideTransitionInput): ProductSkinSideTransition
+```
+
+`ProductSkinSideTransitionInput`: `{ name?: string, v?: number, offset?: number }`
+
+`ProductSkinSideTransition`: `{ name?: string, from: ProductSkinSurfaceCoordinate, to: ProductSkinSurfaceCoordinate }`
+
+#### `sideTransitionChain()` — Return a sequence of matching side-local coordinates for an explicit multi-side split-member route.
+
+Each adjacent side pair becomes one named transition. Build one member per side segment, add transition anchors at each returned pair, then join the anchors. The same validation as `sideTransition()` applies to every adjacent pair.
+
+```ts
+sideTransitionChain(sides: ProductSkinSide[], input?: ProductSkinSideTransitionInput): ProductSkinSideTransition[]
+```
+
+#### `sideRoute()` — Return side-local member segments for a generated multi-side split-member route.
+
+The route still compiles as explicit members plus named-anchor joins. This helper only generates the per-side segment endpoints and transition names.
+
+```ts
+sideRoute(input: ProductSkinSideRouteInput): ProductSkinSideRoute
+```
+
+**`ProductSkinSideRouteInput`**: `name?: string`, `sides: ProductSkinSide[]`, `from: ProductSkinSurfaceCoordinate`, `to: ProductSkinSurfaceCoordinate`, `v?: number`, `offset?: number`
+
+`ProductSkinSideRoute`: `{ name?: string, transitions: ProductSkinSideTransition[], segments: ProductSkinSideRouteSegment[] }`
+
+**`ProductSkinSideRouteSegment`**: `name: string`, `side: ProductSkinSide`, `from: ProductSkinSurfaceCoordinate`, `to: ProductSkinSurfaceCoordinate`, `startAnchorName?: string`, `endAnchorName?: string`
+
+#### `pointAt()`
+
+```ts
+pointAt(coordinate: ProductSkinSurfaceCoordinate): Vec3
+```
+
+#### `mirrorPoint()`
+
+```ts
+mirrorPoint(point: Vec3): Vec3
+```
+
+#### `normalAt()`
+
+```ts
+normalAt(coordinate: ProductSkinSurfaceCoordinate): Vec3
+```
+
+#### `tangentAt()`
+
+```ts
+tangentAt(coordinate: ProductSkinSurfaceCoordinate, tangentHint?: Vec3): Vec3
+```
+
+#### `frameAt()`
+
+```ts
+frameAt(coordinate: ProductSkinSurfaceCoordinate, tangentHint?: Vec3): SurfaceFrame
+```
+
+**`SurfaceFrame`**: `point: Vec3`, `normal: Vec3`, `tangentAlong: Vec3`, `tangentAcross: Vec3`, `matrix: Mat4`, `carrier: string`, `representation: SurfaceCarrierKind | string`, `coordinate: SurfaceCoordinate`
+
+#### `bounds()`
+
+```ts
+bounds(): SurfaceBounds
+```
+
+**`SurfaceBounds`**: `u?: [ number, number ]`, `v?: [ number, number ]`, `angle?: [ number, number ]`, `z?: [ number, number ]`, `x?: [ number, number ]`, `y?: [ number, number ]`
+
+#### `offset()`
+
+```ts
+offset(distance: number): ProductSkinCarrier
+```
+
+#### `mirrorCoordinate()`
+
+```ts
+mirrorCoordinate(coordinate: ProductSkinSurfaceCoordinate): ProductSkinSurfaceCoordinate
+```
+
+### `SurfacePath`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `carrier` | `CarrierSurface<C>` | — |
+| `points` | `C[]` | — |
+| `closedValue` | `boolean` | — |
+
+**Methods:**
+
+#### `closed()`
+
+```ts
+closed(): SurfacePath<C>
+```
+
+#### `mirror()`
+
+```ts
+mirror(): SurfacePath<C>
+```
+
+#### `coordinateAt()`
+
+```ts
+coordinateAt(t: number): C
+```
+
+#### `sample()`
+
+```ts
+sample(count?: number): SurfacePathSample<C>[]
+```
+
+#### `length()`
+
+```ts
+length(samples?: number): number
+```
+
+### `SurfacePathBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `carrier` | `CarrierSurface<C>` | — |
+
+**Methods:**
+
+#### `from()`
+
+```ts
+from(coordinate: C): this
+```
+
+#### `through()`
+
+```ts
+through(coordinate: C): this
+```
+
+#### `to()`
+
+```ts
+to(coordinate: C): this
+```
+
+#### `around()`
+
+```ts
+around(input: { z: number; fromAngle: number; toAngle: number; offset?: number; }): this
+```
+
+#### `closed()`
+
+```ts
+closed(): this
+```
+
+#### `mirror()`
+
+```ts
+mirror(): SurfacePath<C>
+```
+
+#### `build()`
+
+```ts
+build(): SurfacePath<C>
+```
+
+#### `sample()`
+
+```ts
+sample(count?: number): SurfacePathSample<C>[]
+```
+
+### `SurfaceBand`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `centerPath` | `SurfacePath<C>` | — |
+| `widthProfile` | `WidthProfile` | — |
+| `capStyle` | `SurfaceBandCap` | — |
+
+**Methods:**
+
+#### `widthAt()`
+
+```ts
+widthAt(t: number): number
+```
+
+#### `boundaries()`
+
+```ts
+boundaries(samples?: number): SurfaceBandBoundarySample[]
+```
+
+#### `withHole()` — Return a new band with a named member-local rounded-slot hole region recorded as inspectable intent.
+
+```ts
+withHole(name: string, input: SurfaceBandHoleInput): SurfaceBand<C>
+```
+
+#### `holes()` — Resolve recorded hole regions into member-local across/along loops.
+
+```ts
+holes(): SurfaceBandHoleRegion[]
+```
+
+### `SurfaceBodyBuilder`
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | `string` | — |
+
+**Methods:**
+
+#### `carrier()`
+
+```ts
+carrier(carrier: CarrierSurface): this
+```
+
+#### `member()`
+
+```ts
+member(name: string): SurfaceMemberBuilder
+```
+
+#### `join()`
+
+```ts
+join(from: string, to: string | string[]): SurfaceJoinBuilder
+```
+
+#### `autoJoinAtSharedAnchors()`
+
+```ts
+autoJoinAtSharedAnchors(): this
+```
+
+#### `build()`
+
+```ts
+build(): Shape | ShapeGroup
+```
+
+### `SurfaceMemberBuilder`
+
+#### `plate()`
+
+```ts
+plate(): this
+```
+
+#### `band()`
+
+```ts
+band(): this
+```
+
+#### `at()`
+
+```ts
+at(anchor: SurfaceAnchor<C>): this
+```
+
+#### `size()`
+
+```ts
+size(width: number, height: number): this
+```
+
+#### [`path()`](/docs/sketch#path)
+
+```ts
+path(path: SurfacePath<C> | SurfacePathBuilder<C>): this
+```
+
+#### `section()`
+
+```ts
+section(section: MemberSectionInput): this
+```
+
+#### `cap()`
+
+```ts
+cap(style: SurfaceBandCap): this
+```
+
+#### [`slot()`](/docs/sketch#slot)
+
+```ts
+slot(name: string, feature: MemberFeature | RoundedSlotBuilder): this
+```
+
+#### `cutout()`
+
+```ts
+cutout(name: string, feature: MemberFeature | RoundedSlotBuilder): this
+```
+
+#### `counterbore()`
+
+```ts
+counterbore(name: string, feature: MemberFeature | CounterboreBuilder): this
+```
+
+#### `anchorAt()` — Add a named anchor at a carrier surface coordinate for explicit member joins.
+
+```ts
+anchorAt(name: string, coordinate: C | SurfaceAnchor<C>): this
+```
+
+#### `features()`
+
+```ts
+features(features: MemberFeature | MemberFeature[]): this
+```
+
+#### `profile()`
+
+```ts
+profile(name: string, options?: { depth?: number; height?: number; }): this
+```
+
+#### `mirrorOf()`
+
+```ts
+mirrorOf(memberName: string): SurfaceBodyBuilder
+```
+
+#### `member()`
+
+```ts
+member(name: string): SurfaceMemberBuilder
+```
+
+#### `join()`
+
+```ts
+join(from: string, to: string | string[]): SurfaceJoinBuilder
+```
+
+#### `autoJoinAtSharedAnchors()`
+
+```ts
+autoJoinAtSharedAnchors(): SurfaceBodyBuilder
+```
+
+#### `build()`
+
+```ts
+build(): Shape | ShapeGroup
+```
+
+### `SurfaceJoinBuilder`
+
+#### `betweenAnchors()` — Select named anchors on the source and target members before lowering this join.
+
+```ts
+betweenAnchors(fromAnchor: string, toAnchor: string): this
+```
+
+#### `blend()`
+
+```ts
+blend(input?: { radius?: number; style?: string; priority?: number; continuity?: string; }): SurfaceBodyBuilder
+```
+
+### `CounterboreBuilder`
+
+#### `at()`
+
+```ts
+at(input: { along?: number; across?: number; z?: number; }): this
+```
+
+#### `named()`
+
+```ts
+named(name: string): MemberFeature
+```
+
+#### `toFeature()`
+
+```ts
+toFeature(name?: string): MemberFeature
+```
+
+### `RoundedSlotBuilder`
+
+#### `verticalTravel()`
+
+```ts
+verticalTravel(value: number): this
+```
+
+#### `at()`
+
+```ts
+at(input: { along?: number; across?: number; z?: number; }): this
+```
+
+#### `named()`
+
+```ts
+named(name: string): MemberFeature
+```
+
+#### `toFeature()`
+
+```ts
+toFeature(name?: string): MemberFeature
+```
+
 ---
 
 ## Constants
 
 ### `Surface`
 
+- `Plane(options: SurfacePlaneOptions): Shape` — Create a finite analytic plane sheet that can be trimmed, sewn, thickened, or used as a low-level face.
+- `Cylinder(options: SurfaceCylinderOptions): Shape` — Create a finite analytic cylindrical sheet, optionally bounded by start/end angles.
+- `Cone(options: SurfaceConeOptions): Shape` — Create a finite analytic conical or frustum sheet, optionally bounded by start/end angles.
+- `Sphere(options: SurfaceSphereOptions): Shape` — Create a finite analytic spherical sheet bounded by longitude and latitude ranges.
+- `Torus(options: SurfaceTorusOptions): Shape` — Create a finite analytic torus sheet bounded by major and tube angle ranges.
 - `Nurbs(controlGrid: Vec3[][], options?: NurbsSurfaceOptions): Shape`
 - `Ruled(curveA: ExactCurveInput, curveB: ExactCurveInput, options?: SurfaceCommonOptions): Shape`
 - `Patch(curves: { bottom: ExactCurveInput; top: ExactCurveInput; left: ExactCurveInput; right: ExactCurveInput; }, options?: SurfacePatchOptions): Shape`
 - `Boundary(input: SurfaceBoundaryInput): Shape`
 - `Fill(input: SurfaceFillInput): Shape`
 - `Sew(shapes: Shape[], options?: { tolerance?: number; }): Shape`
+- `Solid(input: Shape | Shape[], options?: SurfaceSolidOptions): Shape` — Sew surface faces or consume an existing sewn shell and make a solid B-rep.
 - `Extend(shape: Shape, options: SurfaceExtendOptions): Shape`
 - `Trim(shape: Shape, tool: Shape | SurfacePlaneOp): Shape`
 - `Split(shape: Shape, tool: Shape | SurfacePlaneOp): [ Shape, Shape ]`
@@ -1814,7 +2436,6 @@ toGroup(): ShapeGroup
 
 - `Edge(options: BlendEdgeOptions): Shape`
 - `Surface(options: BlendSurfaceOptions): Shape`
-- `CornerY(options: BlendCornerYOptions): Shape` — Current implementation uses continuity-controlled edge fillets on solid edges. It does not yet provide a dedicated open-sheet or multi-patch Y-corner solver. Follow progress: https://github.com/KoStard/forgecad-private/issues/162
 
 ### `Analysis`
 
@@ -1822,6 +2443,7 @@ toGroup(): ShapeGroup
 - `SurfaceContinuity(shape: Shape, options?: EdgeContinuityThresholds): EdgeContinuityReport`
 - `CurvatureComb(input: NurbsCurve3D | EdgeRef, options?: { samples?: number; }): CurvatureSample[]`
 - `SurfaceHealth(shape: Shape, options?: { tinyEdgeThreshold?: number; sliverThreshold?: number; }): SurfaceHealthReport`
+- `BRepValidity(shape: Shape, options?: BRepValidityOptions): BRepValidityReport` — Validate B-rep/shell/solid structure and return closedness, manifoldness, orientation, and issue diagnostics.
 
 ### `Product`
 
@@ -1847,3 +2469,27 @@ toGroup(): ShapeGroup
 - `handle(name: string): ProductHandleBuilder` — Start a handle feature builder.
 - `place(detail: Shape | ShapeGroup, ref: ProductRefInput, options?: ProductAttachOptions): Shape | ShapeGroup` — Place a shape or group on a ProductSurfaceRef.
 - `landing(name: string, radius?: number, material?: ProductMaterial): Shape` — Small blended landing volume for manual structural bridges and connection proofs.
+
+### `Carrier`
+
+- `cylinder(name: string): CylinderCarrier` — Create an analytic cylinder carrier for bottles, limbs, tubes, guards, and cuffs.
+- `plane(name: string): PlaneCarrier` — Create an analytic plane carrier for plates and local flat construction surfaces.
+- `productSkin(skin: ProductSkin): ProductSkinCarrier` — Adapt an existing ProductSkin into the general surface-member carrier protocol.
+
+### `SurfaceMembers`
+
+- `Body(name: string): SurfaceBodyBuilder` — Start a surface-member body builder for straps, inlays, guards, braces, cuffs, and similar physical members that live on a carrier surface.
+- `Band: typeof SurfaceBand`
+- `band<C extends SurfaceCoordinate>(path: SurfacePath<C> | SurfacePathBuilder<C>, width: WidthProfile, cap?: SurfaceBandCap): SurfaceBand<C>`
+
+### `Slot`
+
+- `rounded(input: { length: number; width: number; }): RoundedSlotBuilder` — Create a rounded member-local slot feature.
+
+### `Counterbore`
+
+- `cylindrical(input: { diameter: number; clearanceDiameter: number; depth: number; }): CounterboreBuilder` — Create a cylindrical member-local counterbore feature.
+
+### `Ribs`
+
+- `repeated(input: { count: number; height: number; }): MemberFeature` — Create repeated ribs that belong to a surface member before lowering.

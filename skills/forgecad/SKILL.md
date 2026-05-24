@@ -16,8 +16,10 @@ Author or modify ForgeCAD models, sketches, assemblies, and CLI workflows. Prefe
 4. If any two parts are intended to touch or mate in the final model, load the positioning guide immediately and default to connectors + `matchTo()`.
 5. Default to a concrete first pass — easy iteration beats speculative design review.
 6. If an existing model is broken, replace the weak structure rather than preserving bad architecture.
-7. Validate with `forgecad run <file>` (add `--debug-imports` for import chain issues, and pass `--backend manifold|occt` when the backend matters).
+7. Validate with `forgecad run <file>` (add `--debug-imports` for import chain issues, and pass `--backend manifold|occt|truck` when the backend matters).
 8. For `jointsView()` animations, keep wrapped revolute tracks continuous across branch cuts; do not assume the viewport will auto-fix `-180/180` jumps.
+9. Model the physical artifact, not an educational diagram. Do not add explanatory labels, arrows, legends, or text plaques unless the user explicitly asks for a presentation or teaching view. Product markings are allowed only when they would exist on the real object.
+10. Build the real closed CAD first. Do not bake cutaways, sectioned shells, permanently exploded layouts, or hidden-parts views into the default model just to show internals. Use viewer-only cut planes, `explodeView`, object hiding, transparency, or `inspect sections` after the artifact exists.
 
 ### Import and Composition
 
@@ -56,7 +58,7 @@ Axis conventions, winding rules, and placement strategy. If parts should touch i
 
 ### 4. Curves and Surfacing (for lofts, sweeps, splines)
 
-Smooth curves, Hermite splines, lofted and swept solids.
+Smooth curves, Hermite splines, lofted and swept solids. For straps, inlays, guards, brace members, vents, or physical bands that live on a carrier surface, use `Carrier` + `SurfaceBody` surface-member primitives before reaching for `variableSweep`, SDF sculpting, or manual boolean overlap recipes.
 
 - `{{SKILL_DIR}}/docs/generated/curves.md`
 
@@ -85,7 +87,7 @@ Parametric bolts, nuts, washers, standard hardware, gears, pipes, and structural
 - `{{SKILL_DIR}}/docs/generated/lib.md`
 - `{{SKILL_DIR}}/docs/generated/wood.md`
 
-### 9. Runtime Viewport APIs (for cut planes, jointsView, and animation playback)
+### 9. Runtime Viewport APIs (for cut planes, exploded views, hiding, and animation playback)
 
 Viewer-only APIs such as cutPlane, explodeView, jointsView, and animation behavior.
 

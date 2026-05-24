@@ -32,7 +32,7 @@ forgecad project push
 forgecad project open
 ```
 
-Most CLI commands require a ForgeCAD account. Use `forgecad login` for email/password accounts, `forgecad login --token` for GitHub/Google web-auth accounts, or `FORGECAD_TOKEN=fc_pat_... forgecad <command>` for CI/CD. `forgecad studio` always requires an explicit project path; use `.` for the current project.
+Most CLI commands require a ForgeCAD account. Run `forgecad login` and choose email/password or API token when prompted. Use `FORGECAD_TOKEN=fc_pat_... forgecad <command>` only for CI/CD and one-off automation. `forgecad studio` always requires an explicit project path; use `.` for the current project.
 
 You can also start from the hosted starter project with `forgecad project clone start-here`, then `cd start-here` and `forgecad studio .`.
 
@@ -45,7 +45,6 @@ ForgeCAD includes a local editor. Open it around a dedicated project folder, edi
 | `studio <project-path> [project-path ...]` | Open the installed local editor around one or more project folders. |
 | `dev <project-path> [project-path ...]` | Start the Vite dev server for ForgeCAD source development. |
 | `web` | Start a local dev server in web/playground mode (no filesystem, localStorage only). |
-| `open <project-path> [project-path ...]` | Alias for `forgecad studio`. |
 
 `forgecad studio <project-path>` is the normal installed-CLI command for users. `forgecad dev <project-path>` starts the Vite dev server and is mainly for ForgeCAD source development.
 
@@ -67,66 +66,124 @@ Execute scripts and produce images headless — no browser window. Renders use C
 
 ### `forgecad run`
 
-Execute a Forge script and print full geometry diagnostics — object summary, collision detection, spatial analysis, verification results, and solver profiling.
+Execute a Forge script quickly and print the inner-loop build summary: returned objects, verification results, parameters, and timing.
 
-The primary validation command. Runs your script with the real geometry kernel (no browser needed) and prints a comprehensive report:
+The fast validation command. Runs your script with the real geometry kernel (no browser needed) and reports whether it built, which objects came back, any `verify.*` results, parameter values, script logs, and elapsed script time. This is the command agents should run frequently while editing a model.
 
-**Object summary** — lists every named shape with its volume, bounding box, and body count. For constrained sketches, shows solver status (FULLY / UNDER / OVER constrained), DOF, and error residuals. Problematic constraints (conflicting, redundant, or high-residual) are flagged individually.
+**Fast by default** — a bare `forgecad run model.forge.js` does not compute per-object volumes, bounding boxes, construction history, feature tallies, spatial relationships, collision intersections, or solver profiles. Those diagnostics are useful, but they are no longer part of the hot path.
 
-**Construction history** — shows the build sequence for each shape (primitives, operations, modifications) so you can verify the modeling intent.
+**Opt-in diagnostics** — use `--details` for volume/bounding-box/object geometry summaries, `--history` for the construction tree, `--features` for feature tallies, `--solver-profile` for constraint solver timing, or `--full` for the legacy rich report. Use `--spatial bounded|exact` only when you want directional relationships and collision intersections from the run command itself.
 
-**Feature summary** — tallies geometry features across all objects (e.g. `3 extrude, 2 fillet, 1 chamfer`).
+**Verification results** — runs any `verify.*` checks in the script and reports pass/fail with expected vs actual values. Verification failures remain non-fatal so the model can still render and be inspected.
 
-**Verification results** — runs any `verify.*` checks in the script and reports pass/fail with expected vs actual values.
+**Physical connectivity** — pass `--connectivity` to list physically connected components across visible objects. Overlapping bbox candidates are checked with exact geometry by default, while bbox-only contact is treated as evidence rather than proof of one connected component. This helps answer whether the model is one continuous assembly or several separate islands.
 
-**Automatic collision detection** — performs an all-pairs collision check on every named shape. For each pair whose bounding boxes overlap, computes the boolean intersection and reports overlap above 0.1 mm³:
+**Quality preset** — pass `--quality live|default|high` to select the same geometry quality profile used by the editor and export tools. `live` is the fastest preset for large audit models.
 
-```
-⚠ COLLISION: bolt ∩ base (shared vol: 42.3mm³)
-```
+**Direct CAD inputs** — pass `.stl`, `.obj`, `.3mf`, `.step`, or `.stp` directly when you just want to inspect an external asset. Mesh files are imported with `importMesh(...)`; STEP/STP files are imported with `importStep(...)` and auto-select OCCT unless you pass `--backend`.
 
-Intra-group pairs (same assembly group) and mock-to-mock pairs are skipped. If a part passes through a boolean-subtracted hole, no collision is reported — the material is gone.
-
-**Spatial analysis** — reports directional relationships and gap distances between nearby objects (e.g. `bracket is ABOVE base (gap: 5mm)`). Exact pairwise collision intersections run by default only for bounded scenes; use `--spatial exact` for exhaustive collision checks or `--spatial off` to skip this section.
-
-**Physical connectivity** — pass `--connectivity` to list physically connected components across visible objects. Overlapping or touching bboxes are joined within `--connectivity-tolerance` (default `0.05` model units); use collision inspection for exact positive-volume overlaps. This helps answer whether the model is one continuous assembly or several separate islands.
-
-**Parameters** — lists all declared parameters with their current values. Overridden values are marked with `*`.
-
-**Solver profiling** — when constraint solving occurs, shows timing breakdown (clone, solve, redundancy detection, surface building) and solver internals.
+For deeper confidence gates, prefer `forgecad inspect mechanical-integrity`, `forgecad check print`, or targeted evidence commands such as `forgecad inspect collisions` instead of turning `run` back into a catch-all audit command.
 
 ```bash
-forgecad run examples/cup.forge.js
-forgecad run examples/cup.forge.js --focus
-forgecad run examples/cup.forge.js --focus bracket,hinge
-forgecad run examples/cup.forge.js --hide "wall,bolt"
-forgecad run examples/cup.forge.js --connectivity
-forgecad run examples/cup.forge.js --journeys
-forgecad run examples/cup.forge.js --backend occt
-forgecad run examples/cup.forge.js --debug-imports
-forgecad run examples/cup.forge.js -p "Wall Thickness=3" -p "Body Height=200"
+forgecad run examples/api/static-assembly-connectors.forge.js
+forgecad run examples/api/static-assembly-connectors.forge.js --focus
+forgecad run examples/api/static-assembly-connectors.forge.js --focus "Bench.Slat*"
+forgecad run examples/api/static-assembly-connectors.forge.js --hide "Bench.Slat0,Bench.Slat1"
+forgecad run examples/api/static-assembly-connectors.forge.js --details --history
+forgecad run examples/api/static-assembly-connectors.forge.js --spatial bounded
+forgecad run examples/api/static-assembly-connectors.forge.js --full
+forgecad run examples/products/cup.forge.js --connectivity
+forgecad run examples/products/cup.forge.js --journeys
+forgecad run examples/products/cup.forge.js --backend occt
+forgecad run examples/products/cup.forge.js --backend truck --quality live
+forgecad run examples/products/cup.forge.js --debug-imports
+forgecad run examples/products/cup.forge.js -p "Wall Thickness=3" -p "Body Height=200"
 forgecad run examples/constraints/06-complex-spectrogram.forge.js --solver-debug-out tmp/spectrogram-debug
 ```
 
+### Object Filtering: `--focus` and `--hide`
+
+Several CLI commands can filter the visible object set without changing model code: `run`, `render 3d`, `render wireframe`, `inspect <evidence>`, `capture`, and `check print`.
+
+Use `forgecad run model.forge.js --quality live` to list returned object names quickly, then pass those names to `--focus` or `--hide`.
+
+```bash
+forgecad run examples/api/static-assembly-connectors.forge.js --quality live
+forgecad render 3d examples/api/static-assembly-connectors.forge.js bench.png --focus "Bench.*"
+forgecad render 3d examples/api/static-assembly-connectors.forge.js slats.png --focus "Bench.Slat*"
+forgecad inspect collisions examples/api/static-assembly-connectors.forge.js --focus "Bench.*"
+forgecad inspect objects examples/api/static-assembly-connectors.forge.js out/bench-objects --hide "Bench.Slat0,Bench.Slat1" --camera iso --force
+```
+
+Rules:
+
+- A bare `--focus` hides mock objects and keeps real objects.
+- `--focus name1,name2` renders only matching objects.
+- `--hide name1,name2` removes matching objects from the visible scene.
+- Matching is case-insensitive and supports `*` / `?` globs.
+- `--focus` and `--hide` are mutually exclusive.
+- Filtering happens after the script runs; it does not avoid evaluating the full model.
+- Filtering works on returned object names. For grouped children, use concrete child names or globs like `Bench.*`.
+- If a model unions many parts into one returned shape, the original parts cannot be isolated by CLI filtering.
+
+### `forgecad inspect`
+
+Inspect a model by asking for one explicit kind of evidence.
+
+`forgecad inspect` is the evidence-first inspection surface. Pick the thing you want to see or verify, then choose the view like you would with `render 3d`.
+
+- `inspect image` — Capture the normal shaded viewport image evidence.
+- `inspect depth` — Capture visible surface depth evidence.
+- `inspect normals` — Capture surface normal evidence.
+- `inspect zebra` — Capture Zebra stripe surface-continuity evidence.
+- `inspect roughness` — Capture mesh roughness and sharp-feature evidence.
+- `inspect objects` — Capture object identity evidence.
+- `inspect connectivity` — Capture physical connectivity evidence.
+- `inspect floating` — Capture floating-body evidence.
+- `inspect distance` — Capture rooted component distance evidence.
+- `inspect comparison` — Capture candidate-vs-reference comparison evidence.
+- `inspect collisions` — Capture collision evidence.
+- `inspect thickness` — Capture wall-thickness evidence.
+- `inspect sections` — Capture internal section evidence.
+- `inspect mechanical-integrity` — model-focused integrity audit for generated assemblies
+
+```bash
+forgecad inspect collisions main.forge.js --camera iso
+forgecad inspect objects main.forge.js --camera front --camera right
+forgecad inspect thickness main.forge.js --min 1.6 --warn 2.4
+forgecad inspect comparison candidate.forge.js --with reference.3mf
+```
+
+| Command | Description |
+|---------|-------------|
+| `inspect image` | Capture the normal shaded viewport image evidence. |
+| `inspect objects` | Capture object identity evidence. |
+| `inspect collisions` | Capture collision evidence. |
+| `inspect thickness` | Capture wall-thickness evidence. |
+| `inspect sections` | Capture internal section evidence. |
+| `inspect comparison` | Capture candidate-vs-reference comparison evidence. |
+| `inspect evidence` | List available inspect evidence commands. |
+
 ### `forgecad render`
 
-Render a Forge scene. Use a subcommand — `3d`, `inspect`, `section`, `wireframe`, `sketch`, or `hq`.
+Render a Forge scene. Use a subcommand — `3d`, `views`, `section`, `wireframe`, `sketch`, or `hq`.
 
 `forgecad render` is a group of rendering subcommands. Pick one based on what you want:
 
 - `render 3d` — standard viewport PNG, the usual way to visually verify geometry
-- `render inspect` — machine-readable inspection bundle with geometry channels and a manifest
+- `render views` — list named cameras declared with `scene({ views })`
 - `render wireframe` — edges only, no shading
 - `render section` — 2D cross-section cut by a plane (SVG or PNG)
 - `render sketch` — 2D sketch script to PNG
 - `render hq` — path-traced via Blender Cycles, for documentation and marketing shots
 
 ```bash
-forgecad render 3d examples/cup.forge.js
-forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask
-forgecad render wireframe examples/cup.forge.js
+forgecad render 3d examples/products/cup.forge.js
+forgecad inspect collisions examples/api/static-assembly-connectors.forge.js --camera iso
+forgecad render views examples/products/cup.forge.js
+forgecad render wireframe examples/products/cup.forge.js
 forgecad render section examples/furniture/01-table.forge.js --plane XZ
-forgecad render hq examples/cup.forge.js --preset dramatic
+forgecad render hq examples/products/cup.forge.js --preset dramatic
 ```
 
 ### `forgecad render 3d`
@@ -135,39 +192,39 @@ Render a Forge scene to PNG using the real viewport renderer.
 
 Launches a headless Chrome instance, renders the scene with the same WebGL viewport as the editor, and saves a PNG. The output path defaults to `<script-name>.png` next to the input file.
 
-Use `--focus` to isolate specific parts (hides everything else) or `--hide` to remove clutter like mock objects. The `--view` flag selects a named camera declared in `scene({ views })`. The `--camera` flag accepts built-in views (`front`, `top`, `iso`), `azimuth:elevation` angles, or an exact `proj/pos/target/up/fov` camera spec — pass `--camera` multiple times to render several viewpoints in one run.
+The input can be a `.forge.js` script or a direct `.stl`, `.obj`, `.3mf`, `.step`, or `.stp` asset. Direct STEP/STP rendering auto-selects OCCT unless you pass `--backend`.
+
+Use `--focus` to isolate specific parts (hides everything else) or `--hide` to remove clutter like mock objects. The `--view` flag selects a named camera declared in `scene({ views })`. The `--camera` flag accepts built-in views (`front`, `top`, `iso`), `azimuth:elevation` angles, or an exact `proj/pos/target/up/fov` camera spec — pass `--camera` multiple times to render several viewpoints in one run. Use `--camera-json <file>` or `--scene <file>` for exact reproducible viewport cameras without shell escaping.
 
 Use `--edges=<off|thin|bold>` to control the edge overlay. For a pure wireframe look, use `render wireframe` instead.
 
 This is the standard way to visually verify geometry from the CLI or in agent workflows. For higher quality (path-traced, materials, HDRI lighting), use `render hq` instead.
 
 ```bash
-forgecad render 3d examples/cup.forge.js
-forgecad render 3d examples/cup.forge.js --focus
-forgecad render 3d examples/cup.forge.js --focus bracket
-forgecad render 3d examples/cup.forge.js --hide "wall,bolt"
+forgecad render 3d examples/products/cup.forge.js
+forgecad render 3d examples/api/static-assembly-connectors.forge.js --focus
+forgecad render 3d examples/api/static-assembly-connectors.forge.js --focus "Bench.Slat*"
+forgecad render 3d examples/api/static-assembly-connectors.forge.js --hide "Bench.Slat0,Bench.Slat1"
 forgecad render 3d model.forge.js --view hero
 forgecad render 3d model.forge.js --camera 45:30
 forgecad render 3d model.forge.js --camera "proj=perspective;pos=200,-160,120;target=0,0,20;up=0,0,1;fov=38"
+forgecad render 3d model.forge.js --camera-json camera.json
+forgecad render 3d model.forge.js --scene scene.json
 forgecad render 3d model.forge.js --camera front --camera side
 forgecad render 3d model.forge.js --edges bold
 forgecad render 3d model.forge.js --edges off
+forgecad render 3d bracket.3mf bracket.png
 ```
 
-### `forgecad render inspect`
+### `forgecad render views`
 
-Render a machine-readable inspection bundle with geometry channels and a manifest.
+List named camera views declared by a model with `scene({ views })`.
 
-Launches the headless viewport renderer and writes a directory bundle for agent and automation workflows. Every channel is opt-in with `--channels`; there is no default bundle. Selected channels emit canonical `front`, `right`, `top`, and `iso` views for RGB, depth, normals, object masks, physical connectivity, rooted component distance, collisions, and wall thickness, or a principal-plane section atlas, plus a root `manifest.json` with scene metadata, filters, object visibility, and relative file paths.
-
-Use `--focus` to isolate specific parts or hide mocks, and `--hide` to remove named clutter. Output defaults to `<script-name>-inspect/` next to the input file.
-
-For bundle layout, channel encodings, and manifest semantics, see [Inspection Bundles](guides/inspection-bundles.md).
+Runs the script headlessly and prints every named render view with an exact camera spec that can be passed back to `render 3d`, `render hq`, or `capture`.
 
 ```bash
-forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask
-forgecad render inspect examples/api/static-assembly-connectors.forge.js out/bench-inspect --channels collisions --focus Bench
-forgecad render inspect examples/api/static-assembly-connectors.forge.js --channels rgb,mask,collisions --hide "Bench.Slat0" --force
+forgecad render views model.forge.js
+forgecad render views model.forge.js --json
 ```
 
 ### `forgecad render wireframe`
@@ -177,8 +234,8 @@ Render a Forge scene as a wireframe (edges only, no shading).
 Same as `render 3d` but renders only the edge geometry — no shaded surfaces. Useful for construction-style documentation or highlighting structural features without material detail.
 
 ```bash
-forgecad render wireframe examples/cup.forge.js
-forgecad render wireframe examples/cup.forge.js --camera iso
+forgecad render wireframe examples/products/cup.forge.js
+forgecad render wireframe examples/products/cup.forge.js --camera iso
 ```
 
 ### `forgecad render hq` **\[Pro\]**
@@ -187,31 +244,37 @@ High-quality render via Blender Cycles — path-traced, HDRI, material presets.
 
 Exports the scene to Blender and renders with Cycles (path tracer). Requires Blender installed and on PATH.
 
-Choose a `--preset` for the look: `studio` (neutral product shot), `dramatic` (high-contrast), `clay` (matte, no color), `glass`, `metallic`, `toon`, `xray`, `normals`, `silhouette`, and more. Control quality vs speed with `--samples` (default 256). Use `--transparent` for a transparent background (compositing-ready).
+Choose a `--preset` for the look: `studio` (neutral product shot), `dramatic` (high-contrast), `clay` (matte, no color), `glass`, `metallic`, `toon`, `xray`, `normals`, `silhouette`, and more. Control quality vs speed with `--samples` (default 256). Use `--view`, `--camera`, `--camera-json`, or `--scene <file>` for still camera control, matching `render 3d`. Use `--transparent` for a transparent background (compositing-ready).
 
 Output defaults to `<script-name>-hq.png`. Great for documentation, marketing renders, and social media.
 
 ```bash
-forgecad render hq examples/cup.forge.js
-forgecad render hq examples/cup.forge.js hero.png --preset dramatic --samples 1024
-forgecad render hq examples/cup.forge.js --preset clay --size 2048
-forgecad render hq examples/cup.forge.js --transparent --preset glass
+forgecad render hq examples/products/cup.forge.js
+forgecad render hq examples/products/cup.forge.js hero.png --preset dramatic --samples 1024
+forgecad render hq examples/products/cup.forge.js hero.png --view hero
+forgecad render hq examples/products/cup.forge.js hero.png --camera-json camera.json
+forgecad render hq examples/products/cup.forge.js --preset clay --size 2048
+forgecad render hq examples/products/cup.forge.js --transparent --preset glass
 ```
 
 ### `forgecad capture gif|mp4` **\[Pro\]**
 
 Animated orbit or joint playback.
 
-Renders an animated sequence by either orbiting the camera around the model or playing back a `jointsView` animation. Use `--capture orbit` (default) for a turntable rotation, `--capture animation --animation <name>` to play a named joints clip, or `--capture section-sweep` to move a clipping plane through the model. Supports `--cut-plane` to animate with a static cross-section visible.
+Renders an animated sequence by either orbiting the camera around the model or playing back a `jointsView` animation. Use `--capture orbit` (default) for a turntable rotation, `--capture animation --animation <name>` to play a named joints clip, or `--capture section-sweep` to move a clipping plane through the model. Supports `--cut-plane` to animate with a static cross-section visible. Use `--view`, `--camera`, `--camera-json`, or `--scene <file>` to choose the orbit base camera or the fixed camera for animations and section sweeps.
 
 ```bash
-forgecad capture gif examples/cup.forge.js
+forgecad capture gif examples/products/cup.forge.js
 forgecad capture gif examples/3d-printer.forge.js out/section.gif --cut-plane "Front Section"
 forgecad capture gif model.forge.js out/raw.gif --param "Output=raw-sdf"
+forgecad capture gif model.forge.js out/front.gif --camera front
+forgecad capture gif model.forge.js out/hero.gif --view hero
 forgecad capture gif examples/3d-printer.forge.js out/sweep.gif --capture section-sweep --sweep-plane YZ
-forgecad capture mp4 examples/cup.forge.js
+forgecad capture mp4 examples/products/cup.forge.js
 forgecad capture mp4 examples/api/runtime-joints-view.forge.js out/step.mp4 --capture animation --animation Step
 forgecad capture mp4 model.forge.js out/raw.mp4 --param "Output=raw-sdf"
+forgecad capture mp4 model.forge.js out/front.mp4 --camera front
+forgecad capture mp4 model.forge.js out/hero.mp4 --view hero
 forgecad capture mp4 examples/3d-printer.forge.js out/sweep.mp4 --capture section-sweep --sweep-plane YZ --sweep-frames 180
 ```
 
@@ -241,26 +304,24 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 
 | Option | Description |
 |--------|-------------|
-| `--focus <names>` | Focus: no arg hides mocks; comma-separated names shows only those |
-| `--hide <names>` | Hide comma-separated object names |
+| `--focus <names>` | Focus: no arg hides mocks; comma-separated names/globs show only those |
+| `--hide <names>` | Hide comma-separated object names/globs |
 | `--camera <front\|back\|side\|right\|top\|iso\|az:el\|az:el:dist\|spec>` | Camera preset, spherical (az:el), or full spec such as `proj=perspective;pos=x,y,z;target=x,y,z;up=x,y,z;fov=45`. Repeatable. |
+| `--camera-json <file>` | Exact viewport camera JSON file |
 | `--view <name>` | Named camera view declared by the model with scene({ views }) |
 | `--size <px>` | Image size in pixels |
-| `--scene <json>` | Viewport scene state JSON |
+| `--scene <json\|file>` | Viewport scene state JSON or JSON file |
 | `--background <color>` | Canvas background override |
 | `--render-mode <solid\|wireframe>` | Shaded solid (default) or wireframe only |
-| `--edges <off\|thin\|bold>` | Edge overlay preset in solid mode (default: thin) |
-| `--render-style <classic\|studio\|fast\|glass>` | Visual render style (default: classic) |
+| `--edges <off\|thin\|bold>` | Edge overlay preset in solid mode (default: off) |
+| `--render-style <classic\|studio\|fast\|glass\|precision\|hybrid>` | Visual render style (default: classic) |
 | `--port <n>` | Vite dev server port |
+| `--fresh-server` | Start a fresh renderer instead of reusing an existing one |
 | `--chrome-path <path>` | Chrome or Chromium executable path |
 | `--output <path>` | Output file path |
-| `--channels <rgb,depth,normals,mask,connectivity,distance,collisions,thickness,section>` | Required inspection channels to emit; no default |
-| `--quality <default\|live\|high>` | Mesh/render quality |
-| `--force` | Replace an existing bundle directory |
-| `--min-thickness <mm>` | Critical thickness threshold in model units |
-| `--warn-thickness <mm>` | Warning thickness threshold in model units |
-| `--max-thickness <mm>` | Thick/blue heatmap threshold in model units |
-| `--thickness-samples <n>` | Maximum sampled triangles per object |
+| `--json` | Print machine-readable JSON |
+| `--quality <default\|live\|high>` | Mesh quality preset |
+| `--backend <manifold\|occt\|truck>` | Geometry backend (default: manifold) |
 | `--preset <name>` | Material/lighting preset |
 | `--width <px>` | Output width in pixels |
 | `--height <px>` | Output height in pixels |
@@ -273,7 +334,6 @@ forgecad render section examples/furniture/01-table.forge.js out/bold.svg --edge
 | `--frames <n>` | Video frames per revolution |
 | `--fps <n>` | Video frame rate |
 | `--pitch <deg>` | Camera pitch angle in degrees |
-| `--backend <manifold\|occt>` | Geometry backend |
 | `--format <gif\|mp4>` | Output format |
 | `--capture <orbit\|animation\|section-sweep>` | Capture preset |
 | `--animation <name>` | Named jointsView animation clip |
@@ -327,12 +387,12 @@ forgecad cut-list examples/api/sheet-stock-cut-list.forge.js
 forgecad export cutting-layout examples/api/sheet-stock-cut-list.forge.js --sheet-width 420 --sheet-height 594 --kerf 3
 
 # 3D printing
+forgecad check print bracket.forge.js
 forgecad export stl bracket.forge.js
 forgecad export 3mf bracket.forge.js --quality high
 
 # CAD interchange
 forgecad export step bracket.forge.js
-forgecad export step bracket.forge.js --allow-faceted
 
 # Technical drawings
 forgecad export report bracket.forge.js out/report.pdf
@@ -347,12 +407,9 @@ forgecad export sdf rover.forge.js --output out/forge_scout
 | Option | Description |
 |--------|-------------|
 | `--output <path>` | Output STEP path |
-| `--python <path>` | Python interpreter for uv |
-| `--uv <path>` | uv executable path |
-| `--allow-faceted` | Allow faceted fallback for closed mesh solids |
 | `--quality <default\|live\|high>` | Forge quality preset |
-| `--backend <manifold\|occt>` | Geometry backend |
-| `-o <path>` | Output file path |
+| `--backend <manifold\|occt\|truck>` | Geometry backend (default: manifold) |
+| `-o <path>` | Shorthand for --output |
 | `--dim-angle-tol <deg>` | Dimension routing tolerance in degrees |
 | `--sheet-width <mm>` | Stock sheet width in mm |
 | `--sheet-height <mm>` | Stock sheet height in mm |
@@ -384,7 +441,7 @@ cd start-here
 forgecad studio .
 ```
 
-`forgecad login` prompts for email/password. If your account was created through GitHub or Google, create an API token in Settings > API Tokens and run `forgecad login --token`; it prompts securely when the token is omitted. Use `FORGECAD_TOKEN=fc_pat_...` instead for CI/CD and one-off automation. See [Platform authentication](platform/auth.md#cli-auth-for-oauth-accounts) for details.
+`forgecad login` asks how you want to sign in, then prompts for either email/password or an API token. If your account was created through GitHub or Google, create an API token in Settings > API Tokens, run `forgecad login`, and choose API token. Use `FORGECAD_TOKEN=fc_pat_...` only for CI/CD and one-off automation. See [Platform authentication](platform/auth.md#cli-auth-for-oauth-accounts) for details.
 
 `forgecad project init` creates the remote project, writes `forgecad.json`, pushes any existing local source files, and records server file IDs. `forgecad project push` syncs an already initialized project; it does not create a remote project from an arbitrary folder.
 
@@ -399,7 +456,7 @@ forgecad project status        # See what's different
 ### Publish
 
 ```bash
-forgecad publish adapter.forge.js --title "AMS Lite Adapter"
+forgecad project publish adapter.forge.js --title "AMS Lite Adapter"
 ```
 
 Shares are live references — always the current version, not a snapshot.
@@ -411,7 +468,7 @@ Shares are live references — always the current version, not a snapshot.
 
 | Command | Description |
 |---------|-------------|
-| `login` | Authenticate with ForgeCAD by email/password or API token. |
+| `login` | Authenticate with ForgeCAD interactively. |
 | `logout` | Clear stored authentication credentials. |
 | `whoami` | Show the current user, server, and license status. |
 
@@ -440,25 +497,25 @@ Shares are live references — always the current version, not a snapshot.
 | `project remove-member` | Remove a member from the current project. |
 | `project set-role` | Change a member's role. |
 
-**Files (remote)**
+**Remote files**
 
 | Command | Description |
 |---------|-------------|
-| `file list` | List remote files in the current project. |
-| `file read` | Read a remote file and print its contents. |
-| `file save` | Create or update a remote file. Reads from local file, --content, or --stdin. |
-| `file delete` | Delete a remote file. |
-| `file rename` | Rename or move a remote file. |
-| `file mkdir` | Create a directory in the remote project. |
-| `file copy` | Copy a file from another project into the current one. |
+| `project file list` | List remote files in the current project. |
+| `project file read` | Read a remote file and print its contents. |
+| `project file save` | Create or update a remote file. Reads from local file, --content, or --stdin. |
+| `project file delete` | Delete a remote file. |
+| `project file rename` | Rename or move a remote file. |
+| `project file mkdir` | Create a directory in the remote project. |
+| `project file copy` | Copy a file from another project into the current one. |
 
 **Shares**
 
 | Command | Description |
 |---------|-------------|
-| `publish` | Publish a model and get a shareable link. Auto-syncs project if inside one. |
-| `shares list` | List your published models. |
-| `shares delete` | Unpublish a shared model. |
+| `project publish` | Publish a model and get a shareable link. Auto-syncs project if inside one. |
+| `project shares list` | List your published models. |
+| `project shares delete` | Unpublish a shared model. |
 
 **API Tokens**
 
@@ -495,51 +552,64 @@ forgecad skill one-file ~/Desktop/forgecad-context.md
 forgecad skill flattened-files ~/Desktop/forgecad-skills
 ```
 
-> **Workflow:** Agent writes the model -> `forgecad run` validates it -> `forgecad render inspect` produces evidence -> `forgecad check params` sweeps the parameter range -> export ships the result. All in the terminal.
+> **Workflow:** Agent writes the model -> `forgecad run` validates it -> `forgecad inspect mechanical-integrity` catches disconnected AI-slop patterns -> `forgecad check print` catches printability risks -> `forgecad inspect collisions` or another targeted evidence command produces visual evidence -> export ships the result. All in the terminal.
 
 ## Validation
 
-Test parameter ranges and run invariant suites.
+Check printability and run focused model integrity reviews.
 
-### `forgecad check params`
+### `forgecad score reconstruction`
 
-Sweep parameter ranges and report runtime failures, degeneracy, and new collisions.
+Score a reconstruction against its compareWith() reference.
 
-For each declared parameter, samples `N` values evenly across its `[min, max]` range (default 8) while holding all other parameters at their defaults. At each sample, checks for:
-
-1. **Runtime errors** — script crashes at certain parameter values
-2. **Degenerate geometry** — shapes with near-zero volume (collapsed geometry)
-3. **New collisions** — part pairs that collide at the sampled value but not at the default
-
-Baseline collisions (those present at default parameter values) are listed but not flagged as issues — only *new* collisions introduced by parameter changes are reported. Results are grouped by parameter with the problematic value ranges shown.
+Runs the same geometric scorer as `forgecad compare 3d`, but reads the reference from the candidate model's `compareWith()` directive. Use this as the default reconstruction submission command: one candidate path in, one 0-100 score out. Pass `--reference` only when scoring a raw CAD asset or overriding the declared target.
 
 ```bash
-forgecad check params examples/shoe-rack-doors.forge.js
-forgecad check params path/to/model.forge.js --samples 12
+forgecad score reconstruction reconstruction.forge.js
+forgecad score reconstruction reconstruction.forge.js --score-only
+forgecad score reconstruction candidate.3mf --reference source.3mf --json --samples 3000
 ```
 
-<details>
-<summary>All check commands (CI / development)</summary>
+### `forgecad compare 3d`
 
-| Command | Description |
-|---------|-------------|
-| `check suite` | Run the repo invariant suite, with smoke and full profiles for the fast merge lane vs the broader regression sweep. |
-| `check runtime-globals` | Ensure the script sandbox does not add new lowercase injected globals. |
-| `check transforms` | Run transform and assembly invariants. |
-| `check dimensions` | Run dimension propagation invariants. |
-| `check placement` | Run placement reference invariants. |
-| `check js-modules` | Run JavaScript module import invariants. |
-| `check brep` | Run exact BREP export invariants. |
-| `check constraints` | Run constraint solver invariants and snapshot regression tests. |
-| `check compiler` | Run compiler routing snapshots and runtime-vs-lowered invariants. |
-| `check query-propagation` | Run focused topology-rewrite query-propagation snapshots and invariants. |
-| `check examples` | Run the example architecture gate, with smoke and full profiles for the maintained fast lane vs the full example catalog. |
-| `check api` | Run script API contract invariants. |
-| `check text` | Run text2d geometry contract tests. |
-| `check occt-lower` | Run OCCT lowerer geometry invariant tests. |
-| `check backend-parity` | Compare Manifold vs OCCT backend outputs across example files. |
+Score geometric similarity between two ForgeCAD scripts or imported 3D assets.
 
-</details>
+Runs both inputs headlessly, samples their triangle surfaces, feature edges, bounds, and volume. Use this to grade a reconstructed `.forge.js` model against a reference `.stl`, `.obj`, `.3mf`, `.step`, or `.stp` file. The overall 0-100 score uses multi-threshold bidirectional surface F-scores, sharp/boundary feature-edge F-scores, dimension agreement, volume IoU, and hard caps; JSON output includes threshold, feature, cap, and distance metrics for automation.
+
+```bash
+forgecad compare 3d reference.stl reconstruction.forge.js
+forgecad compare 3d reference.step reconstruction.forge.js --json --samples 3000
+forgecad compare 3d source.3mf candidate.3mf --align center --tolerance-mm 0.5 --fail-under 90
+```
+
+### `forgecad check print`
+
+Run fast 3D-print readiness checks for collisions, mesh health, walls, overhangs, and bed contact.
+
+Runs a Forge script with the headless kernel and emits a slicer-adjacent printability report without launching a browser. The check is designed for agents: JSON is stable, failures name the specific print risk, and the default profile is conservative for FDM PLA on a 0.4mm nozzle.
+
+Checks include script `verify.*` results, exact positive-volume object collisions, physical component count, mesh topology, sampled wall thickness, unsupported overhang budget, and bed-contact area. Use `--json` for automation and `--output` to save the full report while keeping the readable terminal summary.
+
+```bash
+forgecad check print examples/api/attachTo-basics.forge.js
+forgecad check print examples/api/verification-demo.forge.js --json
+forgecad check print model.forge.js --min-wall 1.2 --warn-wall 2
+forgecad check print model.forge.js --expect-components 1 -p "Wall Thickness=3"
+```
+
+### `forgecad inspect mechanical-integrity`
+
+Inspect generated ForgeCAD models for mechanical integrity failures.
+
+Scans a Forge script or a folder of generated projects and runs a mechanical integrity inspection. The inspection flags timeouts, runtime errors, missing `verify.*` checks, missing executed mechanical-interface checks, fragmented named groups, uncontracted manual assemblies, optional positive-volume object collisions, and excessive physical component counts when requested. Markdown details include suggested repair patterns such as connector-authored mates, bolted service covers, pinned levers, captured slides, hinges, clevis joints, retained shafts, and seated bearings. When `--collisions` is enabled, the Markdown details list the largest overlapping object pairs by volume so agents can repair the highest-risk interfaces first. Exact collision checks use a default 40-pair bbox-overlap budget and 30s exact-check time budget; exhausting either budget fails the file instead of silently passing a partial check.
+
+```bash
+forgecad inspect mechanical-integrity path/to/generated-models
+forgecad inspect mechanical-integrity path/to/model/main.forge.js --min-verifications 2
+forgecad inspect mechanical-integrity path/to/model/main.forge.js --collisions
+forgecad inspect mechanical-integrity path/to/generated-models --collisions --collision-pair-limit 250
+forgecad inspect mechanical-integrity path/to/generated-models --json --timeout-ms 40000 --jobs 4
+```
 
 <details>
 <summary>Debug commands (ForgeCAD development)</summary>
@@ -567,7 +637,7 @@ The CLI is free for core workflows and exports. Production outputs are free to r
 
 | Free | Production outputs | Pro |
 |------|--------------------|-----|
-| `run`, `dev`, `studio`, `render 3d`, `export stl`, `export 3mf`, `export svg`, `check params`, `check suite` | `cut-list`, `export sketch-pdf`, `export step`, `export brep`, `export gcode`, `export sdf`, `export urdf`, `export report`, `export cutting-layout` are free to run; Pro covers commercial use. | `render hq`, `capture gif`, `capture mp4` |
+| `run`, `dev`, `studio`, `render 3d`, `export stl`, `export 3mf`, `export svg`, `score reconstruction`, `compare 3d`, `check print`, `inspect collisions`, `inspect mechanical-integrity` | `cut-list`, `export sketch-pdf`, `export step`, `export brep`, `export gcode`, `export sdf`, `export urdf`, `export report`, `export cutting-layout` are free to run; Pro covers commercial use. | `render hq`, `capture gif`, `capture mp4` |
 
 ```bash
 forgecad license                    # Check signed-in account status

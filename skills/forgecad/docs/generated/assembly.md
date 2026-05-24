@@ -29,7 +29,12 @@ bomToCsv(rows: BomRow[]): string
 
 **`BomRow`**: `part: string`, `qty: number`, `material?: string`, `process?: string`, `tolerance?: string`, `notes?: string`, `metadata?: PartMetadata`
 
-**`PartMetadata`**: `material?: string`, `process?: string`, `tolerance?: string`, `qty?: number`, `notes?: string`, `densityKgM3?: number`, `massKg?: number`
+**`PartMetadata`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `tags?` | `string \| readonly string[]` | Viewport organization tags applied to scene objects produced from this part. |
+| `material?`, `process?`, `tolerance?`, `qty?`, `notes?`, `densityKgM3?`, `massKg?` | | — |
 
 #### `assembly()` — Create an assembly container with named parts and joints for kinematic mechanisms.
 
@@ -670,13 +675,13 @@ toGroup(): ShapeGroup
 Each part becomes `{ name, shape }` or `{ name, group: [...] }` if the part is a [`ShapeGroup`](/docs/core#shapegroup). Top-level scripts should normally return the `SolvedAssembly` directly. Use `toGroup()` when you need [`ShapeGroup`](/docs/core#shapegroup) behavior; use this method only for advanced scene-graph control where you need access to the flat per-part array with metadata.
 
 ```ts
-toSceneObjects(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; shape: Shape; }>; metadata?: PartMetadata; }>
+toSceneObjects(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; shape: Shape; tags?: string[]; }>; metadata?: PartMetadata; }>
 ```
 
 #### `toScene()` — Backward-compatible alias for `toSceneObjects()`.
 
 ```ts
-toScene(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; shape: Shape; }>; metadata?: PartMetadata; }>
+toScene(): Array<{ name: string; shape?: Shape; group?: Array<{ name: string; shape: Shape; tags?: string[]; }>; metadata?: PartMetadata; }>
 ```
 
 #### [`bom()`](/docs/output#bom) — Generate a bill of materials for all parts in the solved assembly.

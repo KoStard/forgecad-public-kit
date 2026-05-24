@@ -126,7 +126,7 @@ If no process is specified, treat manufacturing/process choice as an HLD alterna
 
 ### 2. Sketch the approach
 
-Describe the recommended approach at a conceptual level. Draw an ASCII diagram showing the key elements and their spatial relationships. Label the diagram.
+Describe the recommended approach at a conceptual level. Draw an ASCII diagram showing the key elements and their spatial relationships. Label the markdown diagram, but do not carry those labels into CAD geometry unless the real artifact needs markings.
 
 ### 3. Identify interfaces
 

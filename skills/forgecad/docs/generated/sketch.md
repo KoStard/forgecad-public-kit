@@ -257,10 +257,15 @@ filletTrackedEdge(shape: Shape, edge: EdgeRef, radius: number, quadrant?: [ numb
 ```
 
 **`EdgeRef`**
-- `start: [ number, number, number ]` — Start point
-- `end: [ number, number, number ]` — End point
-- `query?: EdgeQueryRef` — Compiler-owned edge query when available.
-- Also: `name: EdgeName`
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `start` | `[ number, number, number ]` | Start point |
+| `end` | `[ number, number, number ]` | End point |
+| `query?` | `EdgeQueryRef` | Compiler-owned edge query when available. |
+| `curve?` | `EdgeCurve` | Exact or parametric curve family when the backend/source can identify one. |
+| `faceName?` | `string` | Owning face name when the edge is associated with one face in a larger topology. |
+| `name` | | — |
 
 #### `chamferTrackedEdge()` — Bevel a tracked vertical solid edge with a 45° chamfer.
 
@@ -299,7 +304,7 @@ loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype.Font
 
 The Sketch origin is at the left end of the text baseline by default. Use `align` and `baseline` options to adjust placement. Text is rendered using the bundled Inter font by default, or any TTF/OTF/WOFF font you provide.
 
-`text2d()` creates real geometry. For non-exported explanatory labels in the viewport, prefer `Viewport.label()` so the text stays off the geometry and OCCT compile paths.
+`text2d()` creates real geometry. For temporary viewport annotations, prefer `Viewport.label()` so the text stays off the geometry and OCCT compile paths. Do not use either form of text to make unclear production geometry readable; model the physical artifact clearly instead.
 
 Alignment reference table:
 
@@ -340,7 +345,7 @@ text2d(content: string, options?: TextOptions): Sketch
 | `letterSpacing?` | `number` | Extra space between characters in model units. Negative values tighten the tracking. |
 | `align?` | `"left" \| "center" \| "right"` | Horizontal alignment relative to x = 0. - `'left'` — left edge at x = 0 (default) - `'center'` — centred on x = 0 - `'right'` — right edge at x = 0 |
 | `baseline?` | `"baseline" \| "center" \| "top"` | Vertical alignment relative to y = 0. - `'baseline'` — y = 0 is the text baseline (bottom of capital letters) - `'center'` — y = 0 is the vertical midpoint of the cap height - `'top'` — y = 0 is the top of capital letters |
-| `font?` | `string \| opentype.Font` | Font to use for text rendering. - `'sans-serif'` or `'inter'` — bundled Inter font (works everywhere, including browser) - **file path** — path to a TTF, OTF, or WOFF font file (CLI/Node only) - **Font object** — a previously loaded opentype.js Font (from `loadFont()`) - **omitted** — uses the bundled Inter font (same as `'sans-serif'`) text2d('Hello World', { size: 10 }) // default Inter text2d('Custom Font', { size: 10, font: '/path/to/font.ttf' }) |
+| `font?` | `string \| opentype.Font` | Font to use for text rendering. - `'sans-serif'` or `'inter'` — bundled Inter font (works everywhere, including browser) - **file path** — path to a TTF, OTF, or WOFF font file (CLI/Node only) - **Font object** — a previously loaded opentype.js Font (from `loadFont()`) - **omitted** — uses the bundled Inter font (same as `'sans-serif'`) |
 | `flattenTolerance?` | `number` | Bezier flattening tolerance in model units. Smaller = more polygon segments = smoother curves. |
 
 #### `textWidth()` — Measure the rendered advance width of a string without creating any geometry.
@@ -1452,7 +1457,15 @@ detectArrangement(): Sketch[]
 #### `detectArrangementRegion()` — Select the single arrangement region that contains the given seed point. Throws if no region contains the seed.
 
 ```ts
-detectArrangementRegion(seed: [ number, number ]): Sketch
+detectArrangementRegion(_seed: [ number, number ]): Sketch
+```
+
+#### `toPolyline()` — Return the solved constrained path as a sampled 2D polyline.
+
+Use this when a construction rail was authored with `constrainedSketch()` and should feed another operation such as `Loft.pathOnXz(...)`. The sketch must contain exactly one profile path.
+
+```ts
+toPolyline(samples?: number): [ number, number ][]
 ```
 
 #### `withUpdatedConstraint()` — Re-solve the sketch after changing the value of one existing constraint.

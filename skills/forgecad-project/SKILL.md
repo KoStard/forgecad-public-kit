@@ -13,7 +13,7 @@ forgecad-public: true
 ## Authentication
 
 ```sh
-forgecad login                          # Interactive email/password login
+forgecad login                          # Choose email/password or API token
 forgecad login --server http://localhost:5174  # Local dev server
 forgecad logout
 forgecad whoami                         # Show user, server, license
@@ -60,20 +60,20 @@ forgecad project delete [--force]       # Permanently delete
 forgecad project open                   # Open in browser
 ```
 
-## File Management (Remote)
+## Remote File Management
 
-Operate directly on remote files without the push/pull cycle:
+Prefer `forgecad project status`, `forgecad project pull`, and `forgecad project push` for normal local sync. Use direct remote file commands only when you need a single hosted file operation without a full push/pull cycle:
 
 ```sh
-forgecad file list [path]               # List remote files
-forgecad file read <path>               # Print contents to stdout
-forgecad file save <path>               # Upload local file (same relative path)
-forgecad file save <path> --content "const x = box(10, 10, 10); return x;"
-cat model.forge.js | forgecad file save model.forge.js --stdin
-forgecad file delete <path> [--force]   # Delete remote file
-forgecad file rename <old> <new>        # Rename/move
-forgecad file mkdir <path>              # Create directory
-forgecad file copy <source-slug> <path> [--dest <dest-path>]  # Copy from another project
+forgecad project file list [path]               # List remote files
+forgecad project file read <path>               # Print contents to stdout
+forgecad project file save <path>               # Upload local file (same relative path)
+forgecad project file save <path> --content "const x = box(10, 10, 10); return x;"
+cat model.forge.js | forgecad project file save model.forge.js --stdin
+forgecad project file delete <path> [--force]   # Delete remote file
+forgecad project file rename <old> <new>        # Rename/move
+forgecad project file mkdir <path>              # Create directory
+forgecad project file copy <source-slug> <path> [--dest <dest-path>]  # Copy from another project
 ```
 
 All file commands require being inside an initialized project (has `forgecad.json`).
@@ -93,10 +93,10 @@ Roles: **owner** (full control), **editor** (read/write), **viewer** (read-only)
 ## Publishing & Sharing
 
 ```sh
-forgecad publish model.forge.js --title "My Model"   # Publish, get URL
-forgecad publish model.forge.js --no-sync             # Skip auto-push
-forgecad shares list                                  # List published models
-forgecad shares delete <share-id> [--force]           # Unpublish
+forgecad project publish model.forge.js --title "My Model"   # Publish, get URL
+forgecad project publish model.forge.js --no-sync             # Skip auto-push
+forgecad project shares list                           # List published models
+forgecad project shares delete <share-id> [--force]    # Unpublish
 forgecad link <gist-url-or-id>                        # Share from Gist
 ```
 
@@ -120,13 +120,13 @@ forgecad new housing --template part
 forgecad project push --force
 
 # 5. Or save directly to remote
-forgecad file save housing.forge.js --content "$(cat housing.forge.js)"
+forgecad project file save housing.forge.js --content "$(cat housing.forge.js)"
 
 # 6. Validate
 forgecad run housing.forge.js
 
 # 7. Publish
-forgecad publish housing.forge.js --title "Gadget Housing"
+forgecad project publish housing.forge.js --title "Gadget Housing"
 ```
 
 ## How sync works

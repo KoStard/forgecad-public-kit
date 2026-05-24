@@ -9,7 +9,7 @@ Cut planes, exploded views, joint animations, and scene configuration.
 
 ## Contents
 
-- [Viewport & Runtime](#viewport-runtime) — `Viewport.label`, `scene`, `viewConfig`, `explodeView`, `jointsView`, `cutPlane`, `mock`, `showLabels`, `highlight`
+- [Viewport & Runtime](#viewport-runtime) — `Viewport.label`, `scene`, `viewConfig`, `explodeView`, `jointsView`, `compareWith`, `cutPlane`, `mock`, `showLabels`, `highlight`
 - [RouteBuilder](#routebuilder)
 - [route](#route)
 
@@ -19,7 +19,9 @@ Cut planes, exploded views, joint animations, and scene configuration.
 
 #### `Viewport.label()` — Add a render-only viewport label at a world-space point.
 
-`Viewport.label()` is for explanatory text that helps a viewer understand the model. It does not create sketches, meshes, B-rep topology, exported text, or face labels, so it stays off the OCCT path. Use [`text2d()`](/docs/sketch#text2d) only when the letters should become manufactured geometry, such as raised lettering, engraved serial numbers, or exported nameplates.
+`Viewport.label()` is for temporary review, debug, tutorial, or explicitly requested presentation overlays. It does not create sketches, meshes, B-rep topology, exported text, or face labels, so it stays off the OCCT path. Default production models should be understandable from physical geometry, materials, part boundaries, and named objects, not viewport annotations.
+
+Use [`text2d()`](/docs/sketch#text2d) only when the letters should become manufactured geometry, such as raised lettering, engraved serial numbers, or exported nameplates.
 
 Labels are collected during script execution and rendered by the viewport as lightweight overlay annotations. They are ignored by exports and do not appear in `objects`.
 
@@ -57,7 +59,7 @@ When `lights` is specified, **all** default lights are removed. You must include
 
 Setting `camera.position` overrides auto-framing — the viewport will no longer auto-fit the geometry on script reload.
 
-Named render views let scripts check in repeatable cameras next to the model code. The canonical shape is `{ camera: { position, target } }`, and a direct camera shorthand `{ position, target }` is also accepted. Use the canonical shape when you may add view metadata later. Use it from the CLI with `forgecad render 3d model.forge.js --view hero`.
+Named render views let scripts check in repeatable cameras next to the model code. The canonical shape is `{ camera: { position, target } }`, and a direct camera shorthand `{ position, target }` is also accepted. Use the canonical shape when you may add view metadata later. Use it from the CLI with `--view hero` on `forgecad render 3d`, `forgecad render hq`, or `forgecad capture`.
 
 Model journeys let scripts check in a compact guided path through named objects. Each journey has ordered `steps`; each step can name a `focus` target by object name/tree path, provide a caption, and optionally provide an explicit camera. In the viewer, journeys are opt-in: they appear as a small Explore control and do not move the camera until the user starts them. Use `forgecad run model.forge.js --journeys` or `--journeys-json` to inspect resolved targets.
 
@@ -126,7 +128,6 @@ scene(options: SceneOptions): void
 | `behavior?` | `"opt-in" \| "auto"` | Whether the viewer should offer or auto-open the journey. First slice supports opt-in. |
 | `steps` | `SceneJourneyStepConfig[]` | Ordered journey spine. Branches can be added later without changing this core contract. |
 | `valid?` | `boolean` | True unless any journey or step diagnostic has level "error". |
-| `diagnostics?` | `SceneJourneyDiagnostic[]` | Whole-journey diagnostics, including unresolved startsAt and step target diagnostics. |
 
 **`SceneJourneyStepConfig`**
 
@@ -139,9 +140,6 @@ scene(options: SceneOptions): void
 | `camera?` | `SceneViewCameraConfig` | Optional explicit camera for this step. When omitted, the viewer fits `focus`. |
 | `resolvedFocusId?` | `string \| null` | Resolved object id after script execution, when `focus` matched exactly one object. |
 | `resolvedFocusPath?` | `string \| null` | Resolved object tree path or name after script execution. |
-| `diagnostics?` | `SceneJourneyDiagnostic[]` | Resolution diagnostics for this step. |
-
-`SceneJourneyDiagnostic`: `{ level: SceneJourneyDiagnosticLevel, message: string, stepId?: string, suggestions?: string[] }`
 
 **`SceneLightConfig`**
 
@@ -216,10 +214,6 @@ viewConfig({
 ```ts
 viewConfig(options?: ViewConfigOptions): void
 ```
-
-`ViewConfigOptions`: `{ jointOverlay?: JointOverlayViewConfigOptions }`
-
-**`JointOverlayViewConfigOptions`**: `enabled?: boolean`, `axisColor?: string`, `axisCoreColor?: string`, `arcColor?: string`, `zeroColor?: string`, `arcVisualLimitDeg?: number`, `axisLengthScale?: number`, `axisLengthMin?: number`, `axisLineRadiusScale?: number`, `axisLineRadiusMin?: number`, `axisLineRadiusMax?: number`, `spokeLineRadiusScale?: number`, `spokeLineRadiusMin?: number`, `spokeLineRadiusMax?: number`, `arcLineRadiusScale?: number`, `arcLineRadiusMin?: number`, `arcLineRadiusMax?: number`, `axisDotRadiusScale?: number`, `axisDotRadiusMin?: number`, `axisArrowRadiusScale?: number`, `axisArrowRadiusMin?: number`, `axisArrowLengthScale?: number`, `axisArrowLengthMin?: number`, `axisArrowOffsetFactor?: number`, `arcRadiusScale?: number`, `arcRadiusMin?: number`, `arcDotRadiusScale?: number`, `arcDotRadiusMin?: number`, `arcArrowRadiusScale?: number`, `arcArrowRadiusMin?: number`, `arcArrowLengthScale?: number`, `arcArrowLengthMin?: number`, `arcArrowOffsetFactor?: number`, `arcStepDeg?: number`, `arcMinSteps?: number`, `arcTubeSegmentsMin?: number`, `arcTubeSegmentsFactor?: number`, `arcTubeRadialSegments?: number`
 
 #### `explodeView()` — Configure how the viewport explode slider offsets returned objects.
 
@@ -344,6 +338,30 @@ jointsView(options?: JointsViewOptions): void
 - `ticks?: number` — Relative weight of the segment from this keyframe to the next (default 1). Only used in tick-based mode (when `at` is omitted). Last keyframe's ticks value is ignored.
 - Also: `values: Record<string, number>`
 
+#### `compareWith()` — Declare a reference model for comparison inspection.
+
+`compareWith()` lets a model carry its own comparison target for inspection workflows. `forgecad inspect comparison model.forge.js` uses this reference to render the same Difference Only comparison overlay as the live viewport. Amber marks candidate mismatch evidence, cyan marks reference mismatch evidence, and faint model context keeps the overlay readable. When the CLI can resolve the referenced file, the manifest also includes the same geometric score produced by `forgecad compare 3d`.
+
+The path is resolved relative to the file that calls `compareWith()`. It may point to another `.forge.js` file or an imported CAD asset such as `.stl`, `.obj`, `.3mf`, `.step`, or `.stp`.
+
+```js
+compareWith('./reference.3mf', { align: 'center', toleranceMm: 0.25, samples: 3000 });
+return rebuiltBearing;
+```
+
+```ts
+compareWith(path: string, options?: CompareWithOptions): void
+```
+
+**`CompareWithOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `align?` | `CompareAlignMode` | Candidate alignment before scoring. Defaults to no automatic alignment. |
+| `toleranceMm?` | `number` | Distance tolerance in model units for coverage scoring. Defaults to the comparison scorer's auto tolerance. |
+| `samples?` | `number` | Surface samples per direction for numeric scoring. Defaults to the comparison scorer's standard sample count. |
+| `label?` | `string` | Human label for the reference model in inspection manifests. |
+
 #### `cutPlane()` — Define a named section plane for inspecting internal geometry.
 
 Registers a cut plane that appears as a toggle in the viewport View Panel. When enabled, geometry on the positive side of the plane (the side the normal points toward) is clipped away, revealing the internal cross-section. The newly exposed section faces render with a hatched overlay; pre-existing coplanar boundary faces are left unhatched.
@@ -372,7 +390,7 @@ Mock objects appear in the viewport and spatial analysis when you run a file dir
 
 The shape is returned unchanged, so you can reference it for alignment, dimensioning, and `verify` checks.
 
-Mock objects participate in `forgecad run` collision detection and spatial analysis. Their names appear with a `(mock)` suffix in reports.
+Mock objects participate in `forgecad run --spatial bounded|exact` collision detection and spatial analysis. Their names appear with a `(mock)` suffix in reports.
 
 In the viewport, mock objects render at reduced opacity so they are visually distinct from real geometry.
 
@@ -439,16 +457,22 @@ Overloads:
 | `planar?` | `boolean` | True when the face can host a 2D sketch placement frame |
 | `uAxis?` | `[ number, number, number ]` | Face-local horizontal axis for planar faces |
 | `vAxis?` | `[ number, number, number ]` | Face-local vertical axis for planar faces |
+| `surface?` | `FaceSurface` | Analytic surface family when the backend can identify one. |
 | `descendant?` | `FaceDescendantMetadata` | Shared descendant-resolution metadata when this face is a semantic region/set. |
 | `name` | | — |
 
 **`FaceDescendantMetadata`**: `kind: "single" | "face-set"`, `semantic: FaceDescendantSemantic`, `memberCount: number`, `memberNames: string[]`, `coplanar: boolean`
 
 **`EdgeRef`**
-- `start: [ number, number, number ]` — Start point
-- `end: [ number, number, number ]` — End point
-- `query?: EdgeQueryRef` — Compiler-owned edge query when available.
-- Also: `name: EdgeName`
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `start` | `[ number, number, number ]` | Start point |
+| `end` | `[ number, number, number ]` | End point |
+| `query?` | `EdgeQueryRef` | Compiler-owned edge query when available. |
+| `curve?` | `EdgeCurve` | Exact or parametric curve family when the backend/source can identify one. |
+| `faceName?` | `string` | Owning face name when the edge is associated with one face in a larger topology. |
+| `name` | | — |
 
 ---
 

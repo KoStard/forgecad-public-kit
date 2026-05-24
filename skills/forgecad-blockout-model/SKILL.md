@@ -6,7 +6,7 @@ forgecad-public: true
 
 # Block Out a Model
 
-Create lightweight ForgeCAD concept models. These are communication artifacts: fast, legible, and intentionally approximate.
+Create lightweight ForgeCAD concept models. These are spatial planning artifacts: fast, legible, and intentionally approximate, but still grounded in the physical object rather than an annotated lesson diagram.
 
 ## Trigger Boundary
 
@@ -66,11 +66,14 @@ Use today's date for the directory. Use the user's current ForgeCAD project when
 - A bounding box is usually better than a fake detailed part.
 - Use at most a handful of top-level `param()` values when comparing rough proportions. Do not parameterize every dimension.
 - Name uncertainty honestly: `armLengthGuess`, `baseWidthApprox`, `screenVolume`, `clearanceEnvelope`.
+- Do not add text labels, callout arrows, legends, coordinate labels, or explanatory plaques to the model. Use named return objects and a short written note outside the geometry.
+- Do not cut away a shell, remove covers, or permanently explode parts just to show hidden intent. Even a blockout should represent the object in its normal assembled state unless the user explicitly asks for a presentation view.
 - Use transparent ghost geometry for:
   - sweep arcs
   - keep-out volumes
   - approximate payloads
   - user reach or access space
+- Ghost geometry must represent a real physical envelope, clearance, motion path, or human-access zone, not decorative teaching overlays.
 - Exaggerate tiny clearances if needed to keep the concept readable.
 - Keep each conceptual part visually distinct through color or opacity.
 - Prefer arrays of named shapes in the return value so the viewer can inspect the concept part-by-part.

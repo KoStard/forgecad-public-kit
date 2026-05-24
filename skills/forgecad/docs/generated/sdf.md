@@ -191,6 +191,36 @@ intersect(...others: SdfShape[]): SdfShape
 clipBox(x: number, y: number, z: number): SdfShape
 ```
 
+#### `fillWith()` — Keep only the material where this shape overlaps another SDF pattern.
+
+```ts
+fillWith(pattern: SdfShape): SdfShape
+```
+
+#### `fillWithGyroid()` — Keep only the gyroid lattice inside this shape.
+
+```ts
+fillWithGyroid(options: TpmsOptions): SdfShape
+```
+
+#### `fillWithSchwarzP()` — Keep only the Schwarz-P lattice inside this shape.
+
+```ts
+fillWithSchwarzP(options: TpmsOptions): SdfShape
+```
+
+#### `fillWithDiamond()` — Keep only the diamond TPMS lattice inside this shape.
+
+```ts
+fillWithDiamond(options: TpmsOptions): SdfShape
+```
+
+#### `fillWithLidinoid()` — Keep only the lidinoid TPMS lattice inside this shape.
+
+```ts
+fillWithLidinoid(options: TpmsOptions): SdfShape
+```
+
 #### `smoothUnion()` — Smooth union — blends shapes together with a smooth radius.
 
 ```ts
@@ -269,6 +299,14 @@ bend(radius: number): SdfShape
 repeat(spacing: Vec3, count?: Vec3): SdfShape
 ```
 
+#### `circularArray()` — Arrange this SDF in a circular array around the Z axis.
+
+The source shape is translated by `offset` in +X before arraying. This uses angular domain folding, so evaluation stays O(1): the source SDF is sampled twice no matter how many copies are requested.
+
+```ts
+circularArray(count: number, offset?: number): SdfShape
+```
+
 #### `shell()` — Hollow out, keeping only a shell of given thickness.
 
 ```ts
@@ -281,8 +319,8 @@ shell(thickness: number): SdfShape
 // Function displacement
 shape.displace((x, y, z) => Math.sin(x) * 0.5)
 
-// Pattern displacement (e.g. basketWeave)
-shape.displace(sdf.basketWeave({ threads: 16, spacing: 3 }))
+// Pattern displacement from a 3D SDF field
+shape.displace(sdf.knurl({ pitch: 2, depth: 0.3 }))
 ```
 
 ```ts
@@ -295,10 +333,16 @@ Automatically detects the shape's UV parametrization (sphere, cylinder, torus) f
 
 UV coordinates are in **surface millimeters** — patterns defined with `spacing: 3` always produce 3mm spacing, regardless of shape size.
 
+Prefer `sdf.pattern2d()` or built-in surface patterns when the relief should stay on the native shader and meshing path. Callback functions are supported for experimentation, but they are opaque to the typed pattern optimizer.
+
 ```js
-// Surface-following basket weave — auto-detects sphere UV
+// Native typed pattern — auto-detects sphere UV
+const p = sdf.pattern2d()
+const ribs = p.stripes({ spacing: 3, width: 0.8, depth: 0.35 })
+  .add(p.sineWave({ direction: [0, 1], wavelength: 14, amplitude: 0.08 }))
+
 sdf.sphere(27).shell(3)
-  .surfaceDisplace(sdf.basketWeave({ spacing: 3, depth: 0.8 }))
+  .surfaceDisplace(ribs)
   .toShape()
 
 // Custom 2D pattern via function
@@ -370,9 +414,11 @@ return {
 - `brick(options?: BrickOptions): SdfShape` — Brick/stone wall pattern — running bond with mortar grooves.
 - `weave(options?: WeaveOptions): SdfShape` — Grid lattice pattern — two families of infinite slabs crossing at 90°.
 - `basketWeave(options?: BasketWeaveOptions): SurfacePattern` — Basket weave surface pattern — threads with over-under crossings in UV space. Returns a SurfacePattern for use with `.surfaceDisplace()`.
+- `pattern2d(): Pattern2DBuilder` — Create typed, composable 2D surface patterns for `.surfaceDisplace()`.
 - `twist(shape: SdfShape, degreesPerUnit: number): SdfShape` — Twist an SDF shape around the Z axis.
 - `bend(shape: SdfShape, radius: number): SdfShape` — Bend an SDF shape around the Z axis.
 - `repeat(shape: SdfShape, spacing: Vec3, count?: Vec3): SdfShape` — Repeat an SDF shape in space.
+- `circularArray(shape: SdfShape, count: number, offset?: number): SdfShape` — Arrange an SDF shape in a circular array around the Z axis with O(1) folded-domain evaluation.
 - `SurfacePattern: typeof SurfacePattern` — A 2D surface pattern — a heightmap function for use with `.surfaceDisplace()`.
 - `fromFunction(fn: SdfFunctionSource, options: SdfFunctionOptions): SdfShape` — Create a custom SDF from one expression; shader-safe expressions raymarch directly.
 - `Sculpt: { sphere: (radius: number) => SdfShape; box: (x: number, y: number, z: number, options?: SculptBoxOptions) => SdfShape; cylinder: (height: number, radius: number) => SdfShape; disk: (radius: number, thickness?: number) => SdfShape; circle: (radius: number, thickness?: number) => SdfShape; capsule: (height: number, radius: number) => SdfShape; torus: (majorRadius: number, minorRadius: number) => SdfShape; cone: (height: number, radius: number) => SdfShape; tube: (points: SculptPointList, options?: SculptTubeOptions) => SdfShape; curve: (points: SculptPointList, options?: SculptTubeOptions) => SdfShape; path: (points: SculptPointList, options?: SculptTubeOptions) => SdfShape; blend: (first?: SculptBlendInput | SculptBlendOptions, optionsOrShape?: SculptBlendInput | SculptBlendOptions, ...rest: (SculptBlendInput | SculptBlendOptions)[]) => SdfShape; union: (first?: SculptBlendInput, ...rest: SculptBlendInput[]) => SdfShape; carve: (base: SdfShape, cutters: SculptBlendInput, options?: SculptBlendOptions) => SdfShape; keep: (first?: SculptBlendInput | SculptBlendOptions, optionsOrShape?: SculptBlendInput | SculptBlendOptions, ...rest: (SculptBlendInput | SculptBlendOptions)[]) => SdfShape; polish: (shape: SdfShape, input?: SculptPolishInput) => SdfShape; material: (input?: SculptPolishInput) => ShapeMaterialProps & { color?: string; }; look: (preset?: SculptLookPreset) => SceneOptions; knownMaterials: typeof knownSculptMaterialPresets; }` — Sculpt-like facade: friendly liquid-modeling verbs backed by the same SDF kernel.

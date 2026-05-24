@@ -32,6 +32,7 @@ The image should not:
 - smooth away the mechanism into a fake consumer shell
 - invent flashy sci-fi styling that hides how it works
 - pretend to be a CAD drawing, dimensioned blueprint, or engineering diagram
+- turn the artifact into a cutaway, sectioned shell, or exploded teaching view unless the user explicitly asks for that representation
 
 ## Default Strategy
 
@@ -119,6 +120,7 @@ Bias harder toward interfaces, seams, mounted actuators, and subsystem boundarie
 Use when the user wants assembly logic or modular breakdown.
 
 Keep the explosion restrained. Separate only major modules, not every screw.
+This is a visual-spec support image, not a default ForgeCAD modeling instruction; the CAD artifact should still be the complete assembled product.
 
 ### Workshop Prototype Realism
 
