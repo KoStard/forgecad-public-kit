@@ -239,4 +239,4 @@ Full documentation is available at [forgecad.io/docs](https://forgecad.io/docs).
 
 ## License
 
-[Business Source License 1.1](LICENSE) with an additional use grant for most production use, excluding hosted or embedded use that competes with ForgeCAD's paid version. Each version converts to MIT four years after its first public distribution. See [LICENSE](LICENSE) for the exact terms.
+This public kit is available under the [MIT License](LICENSE). The ForgeCAD npm package, CLI, hosted app, and commercial/backend usage are covered separately by ForgeCAD's product terms and pricing at [forgecad.io/pricing](https://forgecad.io/pricing).
