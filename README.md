@@ -4,15 +4,35 @@
 
 Public examples, agent skills, docs links, and issue tracking for ForgeCAD.
 
-This is not the ForgeCAD application source repository. The hosted CAD app, core product development, user projects, and product usage metrics live outside this public repo.
+ForgeCAD is code-first parametric CAD for JavaScript/TypeScript: a normal `.forge.js` file becomes a live model with parameters, assemblies, validation, renders, inspections, and exports.
 
-ForgeCAD is code-first parametric CAD for JavaScript/TypeScript, with a browser workbench, local CLI, and agent-ready modeling workflow.
-
-ForgeCAD turns a normal `.forge.js` file into a live CAD model: parameters become sliders, scripts return shapes or assemblies, and the CLI can validate, render, inspect, and export the same model from your terminal.
+This repository is the public companion kit. It is intentionally focused on assets people can use directly: example models, installable agent skills, public issues, docs links, and historical benchmark artifacts.
 
 TypeScript is the file format. The browser is the CAD system.
 
-[**Try it in the browser**](https://forgecad.io) • [Docs](https://forgecad.io/docs) • [Examples](examples) • [Agent Skill](skills/forgecad/SKILL.md) • [Open an issue](https://github.com/KoStard/forgecad-public-kit/issues)
+[**Try ForgeCAD**](https://forgecad.io) • [Docs](https://forgecad.io/docs) • [Examples](examples) • [Agent skills](skills/README.md) • [Open an issue](https://github.com/KoStard/forgecad-public-kit/issues)
+
+## Start Here
+
+| If you want to... | Go here |
+| --- | --- |
+| Use the CAD app | [forgecad.io](https://forgecad.io) |
+| Learn the API | [Docs](https://forgecad.io/docs) |
+| Run example models | [`examples/`](examples) |
+| Install agent workflows | [`skills/`](skills/README.md) |
+| Report a bug or request an API | [Issues](https://github.com/KoStard/forgecad-public-kit/issues) |
+| Check commercial terms | [Pricing](https://forgecad.io/pricing) |
+
+## Repository Scope
+
+| This public kit contains | The hosted product contains |
+| --- | --- |
+| Ready-to-run `.forge.js` examples | Browser workbench and project storage |
+| Agent skills and workflow prompts | Core app source and infrastructure |
+| Public bug reports and feature requests | Account, billing, and usage systems |
+| Historical benchmark artifacts | Product roadmap execution and customer projects |
+
+The npm package, CLI, hosted app, and backend/application usage are governed by ForgeCAD's product terms. This public kit itself is MIT licensed.
 
 ## Get Started
 
@@ -88,7 +108,7 @@ forgecad run starter.forge.js
 forgecad studio .
 ```
 
-## What Lives Here
+## Repository Contents
 
 This repository is ForgeCAD's public companion kit for:
 
@@ -98,7 +118,7 @@ This repository is ForgeCAD's public companion kit for:
 - **Benchmarks** — examples of how current language models handle code-first CAD prompts.
 - **Docs links** — full user documentation lives at [forgecad.io/docs](https://forgecad.io/docs).
 
-The ForgeCAD app, core source, hosted product development, and usage metrics live outside this public repo. This repo is intentionally focused on the assets people can use directly: examples, issue tracking, agent context, and public workflow prompts. If there is a component you want opened up sooner, [file an issue](https://github.com/KoStard/forgecad-public-kit/issues).
+If there is a component you want opened up sooner, [file an issue](https://github.com/KoStard/forgecad-public-kit/issues).
 
 ## Examples To Try
 
