@@ -33,49 +33,27 @@ Pre-built fasteners, gears, pipes, structural profiles, and utility shapes. Acce
 
 **Methods:**
 
-#### `toSketch()` — Convert the loop centerline into a thin visual sketch.
+#### `toSketch(width?: number): Sketch` — Convert the loop centerline into a thin visual sketch.
 
-```ts
-toSketch(width?: number): Sketch
-```
+#### `toProfile(): Sketch` — Convert the loop into a filled profile using the pitch path itself as the boundary.
 
-#### `toProfile()` — Convert the loop into a filled profile using the pitch path itself as the boundary.
-
-```ts
-toProfile(): Sketch
-```
-
-#### `offsetBand()` — Build a belt band sketch by offsetting the route to inner and outer pulley radii.
-
-```ts
-offsetBand(thickness: number): Sketch
-```
+#### `offsetBand(thickness: number): Sketch` — Build a belt band sketch by offsetting the route to inner and outer pulley radii.
 
 ### `DriveWheelBuilder`
 
-#### `addSpurTeethBetween()` — Add an involute spur-tooth window on part of the pitch circle.
+#### `addSpurTeethBetween(options: DriveWheelSpurTeethRegionOptions): this` — Add an involute spur-tooth window on part of the pitch circle.
 
-```ts
-addSpurTeethBetween(options: DriveWheelSpurTeethRegionOptions): this
-```
+`DriveWheelSpurTeethRegionOptions`: `{ name?: string, teethOnFullCircle: number, toothCount: number, firstTooth?: number, faceWidth?: number }`
 
-#### `addSolidArcBetween()` — Add a constant-radius solid arc region such as a dwell, stop, or pusher.
+#### `addSolidArcBetween(options: DriveWheelSolidArcRegionOptions): this` — Add a constant-radius solid arc region such as a dwell, stop, or pusher.
 
-```ts
-addSolidArcBetween(options: DriveWheelSolidArcRegionOptions): this
-```
+**`DriveWheelSolidArcRegionOptions`**: `name?: string`, `fromAngleDeg: number`, `toAngleDeg: number`, `innerRadius?: number`, `outerRadius: number`, `faceWidth?: number`, `segments?: number`
 
-#### `addShapeRegion()` — Add a fully custom region shape while preserving region metadata.
+#### `addShapeRegion(name: string, shape: Shape, options?: DriveWheelShapeRegionOptions): this` — Add a fully custom region shape while preserving region metadata.
 
-```ts
-addShapeRegion(name: string, shape: Shape, options?: DriveWheelShapeRegionOptions): this
-```
+`DriveWheelShapeRegionOptions`: `{ fromAngleDeg?: number, toAngleDeg?: number, innerRadius?: number, outerRadius?: number }`
 
-#### `build()` — Build the final wheel shape with a bore connector and region metadata.
-
-```ts
-build(): Shape
-```
+#### `build(): Shape` — Build the final wheel shape with a bore connector and region metadata.
 
 ---
 
@@ -85,85 +63,239 @@ build(): Shape
 
 Pre-built parametric parts available in user scripts as `lib.*`.
 
-Every key in this object becomes a method or namespace on the `lib` object exposed to `.forge.js` scripts. The catalog includes:
+Every key in this object becomes a method or namespace on the `lib` object exposed to `.forge.js` scripts — see the member list below for the catalog. Sizes outside the supported ranges throw at runtime with a descriptive error.
 
-**Fasteners and hardware patterns:** `bolt`, `nut`, `washer`, `fastenerSet`, `boltedServiceCover`, `datumEnclosureAssembly`, `snapLatchCoverAssembly`, `pinnedLeverAssembly`, `retainedShaftAssembly`, `capturedLinearSlide`, `capturedCartridgeGuideAssembly`, `livingHingeCoverAssembly`, `knuckledHingeAssembly`, `clevisPinJointAssembly`, `seatedBearingAssembly`, `cableGlandAnchorAssembly`, `hoseBarbPortAssembly`, `routedTubeClipAssembly`, `pcbTerminalBlockAssembly`, `thumbScrewClampAssembly`, `fastenerHole`, `boltHole`, `counterbore`, `hexNut`, `holePattern`
+- `fastenerHole(opts: FastenerHoleOptions): Shape` — ISO metric fastener hole cutter with optional counterbore or countersink.
 
-**Structure:** `tube`, `pipe`, `bracket`, `pipeRoute`, `elbow`, `tSlotProfile`, `tSlotExtrusion`, `profile2020BSlot6Profile`, `profile2020BSlot6`
+  Returns a cutter shape (subtract from a solid to produce the hole). Sizes outside M2–M10 will throw.
 
-**Belt drives:** `beltDrive`, `tangentLoop2d`
+  ```ts
+  const plate = box(60, 40, 8)
+    .subtract(lib.fastenerHole({ size: 'M5', fit: 'normal', depth: 8 })
+      .translate(15, 10, 4));
+  ```
+- `tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape` — Rectangular hollow tube (thin-wall box section).
 
-**Threads:** `thread`
+  Both the outer and inner boxes are centered on the XY plane with their base at Z=0.
+- `pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape` — Hollow cylindrical pipe.
 
-**Gears:** `spurGear`, `sectorGear`, `driveWheel`, `bevelGear`, `faceGear`, `sideGear`, `ringGear`, `rackGear`, `gearPair`, `bevelGearPair`, `faceGearPair`, `sideGearPair`
+  Centered on the XY plane, extending upward along +Z from z=0 to z=height. For complex routed pipe geometry, see `lib.pipeRoute`.
+- `explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options?: ExplodeOptions): T` — Apply deterministic exploded-view offsets to an assembly tree.
 
-**Gear bodies:** `gearBodies.disk`, `gearBodies.diskWithHub`, `gearBodies.spoked`, `gearBodies.fromProfile` plus direct aliases `gearBodyDisk`, `gearBodyDiskWithHub`, `gearBodySpoked`, `gearBodyFromProfile`
+  Traverses arrays, nested `{ name, group: [...] }` structures, and [`ShapeGroup`](/docs/core#shapegroup) outputs, translating each node while preserving names, colors, and nesting; returns the same structure type as the input. `radial` mode is branch-aware and parent-relative — nested assemblies peel apart level by level. Named items accept an inline `explode: { stage?, direction?, axisLock? }` override. Bakes the offset into geometry (e.g. driven by a `param()` slider); for a viewport-only slider use [`explodeView()`](/docs/viewport#explodeview) instead.
 
-**Gear ratios (pure math helpers):** `gearRatio`, `rackRatio`, `planetaryRatio`
+  ```js
+  const explodeAmt = param('Explode', 0, { min: 0, max: 40, unit: 'mm' });
 
-**Bolt patterns:** `boltPattern` — define hole positions once, cut them from multiple parts
+  return lib.explode(assembly, {
+    amount: explodeAmt,
+    stages: [0.4, 0.8],
+    mode: 'radial',
+    byName: { Shaft: { direction: [1, 0, 0], stage: 1.4 } },
+  });
+  ```
+- `bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape` — L-shaped mounting bracket with optional through-holes.
 
-**Utilities:** `explode`
+  Produces a right-angle bracket: a horizontal base plate and a vertical wall. Both legs share `width`. Optional holes are drilled through the base (along Z) and the wall (along Y).
+- `holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape` — Rectangular grid of cylindrical hole cutters.
 
-Sizes outside the supported ranges will throw at runtime with a descriptive error.
+  Returns the union of `rows × cols` cylinders laid out on a regular grid. Subtract from a solid to produce the full pattern.
 
-- `boltHole(diameter: number, depth: number): Shape` — Simple cylindrical through-hole cutter centered on Z=0. Subtract the result from a part to produce a plain cylindrical clearance hole. For ISO metric sizes with fit classes and counterbore/countersink, use {
-- `fastenerHole(opts: FastenerHoleOptions): Shape` — ISO metric fastener hole cutter with optional counterbore or countersink. **Details** Returns a cutter shape (subtract from a solid to produce the hole). Sizes outside M2–M10 will throw. Extend `METRIC_HOLE_TABLE` in this file to add new sizes. **Example** ```ts const plate = box(60, 40, 8) .subtract(lib.fastenerHole({ size: 'M5', fit: 'normal', depth: 8 }) .translate(15, 10, 4)); ```
-- `counterbore(holeDia: number, boreDia: number, boreDepth: number, totalDepth: number): Shape` — Counterbore hole cutter — through-hole with a wider cylindrical recess at the top. Use for socket-head cap screws that must sit flush. Subtract from a solid. For ISO metric sizing and fit classes, prefer {
-- `tube(outerX: number, outerY: number, outerZ: number, wall: number): Shape` — Rectangular hollow tube (thin-wall box section). Both the outer and inner boxes are centered on the XY plane with their base at Z=0.
-- `pipe(height: number, outerRadius: number, wall: number, segments?: number): Shape` — Hollow cylindrical pipe. Centered on the XY plane, extending upward along +Z from z=0 to z=height. For complex routed pipe geometry, see `lib.pipeRoute`.
-- `explode<T extends ExplodeItem[] | ShapeGroup>(items: T, options?: ExplodeOptions): T` — Apply deterministic exploded-view offsets to an assembly tree. **Details** Traverses arrays of shapes/sketches/named items, nested `{ name, group: [...] }` structures, and [`ShapeGroup`](/docs/core#shapegroup) outputs, translating each node by a computed offset while preserving names, colors, and nesting. Returns the same structure type as the input. In `radial` mode the algorithm is branch-aware and parent-relative: each node fans out from its immediate parent's center, so nested assemblies peel apart level by level. Named items may also include an inline `explode: { stage?, direction?, axisLock? }` property to override per-item behavior. Use this function when you want to bake the explode offset into the geometry before returning (e.g. to drive the amount with a `param()` slider). For a viewport-only explode slider without rerunning the script, use [`explodeView()`](/docs/viewport#explodeview) instead. **Example** ```js const explodeAmt = param('Explode', 0, { min: 0, max: 40, unit: 'mm' }); return lib.explode(assembly, { amount: explodeAmt, stages: [0.4, 0.8], mode: 'radial', byName: { Shaft: { direction: [1, 0, 0], stage: 1.4 } }, }); ```
-- `hexNut(acrossFlats: number, height: number, holeDia: number): Shape` — Generic hex nut with a cylindrical bore. Constructed via intersection of three rotated rectangular slabs, then a bore is subtracted. Centered at origin, height along Z. For standard ISO metric nuts by thread size, use `lib.nut` instead.
-- `bracket(width: number, height: number, depth: number, thick: number, holeDia?: number): Shape` — L-shaped mounting bracket with optional through-holes. Produces a right-angle bracket: a horizontal base plate and a vertical wall. Both legs share `width`. Optional holes are drilled through the base (along Z) and the wall (along Y).
-- `holePattern(rows: number, cols: number, spacingX: number, spacingY: number, holeDia: number, depth: number): Shape` — Rectangular grid of cylindrical hole cutters. Returns the union of `rows × cols` cylinders laid out on a regular grid. Subtract from a solid to produce the full pattern. **Example** ```ts const pattern = lib.holePattern(3, 4, 20, 20, 4, 10); const panel = box(80, 70, 10).subtract(pattern.translate(-30, -20, 0)); ```
-- `thread(diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number; }): Shape` — External helical thread — clean mesh, no SDF grid artifacts. **Details** Builds a cross-section with a single trapezoidal tooth from the root radius out to the crest radius, then twist-extrudes it so the tooth traces a helix. Manifold's extrude+twist produces structured quad-based geometry that follows the thread profile cleanly. Returns a threaded cylinder along +Z from z=0 to z=length. **Example** ```ts const t = lib.thread(5, 0.8, 12); // M5 × 0.8 pitch, 12 mm long ```
-- `bolt(diameter: number, length: number, options?: { ... }): Shape` — ISO-style hex bolt with real helical threads. **Details** The hex head sits from z=0 up to z=headHeight. The shaft extends downward along −Z by `length` mm. An unthreaded shank section is included when `threadLength < length`. Default proportions follow ISO 4762 loosely: pitch ≈ 0.15×diameter, head height ≈ 0.65×diameter, across-flats ≈ 1.6×diameter. For standard M-size bolts pre-configured for a complete joint, use { **Example** ```ts const b = lib.bolt(5, 20); // M5 × 20 mm ```
-- `nut(diameter: number, options?: { pitch?: number; height?: number; acrossFlats?: number; segments?: number; }): Shape` — ISO-style hex nut with a threaded bore. **Details** Constructed from the intersection of three rotated slabs with a cylindrical bore subtracted. The nut is centered at the origin, height along Z. Default proportions follow ISO 4032 loosely: height ≈ 0.8×diameter, across-flats ≈ 1.6×diameter. The bore is a clearance bore (not modelled with helical threads) for rendering efficiency. For standard M-size nuts pre-configured for a complete joint, use { **Example** ```ts const n = lib.nut(5); // M5 nut ```
-- `washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: number; }): Shape` — ISO metric flat washer (DIN 125-A). **Details** Returns a flat ring centered at the origin, thickness along Z. Dimensions are taken from { **Example** ```ts const w = lib.washer('M5'); // DIN 125-A M5 washer ```
-- `fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult` — Complete ISO metric fastener set — bolt, nut, optional washers, and matching hole cutters. **Details** Returns all geometry for one bolted joint: the bolt, nut, up to two washers, a clearance-hole cutter, and a tap-drill cutter. All shapes are returned **un-positioned** (each on the Z-axis). Place them with `.translate()`. Sizes outside M4–M10 are supported for the washer (M2–M10); unsupported combinations will throw. **Example** ```ts const hw = lib.fastenerSet('M5', 20); const topPlate = box(60, 40, 8).translate(0, 0, 12) .subtract(hw.clearanceHole.translate(15, 10, 12)); const botPlate = box(60, 40, 8) .subtract(hw.clearanceHole.translate(15, 10, 0)); return [ { name: 'Top Plate', shape: topPlate }, { name: 'Bot Plate', shape: botPlate }, { name: 'Bolt', shape: hw.bolt.translate(15, 10, 20) }, { name: 'Nut', shape: hw.nut.translate(15, 10, -4) }, ]; ```
-- `boltedServiceCover(options: BoltedServiceCoverOptions): BoltedServiceCoverResult` — Bolted service-cover interface with real seats, aligned holes, gasket, fused pull tabs, and installed screws. **Details** This is a higher-level mechanical pattern for the common "removable service cover" failure mode. It creates the parent ledge, cover, gasket, and screws from one shared bolt pattern so agents do not place decorative screw heads or floating pull tabs by eye. Coordinate convention: the parent frame sits from `z=0` to `parentThickness`, the gasket sits on the ledge, the cover sits above the gasket, and screw shafts run downward through the cover into the parent. All parts are centered on the XY origin. **Example** ```ts const cover = lib.boltedServiceCover({ width: 90, depth: 56, screwSize: 'M4', ledgeWidth: 10, boltInset: [6, 6], }); verify.equal('four retained cover screws', cover.screws.length, 4); return cover.parts; ```
-- `datumEnclosureAssembly(options: DatumEnclosureAssemblyOptions): DatumEnclosureAssemblyResult` — Datum-driven enclosure tray with shared wall, ledge, standoff, cover, gasket, port, and screw geometry. **Details** This pattern is for electronics boxes, thermostat backplates, service-stack housings, camera housings, and small fixtures where generated models often place panels, ribs, bosses, ports, and covers by eye. The tray, internal ledges, standoffs, ribs, service port, gasket, cover holes, and installed screws all come from one datum system. This keeps screw axes, boss locations, wall thickness, and service openings aligned instead of relying on independent magic numbers. Coordinate convention: X/Y are the enclosure footprint, Z is up. The base tray starts at `z=0` and rises to `height`; the gasket and cover sit above the top ledge with small explicit face clearances. **Example** ```ts const enclosure = lib.datumEnclosureAssembly({ width: 96, depth: 64, height: 18, }); verify.notColliding('cover clears enclosure gasket', enclosure.cover, enclosure.gasket); verify.inRange('cover stack has small seating clearance', enclosure.dims.faceClearance, 0.01, 0.08); return enclosure.parts; ```
-- `snapLatchCoverAssembly(options: SnapLatchCoverAssemblyOptions): SnapLatchCoverAssemblyResult` — Snap-retained cover with a receiver frame, latch windows, underside catch lands, and fused snap hooks. **Details** This pattern is for covers, cartridges, clasps, and small housings where agents often add decorative tabs without a catch. The receiver has a real service opening plus two clearance latch windows. The cover is one fused part with two flexible-looking snap fingers that pass through the windows and barb under the receiver underside. Nothing intersects in the final assembly; the hook geometry sits close enough to the catch lands to prove retention intent. Coordinate convention: the receiver frame sits from `z=0` to `parentThickness`; the cover is seated just above the receiver on +Z. Two snap hooks sit on the +/-Y ledges and tuck under the receiver. **Example** ```ts const snapCover = lib.snapLatchCoverAssembly({ width: 72, depth: 44, }); verify.notColliding('snap hooks clear receiver windows', snapCover.cover, snapCover.parent); verify.inRange('snap cover has small seating clearance', snapCover.dims.faceClearance, 0.01, 0.08); return snapCover.parts; ```
-- `pinnedLeverAssembly(options: PinnedLeverAssemblyOptions): PinnedLeverAssemblyResult` — Retained pinned lever stack with a fused hub/arm/grip, low stop land, pivot pin, bore cutters, and thrust washers. **Details** This pattern is for the common handle/lever failure mode where a visual arm, hub, washer, and pin are placed near each other but never form a credible mechanism. The lever body is one fused part, the pin runs through aligned bores, washers sit on both sides of the lever, and the support includes a bearing land plus an optional low stop land beside the lever path. Coordinate convention: pivot axis is +Z at the XY origin. The support starts at `z=0`, the lower washer sits on top of the support, the lever sits on the lower washer, the upper washer sits on the lever, and the retained pin spans the full stack. **Example** ```ts const lever = lib.pinnedLeverAssembly({ armLength: 54, armWidth: 10, pinDiameter: 5, }); verify.equal('lever stack has five retained parts', lever.parts.length, 5); return lever.parts; ```
-- `retainedShaftAssembly(options: RetainedShaftAssemblyOptions): RetainedShaftAssemblyResult` — Retained shaft, washer, knob, and support-cheek stack for trunnions, pivots, and adjustable clamps. **Details** This pattern replaces the common "pin, washers, and knob are near each other" visual shortcut with a mechanically accountable shaft stack. The two support cheeks get matching clearance bores, the through shaft spans the whole stack, washers and knobs share the same axis, and retaining heads keep the knobs from reading as loose floating cylinders. Coordinate convention: the shaft axis is +X through the world origin. Support cheeks are centered at `x = +/- supportSpacing / 2`. The supports are bored for clearance, so collision inspection should report no support/shaft overlap while the connectivity audit still sees one retained stack. **Example** ```ts const trunnion = lib.retainedShaftAssembly({ supportSpacing: 96, shaftDiameter: 8, supportHeight: 42, }); verify.equal('retained shaft stack has seven parts', trunnion.parts.length, 7); return trunnion.parts; ```
-- `capturedLinearSlide(options: CapturedLinearSlideOptions): CapturedLinearSlideResult` — Captured linear slide with a U-channel rail, return lips, end stops, and a carriage posed inside the guide. **Details** This pattern is for drawer-slide, quick-release plate, and guided-carriage models where agents often place rail details and a moving block near each other without a capture relationship. The rail is one fused part with side walls, inward lips, and end stops; the carriage is wider than the lip throat but narrower than the inner rail width, so it is mechanically captured while retaining explicit clearance. Coordinate convention: rail length is along X, width is along Y, and Z is up. The rail base starts at `z=0`; the carriage sits above the base and below the return lips. `travel=0` places the carriage at the negative-X end of travel, and `travel=maxTravel` places it at the positive-X end. **Example** ```ts const slide = lib.capturedLinearSlide({ length: 160, carriageLength: 52, travel: 42, }); verify.greaterThan('carriage is captured by return lips', slide.dims.carriageWidth, slide.dims.throatWidth); return slide.parts; ```
-- `capturedCartridgeGuideAssembly(options: CapturedCartridgeGuideAssemblyOptions): CapturedCartridgeGuideAssemblyResult` — Captured removable cartridge guide with return lips, rear stop, wide cartridge flange, and pull tab. **Details** This pattern is for pump cartridges, filter cassettes, skeg cassettes, battery cartridges, and slide-in service modules where generated models often place a tray and a loose block near each other. The guide is one fused part with side walls, inward return lips, and a rear stop. The cartridge has a wide lower flange captured under the lips and a narrower body that passes through the throat, so the model has a real retention contract without manual coordinate tuning. Coordinate convention: insertion travel is along +X. The open entry is at −X, the rear stop is at +X, the guide base starts at `z=0`, and `insertion=0` places the cartridge at the front travel limit. **Example** ```ts const cassette = lib.capturedCartridgeGuideAssembly({ length: 150, cartridgeLength: 72, }); verify.notColliding('cartridge clears guide rails', cassette.cartridge, cassette.guide); verify.greaterThan('cartridge flange is captured by lips', cassette.dims.cartridgeWidth, cassette.dims.throatWidth); return cassette.parts; ```
-- `livingHingeCoverAssembly(options: LivingHingeCoverAssemblyOptions): LivingHingeCoverAssemblyResult` — One-piece molded living-hinge cover strip with a fixed leaf, thin flexible web, cover leaf, pull lip, snap barb, and catch land. **Details** This pattern is for small polypropylene-style lids, battery doors, sample covers, blister latches, and molded service flaps where generated models often draw a decorative hinge strip between two disconnected plates. It returns one fused molded part in its as-molded flat state: fixed mounting leaf, thin hinge web, moving cover leaf, pull lip, raised snap barb, and catch land. The flexible web is intentionally much thinner than the rigid leaves and shares material with both leaves. Coordinate convention: X is hinge length/part width, Y runs from fixed leaf through hinge web to cover leaf, and Z is thickness. The hinge web is centered on `y=0`; the fixed leaf lies at −Y and the cover leaf at +Y. **Example** ```ts const livingCover = lib.livingHingeCoverAssembly({ width: 64, coverDepth: 42, }); verify.greaterThan('living hinge is much thinner than rigid leaves', livingCover.dims.flexRatio, 3); return livingCover.parts; ```
-- `knuckledHingeAssembly(options: KnuckledHingeAssemblyOptions): KnuckledHingeAssemblyResult` — Alternating knuckle hinge with two fused leaves and a retained pin. **Details** This pattern replaces hand-placed hinge barrels and pin ghosts with a mechanically accountable hinge. The fixed leaf owns every other knuckle, the moving leaf owns the alternating knuckles, all knuckles share one bore size, and the retained pin spans the full stack with heads outside the barrels. Coordinate convention: the hinge pin axis is +X through the world origin. The fixed leaf extends toward +Y. The moving leaf extends toward -Y and rotates about +X by `openAngleDeg`. **Example** ```ts const hinge = lib.knuckledHingeAssembly({ length: 70, leafLength: 28, openAngleDeg: 45, }); verify.equal('hinge has two leaves and one retained pin', hinge.parts.length, 3); return hinge.parts; ```
-- `clevisPinJointAssembly(options?: ClevisPinJointAssemblyOptions): ClevisPinJointAssemblyResult` — Clevis-style pin joint with bored yoke ears, a center link eye, and a retained pin. **Details** This pattern is for crank links, damper rod ends, pump crossheads, capo/cam pivots, and small mechanism joints where agents often place an eyelet and a pin near a bracket without modeling the captured load path. The clevis is one fused part with two bored ears and a rear bridge, the center link has a real eye and arm, and the retained pin spans the full stack with heads outside the ears. Coordinate convention: the pin axis is +Y through the world origin. The center link arm extends toward +X. The clevis bridge sits behind the eye on -X, leaving the link eye clear inside the yoke. **Example** ```ts const clevis = lib.clevisPinJointAssembly({ pinDiameter: 4, linkArmLength: 38, }); verify.equal('clevis joint has three retained parts', clevis.parts.length, 3); return clevis.parts; ```
-- `seatedBearingAssembly(options: SeatedBearingAssemblyOptions): SeatedBearingAssemblyResult` — Seated radial-bearing support with a real counterbore, shoulder, through shaft, and retaining collars. **Details** This pattern is for purchased bearings, rollers, burr-cartridge shafts, and small spindle supports where agents often place a ring and a shaft near a block without modelling the pocket that locates the bearing. The housing includes a through-bore and a larger counterbore that leaves a shoulder for the bearing outer race. The shaft is smaller than the bearing bore and carries collars outside the housing, so collision checks can distinguish intended clearance from impossible overlap. Coordinate convention: the shaft axis is +Z through the world origin. The housing block starts at `z=0`, the raised boss is on top of the block, the bearing is seated from the top counterbore, and the shaft extends above and below the housing. **Example** ```ts const bearingStack = lib.seatedBearingAssembly({ bearingOuterDiameter: 22, bearingInnerDiameter: 8, bearingWidth: 7, }); verify.greaterThan('housing has wall around bearing pocket', bearingStack.dims.bossOuterDiameter - bearingStack.dims.pocketDiameter, 4); return bearingStack.parts; ```
-- `cableGlandAnchorAssembly(options: CableGlandAnchorAssemblyOptions): CableGlandAnchorAssemblyResult` — Cable, wire, or tube gland anchor with a real panel hole, hollow gland body, compression nut, and routed cable. **Details** This pattern is for pumps, filters, electronics boxes, vents, monitors, and fixtures where generated models often leave hoses or cables terminating in space. It creates the receiving panel hole, a hollow gland body with a panel-side flange seated in a shallow pocket, a hollow compression nut, and a cable/tube that runs through the gland bore with explicit clearance. Coordinate convention: the cable axis is +X through the world origin. The panel is centered around `x=0` with thickness along X; the flange sits on the +X side of the panel and the compression nut sits on the −X side. The cable spans the full anchor. **Example** ```ts const anchor = lib.cableGlandAnchorAssembly({ cableDiameter: 6, panelThickness: 3, }); verify.notColliding('cable clears gland bore', anchor.cable, anchor.gland); verify.clearanceBetween('gland flange is seated at panel pocket', anchor.gland, anchor.panel, 0.01, 0.2); return anchor.parts; ```
-- `hoseBarbPortAssembly(options: HoseBarbPortAssemblyOptions): HoseBarbPortAssemblyResult` — Hose-barb pump/filter port with a bored receiver, shoulder, barb ridges, installed hose, and clamp band. **Details** This pattern is for pump heads, filters, vents, lab cartridges, and fluid fittings where generated models often leave tubes ending near a block. The receiver has a real through-port and raised boss, the fitting is hollow with a shoulder and multiple barb ridges, and the hose is modeled as an installed tube over the barb envelope with a clamp band. The hose bore is sized for the deformed installed hose, so collision checks distinguish the retained interface from impossible solid overlap. Coordinate convention: the fluid axis is +X through the world origin. The receiver block is centered around `x=0`; the raised boss and hose are on the +X side. **Example** ```ts const hosePort = lib.hoseBarbPortAssembly({ hoseInnerDiameter: 6, hoseOuterDiameter: 10, }); verify.notColliding('hose clears barb peaks', hosePort.hose, hosePort.fitting); verify.inRange('fitting shoulder seats near boss face', hosePort.dims.faceClearance, 0.01, 0.08); return hosePort.parts; ```
-- `routedTubeClipAssembly(options: RoutedTubeClipAssemblyOptions): RoutedTubeClipAssemblyResult` — Routed tube or cable retained by saddle clips with real bores, screw holes, and installed screws. **Details** This pattern is for hoses, wires, pump tubes, sensor leads, and appliance cable runs where generated models often draw a cylinder near a wall without clips or strain relief. The base panel has receiving screw envelopes, each saddle clip has a real through-bore around the tube and vertical screw clearances, and the installed screws share those positions. Coordinate convention: the routed tube runs along +X through the world origin. The base panel starts at `z=0`; clips sit on top of the panel, and the tube passes through their bores. **Example** ```ts const route = lib.routedTubeClipAssembly({ tubeDiameter: 6, clipCount: 3, }); verify.notColliding('tube clears clip bores', route.tube, union(...route.clips)); verify.notColliding('clip screws clear retained stack', union(...route.screws), union(route.panel, ...route.clips)); return route.parts; ```
-- `pcbTerminalBlockAssembly(options?: PcbTerminalBlockAssemblyOptions): PcbTerminalBlockAssemblyResult` — PCB terminal-block stack with a backplate, standoffs, mounting screws, pin holes, and a seated terminal block. **Details** This pattern is for thermostat backplates, appliance control panels, sensor boards, and small electronics where generated models often place a terminal block, screw heads, and holes as independent decorations. The PCB mounting holes, fused standoffs, installed screws, terminal pins, and PCB pin clearances all come from one shared datum system so the purchased block is mechanically seated and the board is actually mounted. Coordinate convention: X/Y are the board footprint, Z is up. The backplate starts at `z=0`, standoffs rise from the plate, the PCB rests on the standoffs, and the terminal block sits on top of the PCB near the front edge. **Example** ```ts const terminalStack = lib.pcbTerminalBlockAssembly({ terminalCount: 5, screwSize: 'M3', }); verify.notColliding('terminal pins clear PCB holes', terminalStack.terminalBlock, terminalStack.pcb); verify.notColliding('mounting screws clear PCB and standoff holes', union(...terminalStack.screws), union(terminalStack.pcb, terminalStack.backplate)); return terminalStack.parts; ```
-- `thumbScrewClampAssembly(options?: ThumbScrewClampAssemblyOptions): ThumbScrewClampAssemblyResult` — Thumb-screw clamp with a C-frame, threaded boss, captive pressure pad, knob, and clamped workpiece. **Details** This pattern is for bench clamps, monitor-arm desk clamps, small vise screws, capo pressure screws, fixture hold-downs, and service brackets where generated models often place a loose screw, knob, or pressure pad near a bracket. The helper creates a one-piece clamp frame with a fixed anvil pad, a bored threaded support and boss, an installed screw with a captive pressure pad and hand knob, and a representative clamped workpiece seated between the pads. Coordinate convention: the clamp screw runs along +X. The fixed anvil is on the -X side, the threaded support and knob are on the +X side, and Z is up from the base bridge. **Example** ```ts const clamp = lib.thumbScrewClampAssembly({ screwSize: 'M6', workpieceThickness: 20, }); verify.notColliding('thumb screw clears threaded boss', clamp.clampScrew, clamp.frame); verify.clearanceBetween('pressure pad is seated on workpiece', clamp.clampScrew, clamp.workpiece, -0.01, 0.05); return clamp.parts; ```
-- `pipeRoute(points: [ number, number, number ][], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number; }): Shape` — Route a pipe (solid or hollow) through 3D waypoints with smooth bends. Each interior waypoint gets a torus-section bend. Straight segments connect them. Returns a single unioned Shape.
-- `elbow(pipeRadius: number, bendRadius: number, angle?: number | { ... }, options?: { ... }): Shape` — Pipe elbow — a curved pipe section (torus arc) for connecting two pipe directions. By default creates a bend in the XZ plane: incoming along +Z, outgoing rotated by `angle`. The bend starts at the origin, curving away from it.
-- `beltDrive(options: BeltDriveOptions): BeltDriveResult` — Create a flat open-belt body around two pulley pitch circles. The belt is generated as a tangent loop in the XY plane and extruded along +Z by `beltWidth`. The result includes the solid belt, the 2D belt profile, a thin pitch-path sketch for visualization, total belt length, tangent spans, and wrap metadata for each pulley. For more than two pulleys, the API intentionally asks for route intent before geometry is created. Use `route: "outer"` for the future outside-envelope mode, or an ordered route for future serpentine/idler layouts. ```ts const drive = lib.beltDrive({ pulleys: [ { name: "motor", center: [0, 0], pitchRadius: 12 }, { name: "output", center: [80, 0], pitchRadius: 28 }, ], beltWidth: 8, beltThickness: 2, }); return drive.belt; ```
-- `tangentLoop2d(circles: TangentCircle2D[], options?: TangentLoop2DOptions): TangentLoop2D` — Build a closed 2D route made from common tangent spans and pulley wrap arcs. Use this when you need reusable belt/chain route geometry before creating a solid body. The first implementation supports two circles. `mode: "open"` uses external tangents; `mode: "crossed"` uses internal tangents. ```ts const route = lib.tangentLoop2d([ { center: [0, 0], radius: 12 }, { center: [80, 0], radius: 28 }, ]); const belt = route.offsetBand(2).extrude(8); ```
-- `tSlotProfile(options?: TSlotProfileOptions): Sketch` — Build a 2D T-slot cross-section sketch. Default parameters describe a 20x20 B-type profile with slot 6. Use this when you want a drawing-ready profile sketch before extrusion.
+  ```ts
+  const pattern = lib.holePattern(3, 4, 20, 20, 4, 10);
+  const panel = box(80, 70, 10).subtract(pattern.translate(-30, -20, 0));
+  ```
+- `thread(diameter: number, pitch: number, length: number, options?: { depth?: number; segments?: number; }): Shape` — External helical thread — clean mesh, no SDF grid artifacts.
+
+  Builds a cross-section with a single trapezoidal tooth from the root radius out to the crest radius, then twist-extrudes it so the tooth traces a helix. Manifold's extrude+twist produces structured quad-based geometry that follows the thread profile cleanly.
+
+  Returns a threaded cylinder along +Z from z=0 to z=length.
+- `bolt(diameter: number, length: number, options?: { ... }): Shape` — ISO-style hex bolt with real helical threads.
+
+  The hex head sits from z=0 up to z=headHeight. The shaft extends downward along −Z by `length` mm. An unthreaded shank section is included when `threadLength < length`.
+
+  Default proportions follow ISO 4762 loosely: pitch ≈ 0.15×diameter, head height ≈ 0.65×diameter, across-flats ≈ 1.6×diameter.
+
+  For standard M-size bolts pre-configured for a complete joint, use `fastenerSet` instead.
+- `nut(diameter: number, options?: { ... }): Shape` — ISO-style hex nut with a clearance bore.
+
+  Constructed from the intersection of three rotated slabs with a cylindrical bore subtracted. The nut is centered at the origin, height along Z (−height/2 to +height/2).
+
+  Default proportions follow ISO 4032 loosely: height ≈ 0.8×diameter, across-flats ≈ 1.6×diameter. The bore is a clearance bore — `diameter` + 0.2 mm by default, override with `boreDiameter` for exact bore control — not modelled with helical threads, for rendering efficiency.
+
+  For standard M-size nuts pre-configured for a complete joint, use `fastenerSet` instead.
+- `washer(size: MetricSize, options?: { standard?: WasherStandard; segments?: number; }): Shape` — ISO metric flat washer (DIN 125-A).
+
+  Returns a flat ring centered at the origin, thickness along Z. Dimensions are taken from `WASHER_TABLE`. Sizes outside M2–M10 will throw.
+- `fastenerSet(size: MetricSize, boltLength: number, options?: FastenerSetOptions): FastenerSetResult` — Complete ISO metric fastener set — bolt, nut, optional washers, and matching hole cutters.
+
+  Returns all geometry for one bolted joint: the bolt, nut, up to two washers, a clearance-hole cutter, and a tap-drill cutter. All shapes are returned **un-positioned** (each on the Z-axis). Place them with `.translate()`.
+
+  Sizes outside M4–M10 are supported for the washer (M2–M10); unsupported combinations will throw.
+
+  ```ts
+  const hw = lib.fastenerSet('M5', 20);
+
+  const topPlate = box(60, 40, 8).translate(0, 0, 12)
+    .subtract(hw.clearanceHole.translate(15, 10, 12));
+  const botPlate = box(60, 40, 8)
+    .subtract(hw.clearanceHole.translate(15, 10, 0));
+
+  return [
+    { name: 'Top Plate', shape: topPlate },
+    { name: 'Bot Plate', shape: botPlate },
+    { name: 'Bolt',      shape: hw.bolt.translate(15, 10, 20) },
+    { name: 'Nut',       shape: hw.nut.translate(15, 10, -4) },
+  ];
+  ```
+- `pipeRoute(points: Vec3[], radius: number, options?: { bendRadius?: number; wall?: number; segments?: number; }): Shape` — Route a pipe (solid or hollow) through 3D waypoints with smooth bends.
+
+  This is a convenience recipe over `Curve.Route.fromPolyline()` and [`sweep()`](/docs/curves#sweep). Use `Curve.Route` directly when you need route metadata, named ports, or custom swept profiles.
+- `elbow(pipeRadius: number, bendRadius: number, angle?: number | { ... }, options?: { ... }): Shape` — Pipe elbow — a curved pipe section for connecting two pipe directions.
+
+  This is a convenience recipe over `Curve.Arc()` and [`sweep()`](/docs/curves#sweep). Use `Curve.Route.fromPolyline()` directly when you need named route ports, segment metadata, or multi-bend pipe runs.
+- `beltDrive(options: BeltDriveOptions): BeltDriveResult` — Create a flat open-belt body around two pulley pitch circles.
+
+  The belt is generated as a tangent loop in the XY plane and extruded along +Z by `beltWidth`. The result includes the solid belt, the 2D belt profile, a thin pitch-path sketch for visualization, total belt length, tangent spans, and wrap metadata for each pulley.
+
+  For more than two pulleys, the API intentionally asks for route intent before geometry is created. Use `route: "outer"` for the future outside-envelope mode, or an ordered route for future serpentine/idler layouts.
+
+  ```ts
+  const drive = lib.beltDrive({
+    pulleys: [
+      { name: "motor", center: [0, 0], pitchRadius: 12 },
+      { name: "output", center: [80, 0], pitchRadius: 28 },
+    ],
+    beltWidth: 8,
+    beltThickness: 2,
+  });
+  return drive.belt;
+  ```
+- `tangentLoop2d(circles: TangentCircle2D[], options?: TangentLoop2DOptions): TangentLoop2D` — Build a closed 2D route made from common tangent spans and pulley wrap arcs.
+
+  Use this when you need reusable belt/chain route geometry before creating a solid body. The first implementation supports two circles. `mode: "open"` uses external tangents; `mode: "crossed"` uses internal tangents.
+
+  ```ts
+  const route = lib.tangentLoop2d([
+    { center: [0, 0], radius: 12 },
+    { center: [80, 0], radius: 28 },
+  ]);
+  const belt = route.offsetBand(2).extrude(8);
+  ```
+- `tSlotProfile(options?: TSlotProfileOptions): Sketch` — Build a 2D T-slot cross-section sketch.
+
+  Default parameters describe a 20x20 B-type profile with slot 6. Use this when you want a drawing-ready profile sketch before extrusion.
 - `tSlotExtrusion(length: number, options?: TSlotExtrusionOptions): Shape` — Build a T-slot extrusion from the generated 2D profile. Extrudes along +Z by default.
-- `profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch` — Accurate-ish 2D profile for 20x20 B-type slot 6. Returns a drawing-ready Sketch centered at origin.
-- `profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape` — 20x20 B-type slot 6 extrusion with profile-accurate defaults. Pass option overrides if your supplier's profile differs slightly.
-- `spurGear(options: SpurGearOptions): Shape` — Involute external spur gear with optional center bore. Specify module, teeth, faceWidth as required parameters. Optional tuning includes pressureAngleDeg (default 20), backlash, clearance, addendum, dedendum, boreDiameter, and segmentsPerTooth (default 10). **Connectors (for assembly-based positioning):** - `bore`: revolute connector at the bore center, axis along +Z. Carries measurements: `{ module, teeth, pitchRadius, outerRadius, faceWidth }`. Use `.connect("Housing.seat", "Gear.bore")` to mount a gear on a shaft seat.
-- `bevelGear(options: BevelGearOptions): Shape` — Conical bevel gear generated from a tapered involute extrusion. Specify pitchAngleDeg directly or derive it from mateTeeth + shaftAngleDeg. **Connectors (for assembly-based positioning):** - `bore`: revolute connector at the large-end bore center (Z=0), axis along -Z (away from teeth). - `apex`: connector at the cone apex above the gear (the point where the pitch cone converges), axis along +Z. Useful for meshing two bevel gears — their apices should coincide. Carries measurements: `{ module, teeth, pitchRadius, pitchAngleDeg, coneDistance, faceWidth }`.
-- `faceGear(options: FaceGearOptions): Shape` — Face gear (crown style) where teeth are on one face (top or bottom) instead of the outer rim. Uses the same involute tooth sizing as spurGear, then projects the tooth band axially from one side. Alias for sideGear (which is kept for backward compatibility).
-- `sideGear(options: SideGearOptions): Shape` — Crown/face style gear where the teeth project from one side of the disk instead of the outer cylindrical rim.
-- `ringGear(options: RingGearOptions): Shape` — Internal ring gear with involute-derived tooth spaces. Specify rimWidth or outerDiameter for the annular body. **Connectors (for assembly-based positioning):** - `bore`: connector at the ring center, axis along +Z. For planetary gearboxes, this is where the ring mounts to the housing. Carries measurements: `{ module, teeth, pitchRadius, innerRadius, outerRadius, faceWidth }`.
-- `rackGear(options: RackGearOptions): Shape` — Linear rack gear with pressure-angle flanks. Use with spurGear for rack-and-pinion mechanisms. **Orientation:** teeth run along the X axis with tooth tips pointing +Y (pitch line at Y=0). The rack is extruded +Z by `faceWidth`. Rotate the rack to align with a different slide axis. **Connectors (for assembly-based positioning):** - `teeth`: prismatic connector at the pitch line center, axis along +X (slide direction). Carries measurements: `{ module, teeth, faceWidth, length }`. Connect to a housing's rack channel: ```js housing.withConnectors({ rack_channel: connector("rack-channel", { origin: [pitchR, 0, channelZ], axis: [1, 0, 0], kind: "prismatic", }), }); assembly.connect("Housing.rack_channel", "Rack.teeth", { as: "slide" }); ```
-- `gearPair(options: GearPairOptions): GearPairResult` — Build or validate a spur-gear pair and return ratio, backlash, and mesh diagnostics. Accepts either shapes from spurGear() or analytical specs for each member. When place is true (default), the gear is auto-positioned at the correct center distance.
+- `profile2020BSlot6Profile(options?: Profile2020BSlot6ProfileOptions): Sketch` — Accurate-ish 2D profile for 20x20 B-type slot 6.
+
+  Returns a drawing-ready Sketch centered at origin.
+- `profile2020BSlot6(length: number, options?: Profile2020BSlot6Options): Shape` — 20x20 B-type slot 6 extrusion with profile-accurate defaults.
+
+  Pass option overrides if your supplier's profile differs slightly.
+- `spurGear(options: SpurGearOptions): Shape` — Involute external spur gear with optional center bore.
+
+  Specify module, teeth, faceWidth as required parameters. Optional tuning includes pressureAngleDeg (default 20), backlash, clearance, addendum, dedendum, boreDiameter, and segmentsPerTooth (default 10).
+
+  **Connectors (for assembly-based positioning):**
+
+  - `bore`: revolute connector at the bore center, axis along +Z. Carries measurements: `{ module, teeth, pitchRadius, outerRadius, faceWidth }`.
+
+  Use `.connect("Housing.seat", "Gear.bore")` to mount a gear on a shaft seat.
+- `bevelGear(options: BevelGearOptions): Shape` — Conical bevel gear generated from a tapered involute extrusion. Specify pitchAngleDeg directly or derive it from mateTeeth + shaftAngleDeg.
+
+  **Connectors (for assembly-based positioning):**
+
+  - `bore`: revolute connector at the large-end bore center (Z=0), axis along -Z (away from teeth).
+  - `apex`: connector at the cone apex above the gear (the point where the pitch cone converges), axis along +Z. Useful for meshing two bevel gears — their apices should coincide.
+
+  Carries measurements: `{ module, teeth, pitchRadius, pitchAngleDeg, coneDistance, faceWidth }`.
+- `faceGear(options: FaceGearOptions): Shape` — Face gear (crown style) where the teeth project axially from one face (top or bottom) of the disk instead of the outer cylindrical rim.
+
+  Uses the same involute tooth sizing as spurGear, then projects the tooth band axially from the chosen side (`side`, default `'top'`) with axial tooth height `toothHeight` (default: one module). To mesh it with a perpendicular spur pinion, prefer `lib.faceGearPair()` — it rotates and positions the pinion at the face tooth band for you.
+
+  **Connectors (for assembly-based positioning):**
+
+  - `bore`: revolute connector at the bore center on the body side (the face opposite the teeth), axis pointing away from the teeth. Carries measurements: `{ module, teeth, pitchRadius, outerRadius, faceWidth, toothSide }`.
+
+  ```js
+  const crown = lib.faceGear({ module: 1.5, teeth: 30, faceWidth: 5, boreDiameter: 6 });
+  assembly().connect("Housing.crown_seat", "Crown.bore");
+  ```
+- `ringGear(options: RingGearOptions): Shape` — Internal ring gear with involute-derived tooth spaces. Specify rimWidth or outerDiameter for the annular body.
+
+  **Connectors (for assembly-based positioning):**
+
+  - `bore`: connector at the ring center, axis along +Z. For planetary gearboxes, this is where the ring mounts to the housing. Carries measurements: `{ module, teeth, pitchRadius, innerRadius, outerRadius, faceWidth }`.
+- `rackGear(options: RackGearOptions): Shape` — Linear rack gear with pressure-angle flanks. Use with spurGear for rack-and-pinion mechanisms.
+
+  **Orientation:** teeth run along the X axis with tooth tips pointing +Y (pitch line at Y=0). The rack is extruded +Z by `faceWidth`. Rotate the rack to align with a different slide axis.
+
+  **Connectors (for assembly-based positioning):**
+
+  - `teeth`: prismatic connector at the pitch line center, axis along +X (slide direction). Carries measurements: `{ module, teeth, faceWidth, length }`.
+
+  Connect to a housing's rack channel:
+
+  ```js
+  housing.withConnectors({
+    rack_channel: connector("rack-channel", {
+      origin: [pitchR, 0, channelZ], axis: [1, 0, 0], kind: "prismatic",
+    }),
+  });
+  assembly.connect("Housing.rack_channel", "Rack.teeth", { as: "slide" });
+  ```
+- `gearPair(options: GearPairOptions): GearPairResult` — Build or validate a spur-gear pair and return ratio, backlash, and mesh diagnostics.
+
+  Accepts either shapes from spurGear() or analytical specs for each member. When place is true (default), the gear is auto-positioned at the correct center distance.
 - `bevelGearPair(options: BevelGearPairOptions): BevelGearPairResult` — Build or validate a bevel-gear pair and return ratio diagnostics plus recommended joint placement vectors.
-- `faceGearPair(options: FaceGearPairOptions): FaceGearPairResult` — Build or validate a perpendicular pair between a face gear and a vertical spur gear.
-- `sideGearPair(options: SideGearPairOptions): SideGearPairResult` — Pair helper for side (crown/face) gear + perpendicular "vertical" spur gear. Auto-placement rotates the spur around +Y and positions it to mesh at the side tooth band.
-- `gearRatio(teethA: number, teethB: number, options?: { internal?: boolean; }): number` — Coupling ratio between two meshed spur gears. When gear A turns 1°, gear B turns `-teethA / teethB` degrees (negative because meshed external gears rotate in opposite directions). Pass `{ internal: true }` for internal gear pairs (ring gear + spur/planet), where the two rotate in the same direction.
-- `rackRatio(module: number, pinionTeeth: number): number` — Coupling ratio between a pinion and a rack. When the pinion rotates by `θ` degrees, the rack slides by `θ × (π × module × teeth / 360)` mm. Equivalently, 1mm of rack travel = `180 / (π × pitchRadius)` degrees of pinion rotation.
-- `planetaryRatio(sunTeeth: number, ringTeeth: number): number` — Planetary gear reduction ratio when the ring is held fixed. Input: sun. Output: carrier. Ratio: `1 + ringTeeth / sunTeeth`. One turn of the sun produces `1 / ratio` turns of the carrier.
-- `boltPattern(options: BoltPatternOptions): BoltPattern` — Define a bolt pattern once and cut it from multiple parts. const base = bolts.cut(box(60, 50, 10), 12, { from: -1 }); const cover = bolts.cut(box(60, 50, 3), 5, { from: -1 }); // Same positions in both parts — guaranteed aligned. ```
+- `faceGearPair(options: FaceGearPairOptions): FaceGearPairResult` — Pair helper for a face (crown) gear + perpendicular "vertical" spur gear. Auto-placement rotates the spur around +Y and positions it to mesh at the face tooth band.
+- `gearRatio(teethA: number, teethB: number, options?: { internal?: boolean; }): number` — Coupling ratio between two meshed spur gears.
+
+  When gear A turns 1°, gear B turns `-teethA / teethB` degrees (negative because meshed external gears rotate in opposite directions).
+
+  ```js
+  const drivenPerDriver = lib.gearRatio(12, 24); // -0.5
+  verify.equal("external spur ratio", drivenPerDriver, -0.5);
+
+  Pass `{ internal: true }` for internal gear pairs (ring gear + spur/planet),
+  where the two rotate in the same direction.
+  ```
+- `rackRatio(module: number, pinionTeeth: number): number` — Coupling ratio between a pinion and a rack.
+
+  When the pinion rotates by `θ` degrees, the rack slides by `θ × (π × module × teeth / 360)` mm. Equivalently, 1mm of rack travel = `180 / (π × pitchRadius)` degrees of pinion rotation.
+
+  ```js
+  const pinionDegPerMm = lib.rackRatio(1.5, 12); // ~6.37 deg/mm
+  ```
+- `planetaryRatio(sunTeeth: number, ringTeeth: number): number` — Planetary gear reduction ratio when the ring is held fixed.
+
+  Input: sun. Output: carrier. Ratio: `1 + ringTeeth / sunTeeth`. One turn of the sun produces `1 / ratio` turns of the carrier.
+- `boltPattern(options: BoltPatternOptions): BoltPattern` — Define a bolt pattern once and cut it from multiple parts.
+
+  ```js
+  const bolts = lib.boltPattern({
+    size: 'M5',
+    positions: [[20, 15], [-20, 15], [20, -15], [-20, -15]],
+  });
+
+  const base  = bolts.cut(box(60, 50, 10), 12, { from: -1 });
+  const cover = bolts.cut(box(60, 50, 3), 5, { from: -1 });
+  // Same positions in both parts — guaranteed aligned.
+  ```
 - `driveWheel(options?: DriveWheelOptions): DriveWheelBuilder` — Start a composable exceptional gear or drive wheel.
 - `readDriveWheelMeta(shape: Shape): DriveWheelMeta | null` — Read the functional-region metadata attached by `driveWheel().build()`.
-- `sectorGear(options: SectorGearOptions): Shape` — Involute sector gear with teeth on only part of the pitch circle. Specify the full-circle pitch as `teethOnFullCircle`, then choose the active tooth window with `firstTooth` and `toothCount`. The body is separate from the tooth region: pass a `gearBody...` shape for spokes, hubs, and product styling, or omit it for a simple root-radius disk. **Example** ```ts const body = lib.gearBodies.spoked({ outerRadius: 22, rimWidth: 3, hubDiameter: 10, spokeCount: 5, spokeWidth: 2.5, faceWidth: 8, boreDiameter: 5, }); const sector = lib.sectorGear({ module: 1.25, teethOnFullCircle: 36, toothCount: 10, faceWidth: 8, body, }); ```
+- `sectorGear(options: SectorGearOptions): Shape` — Involute sector gear with teeth on only part of the pitch circle.
+
+  Specify the full-circle pitch as `teethOnFullCircle`, then choose the active tooth window with `firstTooth` and `toothCount`. The body is separate from the tooth region: pass a `gearBody...` shape for spokes, hubs, and product styling, or omit it for a simple root-radius disk.
+
+  ```ts
+  const body = lib.gearBodies.spoked({
+    outerRadius: 22, rimWidth: 3, hubDiameter: 10,
+    spokeCount: 5, spokeWidth: 2.5, faceWidth: 8, boreDiameter: 5,
+  });
+  const sector = lib.sectorGear({
+    module: 1.25, teethOnFullCircle: 36, toothCount: 10,
+    faceWidth: 8, body,
+  });
+  ```
 - `gearBodies: { ... }` — Gear body preset namespace: disk, diskWithHub, spoked, and fromProfile.
-- `gearBodyDisk(options: GearBodyDiskOptions): Shape` — Solid disk/ring gear body, independent from any tooth geometry.
-- `gearBodyDiskWithHub(options: GearBodyDiskWithHubOptions): Shape` — Disk gear body with a raised center hub.
-- `gearBodySpoked(options: GearBodySpokedOptions): Shape` — Spoked gear body with an outer rim, center hub, and radial spokes.
-- `gearBodyFromProfile(profile: Sketch, options: GearBodyFromProfileOptions): Shape` — Extrude a custom 2D profile into a gear body.

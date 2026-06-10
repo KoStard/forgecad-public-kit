@@ -9,16 +9,15 @@ skill-order: 100
 
 ## Contents
 
-- [3D Primitives](#3d-primitives) — `box`, `cylinder`, `sphere`, `torus`
-- [Boolean Operations](#boolean-operations) — `union`, `difference`, `intersection`
-- [Edge Features](#edge-features) — `fillet`, `chamfer`, `draft`, `offsetSolid`
-- [Patterns & Layout](#patterns-layout) — `circularLayout`, `polygonVertices`, `linearPattern`, `circularPattern`, `linearPattern2d`, `circularPattern2d`, `mirrorCopy`, `selectEdges`, `selectEdge`, `coalesceEdges`
-- [Imports & Composition](#imports-composition) — `require`, `importSvgSketch`, `importMesh`, `importStep`
-- [Parameters](#parameters) — `Param.number`, `Param.string`, `Param.bool`, `Param.choice`, `Param.list`
-- [Grouping & Local Coordinates](#grouping-local-coordinates) — `group`
-- [Section & Projection](#section-projection) — `intersectWithPlane`, `faceProfile`, `projectToPlane`
-- [Transforms](#transforms) — `composeChain`
-- [Verification](#verification) — `verify.that`, `verify.equal`, `verify.notEqual`, `verify.greaterThan`, `verify.lessThan`, `verify.inRange`, `verify.centersCoincide`, `verify.connectorDistance`, `verify.physicalComponentCount`, `verify.intentionalOverlap`, `verify.notColliding`, `verify.minClearance`, `verify.clearanceBetween`, `verify.parallel`, `verify.perpendicular`, `verify.coplanar`, `verify.faceAt`, `verify.sameDirection`, `verify.isEmpty`, `verify.notEmpty`, `verify.volumeApprox`, `verify.areaApprox`, `verify.boundingBoxSize`, `verify.edgeContinuity`, `verify.noTinyEdges`, `verify.noSliverFaces`, `verify.noSelfIntersection`, `spec`
+- [3D Primitives](#3d-primitives)
+- [Boolean Operations](#boolean-operations)
+- [Edge Features](#edge-features)
+- [Patterns & Layout](#patterns-layout)
+- [Imports & Composition](#imports-composition)
+- [Parameters](#parameters)
+- [Grouping & Local Coordinates](#grouping-local-coordinates)
+- [Section & Projection](#section-projection)
+- [Verification](#verification)
 - [Shape](#shape) — Appearance, Face Topology, Edge Topology, Transforms, Booleans & Cutting, Features, Placement, Connectors, References, Measurement
 - [Transform](#transform)
 - [ShapeGroup](#shapegroup) — Children, Transforms, Placement, Connectors, References
@@ -28,15 +27,17 @@ skill-order: 100
 - [ShapeRef](#shaperef)
 - [ANCHOR3D_NAMES](#anchor3d-names)
 - [verify](#verify)
-- [Constraint](#constraint)
 - [Points](#points)
 - [connector](#connector)
+- [Import](#import)
 
 ## Functions
 
 ### 3D Primitives
 
-#### `box()` — Create a rectangular box. Centered on XY, base at Z=0.
+#### `box(width: number, depth: number, height: number): Shape` — Create a rectangular box. Centered on XY, base at Z=0.
+
+All ForgeCAD dimensions are millimeters; all angles are degrees (applies to every API, not just `box`).
 
 Extents:
 
@@ -44,13 +45,11 @@ Extents:
 - Y: `[-depth/2, depth/2]`
 - Z: `[0, height]`
 
+This origin convention (centered on XY, base at Z=0) applies to all volumetric primitives that have a base. There is no `center: true` option — recenter with `.translate(0, 0, -height/2)` or `.placeReference('center', [0, 0, 0])`.
+
 For named faces, build from a labeled sketch: `rect(width, depth).labelEdges('s', 'e', 'n', 'w').extrude(height, { labels: { start: 'bottom', end: 'top' } })`.
 
-```ts
-box(width: number, depth: number, height: number): Shape
-```
-
-#### `cylinder()` — Create a cylinder or cone with named faces and edges. Centered on XY, base at Z=0.
+#### `cylinder(height: number, radius: number, radiusTop?: number, segments?: number): Shape` — Create a cylinder or cone with named faces and edges. Centered on XY, base at Z=0.
 
 Extents:
 
@@ -61,11 +60,7 @@ Extents:
 
 Named faces: `top`, `bottom`, `side` Named edges: `top-rim`, `bottom-rim`
 
-```ts
-cylinder(height: number, radius: number, radiusTop?: number, segments?: number): Shape
-```
-
-#### `sphere()` — Create a sphere centered at the origin.
+#### `sphere(radius: number, segments?: number): Shape` — Create a sphere centered at the origin.
 
 Extents:
 
@@ -75,11 +70,7 @@ Extents:
 
 Use `segments` for lower-poly approximations.
 
-```ts
-sphere(radius: number, segments?: number): Shape
-```
-
-#### `torus()` — Create a torus (donut shape) lying in the XY plane. Centered on all axes.
+#### `torus(majorRadius: number, minorRadius: number, segments?: number): Shape` — Create a torus (donut shape) lying in the XY plane. Centered on all axes.
 
 Extents:
 
@@ -89,41 +80,25 @@ Extents:
 
 The origin is the center of the ring.
 
-```ts
-torus(majorRadius: number, minorRadius: number, segments?: number): Shape
-```
-
 ### Boolean Operations
 
-#### `union()` — Combine shapes into a single solid (additive boolean).
+#### `union(...inputs: ShapeOperandInput[]): Shape` — Combine shapes into a single solid (additive boolean).
 
 Accepts individual shapes, or an array of shapes. `union()` returns one solid, so only the first operand's color is preserved in the result. Use `group()` when you want separate child colors or identities.
 
-```ts
-union(...inputs: ShapeOperandInput[]): Shape
-```
-
-#### `difference()` — Subtract shapes from a base shape (subtractive boolean).
+#### `difference(...inputs: ShapeOperandInput[]): Shape` — Subtract shapes from a base shape (subtractive boolean).
 
 The first shape is the base; all subsequent shapes are subtracted from it. Accepts individual shapes, or an array of shapes.
 
-```ts
-difference(...inputs: ShapeOperandInput[]): Shape
-```
-
-#### `intersection()` — Keep only the overlapping volume of the input shapes (intersection boolean).
+#### `intersection(...inputs: ShapeOperandInput[]): Shape` — Keep only the overlapping volume of the input shapes (intersection boolean).
 
 Requires at least two shapes. Accepts individual shapes, or an array.
 
-```ts
-intersection(...inputs: ShapeOperandInput[]): Shape
-```
-
 ### Edge Features
 
-#### `fillet()` — Apply experimental fillets (rounded edges) to one or more edges of a shape.
+#### `fillet(shape: Shape, radius: number, edges?: EdgeSelector, segments?: number): Shape` — Apply experimental fillets (rounded edges) to one or more edges of a shape.
 
-**Experimental**: fillets are still backend-sensitive. The Manifold backend is known to produce incorrect results for some edge-finish cases, and the OCCT backend can be very slow, especially with broad edge selections. Prefer targeted edge selectors and inspect the result before treating it as production-ready geometry.
+**Experimental**: edge finishes (fillet and chamfer) are backend-sensitive. The Manifold backend is known to produce incorrect results for some edge-finish cases, and the OCCT backend can be very slow, especially with broad edge selections. Prefer profile-level rounding where the design allows (`sketch.filletCorners(radius)` before extruding — exact and fast); otherwise use targeted edge selectors and inspect the result before treating it as production-ready geometry.
 
 Edge selections compile into backend operations; unsupported selections fail as explicit kernel gaps instead of using TypeScript geometry fallbacks.
 
@@ -132,6 +107,7 @@ The `edges` parameter is flexible:
 - Omit to fillet **all** sharp edges
 - Pass an `EdgeQuery` for an inline filter (most common)
 - Pass an `EdgeSegment` or `EdgeSegment[]` from `selectEdges()` for pre-selected edges
+- Pass a tracked `EdgeRef` from `shape.edge('vert-br')` (vertical edges of `box()` / [`Rectangle2D`](/docs/sketch#rectangle2d) extrusions) — this takes the **exact** compiler-owned path, not the mesh-approximate one
 
 Throws if no edges match the selection, or if `radius` is not a positive finite number.
 
@@ -145,19 +121,19 @@ fillet(myShape, 1.5, { atZ: 20, convex: true })
 // Fillet vertical edges selected beforehand
 const edges = selectEdges(myShape, { parallel: [0, 0, 1] })
 fillet(myShape, 3, edges)
+
+// Exact compiler-owned fillet on a tracked box edge
+const base = box(50, 50, 20)
+fillet(base, 5, base.edge('vert-br'))
 ```
 
-```ts
-fillet(shape: Shape, radius: number, edges?: EdgeSelector, segments?: number): Shape
-```
+#### `chamfer(shape: Shape, size: number, edges?: EdgeSelector): Shape` — Apply experimental chamfers (beveled edges) to one or more edges of a shape.
 
-#### `chamfer()` — Apply experimental chamfers (beveled edges) to one or more edges of a shape.
-
-**Experimental**: chamfers are still backend-sensitive. The Manifold backend is known to produce incorrect results for some edge-finish cases, and the OCCT backend can be very slow, especially with broad edge selections. Prefer targeted edge selectors and inspect the result before treating it as production-ready geometry.
+**Experimental**: same backend caveats as `fillet` — Manifold may be incorrect for some edge-finish cases, OCCT can be very slow on broad selections; prefer profile-level rounding or targeted selectors and inspect the result.
 
 Produces a 45° bevel at the specified `size` (distance from edge). Edge selections compile into backend operations; unsupported selections fail as explicit kernel gaps instead of using TypeScript geometry fallbacks.
 
-The `edges` parameter accepts the same options as `fillet()`: inline `EdgeQuery`, pre-selected `EdgeSegment`/`EdgeSegment[]`, or `undefined` (all sharp edges).
+The `edges` parameter accepts the same options as `fillet()`: inline `EdgeQuery`, pre-selected `EdgeSegment`/`EdgeSegment[]`, a tracked `EdgeRef` from `shape.edge('vert-br')` (exact compiler-owned path), or `undefined` (all sharp edges).
 
 ```ts
 // Chamfer all edges
@@ -165,13 +141,13 @@ chamfer(myShape, 1)
 
 // Chamfer only vertical edges
 chamfer(myShape, 2, { parallel: [0, 0, 1] })
+
+// Exact compiler-owned chamfer on a tracked box edge
+const base = box(50, 50, 20)
+chamfer(base, 3, base.edge('vert-br'))
 ```
 
-```ts
-chamfer(shape: Shape, size: number, edges?: EdgeSelector): Shape
-```
-
-#### `draft()` — Apply a draft angle (taper) to vertical faces for mold extraction.
+#### `draft(shape: Shape, angleDeg: number, pullDirection?: Vec3, neutralPlaneOffset?: number): Shape` — Apply a draft angle (taper) to vertical faces for mold extraction.
 
 Adds a taper angle to the vertical faces of a solid so that it can be extracted from a mold. The neutral plane is the Z position where the draft angle is zero — faces above and below are tapered symmetrically. Typical values for injection molding are 1–5°.
 
@@ -185,11 +161,7 @@ draft(myBox, 3)
 draft(myShape, 2, [0, 0, 1], 10)
 ```
 
-```ts
-draft(shape: Shape, angleDeg: number, pullDirection?: [ number, number, number ], neutralPlaneOffset?: number): Shape
-```
-
-#### `offsetSolid()` — Uniformly offset all surfaces of a solid inward or outward.
+#### `offsetSolid(shape: Shape, thickness: number): Shape` — Uniformly offset all surfaces of a solid inward or outward.
 
 Unlike `shell()`, which hollows a solid by removing one face, `offsetSolid()` produces a new solid whose every surface is shifted by `thickness`. Positive values grow the shape outward; negative values shrink it inward.
 
@@ -203,13 +175,9 @@ offsetSolid(myBox, 1)
 offsetSolid(myShape, -0.5)
 ```
 
-```ts
-offsetSolid(shape: Shape, thickness: number): Shape
-```
-
 ### Patterns & Layout
 
-#### `circularLayout()` — Compute evenly-spaced positions around a circle.
+#### `circularLayout(count: number, radius: number, options?: CircularLayoutOptions): LayoutPoint[]` — Compute evenly-spaced positions around a circle.
 
 Eliminates the most common trig pattern in CAD scripts:
 
@@ -226,10 +194,6 @@ for (const {x, y} of circularLayout(12, r)) {
 }
 ```
 
-```ts
-circularLayout(count: number, radius: number, options?: CircularLayoutOptions): LayoutPoint[]
-```
-
 **`CircularLayoutOptions`**
 - `startDeg?: number` — Angle of the first element in degrees (default: 0 = +X axis).
 - `centerX?: number` — Center X coordinate (default: 0).
@@ -237,7 +201,7 @@ circularLayout(count: number, radius: number, options?: CircularLayoutOptions): 
 
 `LayoutPoint`: `{ x: number, y: number }`
 
-#### `polygonVertices()` — Compute the vertex positions of a regular polygon.
+#### `polygonVertices(sides: number, radius: number, options?: PolygonVerticesOptions): LayoutPoint[]` — Compute the vertex positions of a regular polygon.
 
 Default orientation places the first vertex at the top (90 degrees), matching the convention used by [`ngon()`](/docs/sketch#ngon).
 
@@ -253,16 +217,12 @@ const v3 = [center.x + r, center.y];
 const [v1, v2, v3] = polygonVertices(3, r);
 ```
 
-```ts
-polygonVertices(sides: number, radius: number, options?: PolygonVerticesOptions): LayoutPoint[]
-```
-
 **`PolygonVerticesOptions`**
 - `startDeg?: number` — Angle of the first vertex in degrees (default: 90 = top).
 - `centerX?: number` — Center X coordinate (default: 0).
 - `centerY?: number` — Center Y coordinate (default: 0).
 
-#### `linearPattern()` — Repeat a shape in a linear pattern along a direction vector and union the copies.
+#### `linearPattern(shape: Shape, count: number, dx: number, dy: number, dz?: number): Shape` — Repeat a shape in a linear pattern along a direction vector and union the copies.
 
 Creates `count` copies of `shape`, each offset by `(dx*i, dy*i, dz*i)` from the original. All copies are unioned into a single `Shape`. Distinct compiler ownership is assigned to each copy so face identity via owner-scoped canonical queries still works post-merge.
 
@@ -271,11 +231,7 @@ Creates `count` copies of `shape`, each offset by `(dx*i, dy*i, dz*i)` from the 
 linearPattern(cylinder(10, 3), 5, 20, 0)
 ```
 
-```ts
-linearPattern(shape: Shape, count: number, dx: number, dy: number, dz?: number): Shape
-```
-
-#### `circularPattern()` — Repeat a shape in a circular pattern around an axis and union the copies.
+#### `circularPattern(shape: Shape, count: number, centerXOrOpts?: number | CircularPatternOptions, centerY?: number): Shape` — Repeat a shape in a circular pattern around an axis and union the copies.
 
 Distributes `count` copies evenly around the rotation axis (360° / count per step). All copies are unioned into a single `Shape`. Distinct compiler ownership is assigned to each copy — post-merge face identity via owner-scoped canonical queries still works for pattern descendants.
 
@@ -292,32 +248,20 @@ circularPattern(cylinder(12, 4).translate(30, 0, -1), 8)
 circularPattern(myFeature, 4, { axis: [1, 0, 0], origin: [0, 0, 50] })
 ```
 
-```ts
-circularPattern(shape: Shape, count: number, centerXOrOpts?: number | CircularPatternOptions, centerY?: number): Shape
-```
-
 **`CircularPatternOptions`**
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `centerX?` | `number` | Center X of the rotation (default: 0). Used when axis is Z (legacy mode). |
-| `centerY?` | `number` | Center Y of the rotation (default: 0). Used when axis is Z (legacy mode). |
-| `axis?` | `[ number, number, number ]` | Rotation axis direction (default: [0, 0, 1] = Z axis). |
-| `origin?` | `[ number, number, number ]` | Pivot point for the rotation (default: [0, 0, 0]). Overrides centerX/centerY when set. |
+| `centerX?` | `number` | Center X of the rotation (default: 0). Used when the rotation axis is Z. |
+| `centerY?` | `number` | Center Y of the rotation (default: 0). Used when the rotation axis is Z. |
+| `axis?` | `Vec3` | Rotation axis direction (default: [0, 0, 1] = Z axis). |
+| `origin?` | `Vec3` | Pivot point for the rotation (default: [0, 0, 0]). Overrides centerX/centerY when set. |
 
-#### `linearPattern2d()` — Repeat a 2D sketch in a linear pattern and union the copies.
+#### `linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch` — Repeat a 2D sketch in a linear pattern and union the copies.
 
-```ts
-linearPattern2d(sketch: Sketch, count: number, dx: number, dy?: number): Sketch
-```
+#### `circularPattern2d(sketch: Sketch, count: number, centerXOrOpts?: number | { centerX?: number; centerY?: number; startDeg?: number; }, centerY?: number): Sketch` — Repeat a 2D sketch in a circular pattern around a center point and union the copies.
 
-#### `circularPattern2d()` — Repeat a 2D sketch in a circular pattern around a center point and union the copies.
-
-```ts
-circularPattern2d(sketch: Sketch, count: number, centerXOrOpts?: number | { centerX?: number; centerY?: number; startDeg?: number; }, centerY?: number): Sketch
-```
-
-#### `mirrorCopy()` — Mirror a shape across a plane and union the mirror with the original.
+#### `mirrorCopy(shape: Shape, normal: Vec3): Shape` — Mirror a shape across a plane and union the mirror with the original.
 
 The mirror plane passes through the origin and is defined by its normal vector. The mirrored copy is unioned with the original to produce a single symmetric Shape.
 
@@ -326,11 +270,7 @@ The mirror plane passes through the origin and is defined by its normal vector. 
 mirrorCopy(box(50, 30, 10), [1, 0, 0])
 ```
 
-```ts
-mirrorCopy(shape: Shape, normal: [ number, number, number ]): Shape
-```
-
-#### `selectEdges()` — Select all edges from a shape that match the given query.
+#### `selectEdges(shape: Shape, query?: EdgeQuery): EdgeSegment[]` — Select all edges from a shape that match the given query.
 
 Uses the active kernel's native topology query when available (Truck), otherwise extracts sharp edges from the mesh (dihedral angle > 1°), applies all filters in the query, and returns the matching `EdgeSegment[]`. When `near` is specified the results are sorted closest-first.
 
@@ -343,10 +283,6 @@ let result = part;
 for (const edge of coalesceEdges(topEdges)) {
   result = fillet(result, 2, edge);
 }
-```
-
-```ts
-selectEdges(shape: Shape, query?: EdgeQuery): EdgeSegment[]
 ```
 
 **`EdgeQuery`**
@@ -363,9 +299,9 @@ selectEdges(shape: Shape, query?: EdgeQuery): EdgeSegment[]
 | `minLength?` | `number` | Filter: minimum edge length. |
 | `maxLength?` | `number` | Filter: maximum edge length. |
 | `within?` | `BoundingRegion` | Filter: edge midpoint must be within this bounding region. |
-| `atZ?` | `number` | Shorthand: edge midpoint Z ≈ this value (within `tolerance`). Equivalent to `within: { zMin: atZ - tol, zMax: atZ + tol }`. |
-| `tolerance?` | `number` | Position tolerance for approximate matches (default: `1.0`). Used by `atZ` and `near`. |
-| `angleTolerance?` | `number` | Angular tolerance in degrees for `parallel`/`perpendicular` filters (default: `10`). |
+| `atZ?` | `number` | Shorthand: edge midpoint Z is approximately this value within `tolerance`. |
+| `tolerance?` | `number` | Position tolerance for approximate matches. Used by `atZ` and `near`. Default: `1.0`. |
+| `angleTolerance?` | `number` | Angular tolerance in degrees for `parallel`/`perpendicular` filters. Default: `10`. |
 
 `BoundingRegion`: `{ xMin?: number, xMax?: number, yMin?: number, yMax?: number, zMin?: number, zMax?: number }`
 
@@ -380,9 +316,10 @@ selectEdges(shape: Shape, query?: EdgeQuery): EdgeSegment[]
 | `normalA` | `Vec3` | Normal of first adjacent face. |
 | `normalB` | `Vec3` | Normal of second adjacent face (same as normalA for boundary edges). |
 | `boundary` | `boolean` | true if this is a boundary (unmatched) edge — unusual for closed solids. |
-| `start`, `end`, `midpoint`, `length` | | — |
 
-#### `selectEdge()` — Select the single best-matching edge from a shape.
+Also: `start: Vec3`, `end: Vec3`, `midpoint: Vec3`, `length: number`.
+
+#### `selectEdge(shape: Shape, query?: EdgeQuery): EdgeSegment` — Select the single best-matching edge from a shape.
 
 When `near` is specified, returns the edge whose midpoint is closest to that point. Otherwise returns the first matching edge in mesh order. Throws if no edges match the query — useful as a guard when you expect exactly one result.
 
@@ -392,11 +329,7 @@ const bottomEdge = selectEdge(part, { near: [25, 0, 0], atZ: 0 });
 result = chamfer(result, 1.5, bottomEdge);
 ```
 
-```ts
-selectEdge(shape: Shape, query?: EdgeQuery): EdgeSegment
-```
-
-#### `coalesceEdges()` — Merge collinear edge segments into longer logical edges.
+#### `coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]` — Merge collinear edge segments into longer logical edges.
 
 Tessellation often splits one geometric edge into multiple short segments. `coalesceEdges` groups adjacent collinear segments and merges each group into a single `EdgeSegment` spanning the full extent. This is usually needed before passing edges to `fillet()` or `chamfer()` on non-primitive shapes.
 
@@ -409,15 +342,22 @@ for (const edge of coalesceEdges(topEdges)) {
 }
 ```
 
-```ts
-coalesceEdges(segments: EdgeSegment[], tolerance?: number): EdgeSegment[]
-```
-
 ### Imports & Composition
 
-#### `require()` — Import a module with optional ForgeCAD parameter overrides. Returns the module's exports.
+#### `require(path: string, paramOverrides?: Record<string, number | string>): any` — Import a module with optional ForgeCAD parameter overrides. Returns the module's exports.
 
-When importing a `.forge.js` file, the return value is what the script returns. If the script returns a metadata object (e.g. `{ shape: myShape, bolts: {...} }`), the caller receives the full object — renderable values and metadata together.
+When importing a `.forge.js` file, most return values are passed through exactly as the script returns them. Assembly returns have one extra composition rule: an unsolved [`Assembly`](/docs/assembly#assembly) is wrapped as an [`ImportedAssembly`](/docs/assembly#importedassembly), preserving `solve(state)` and `mergeInto()` across file boundaries, while a returned [`SolvedAssembly`](/docs/assembly#solvedassembly) stays a [`SolvedAssembly`](/docs/assembly#solvedassembly). If the script returns a metadata object (e.g. `{ shape: myShape, bolts: {...} }`), the caller receives the full object — renderable values and metadata together.
+
+**Script return contract:** a `.forge.js` script returns one of three shapes: a single renderable (Shape, ShapeGroup, Sketch, SdfShape, Assembly), an array of renderables or named descriptors (`{ name, shape|sketch|group }`), or a metadata object mixing renderable values with plain data. When a script runs directly, renderable entries of a metadata object are rendered under their key names and non-renderable entries are silently skipped — both halves of the metadata contract: one return value serves the viewport and `require()` callers.
+
+**Assembly return contract**
+
+| `.forge.js` return value | `require()` result |
+|---|---|
+| `Assembly` | `ImportedAssembly` |
+| `SolvedAssembly` | `SolvedAssembly` |
+
+[`ImportedAssembly`](/docs/assembly#importedassembly) exposes default-pose helpers such as `getPart()`, `collisionReport()`, and `minClearance()`. Use `solve(state)` first when inspecting a non-default pose.
 
 **Path rule:** Always include the file extension in relative imports: use `require("./part.forge.js")` for model files and `require("./helpers.js")` for plain helper modules. ForgeCAD does not apply Node-style extension inference, so `require("./part")` will not find `part.forge.js` or `part.js`.
 
@@ -448,49 +388,40 @@ mount.bolts.pos  // access the metadata
 mount.shape       // access the geometry
 ```
 
-```ts
-require(path: string, paramOverrides?: Record<string, number | string>): any
+**Forge-aware builder module pattern** — use `.forge.js` modules for reusable sketch, profile, shape, or assembly builders that need ForgeCAD runtime APIs:
+
+```js
+// profiles.forge.js — inspectable on its own, reusable through require()
+function wheelProfile() {
+  return circle2d(40).subtract(circle2d(18));
+}
+
+return {
+  preview: [{ name: 'Wheel profile', sketch: wheelProfile() }],
+  make: { wheelProfile },
+};
+
+// main.forge.js
+const profiles = require('./profiles.forge.js');
+const wheel = profiles.make.wheelProfile().extrude(8);
 ```
 
-#### `importSvgSketch()` — Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification.
+Keep exported builders pure over top-level constants, top-level `param()` values, or explicit function arguments. Do not declare new `param()` values inside an exported builder if callers need `require('./profiles.forge.js', { Width: 80 })` overrides: import overrides are validated while the module loads, before any exported builder is called. Use plain `.js` modules only for pure constants, tables, math helpers, and formatting code that does not construct ForgeCAD geometry.
 
-```ts
-importSvgSketch(fileName: string, options?: SvgImportOptions): Sketch
-```
+**Entry detection (Node semantics):** `require.main` is the entry script's module object, so `require.main === module` is true only in the file being run directly. Part files use it to build standalone preview geometry only when opened directly — importers then skip that work entirely:
 
-**`SvgImportOptions`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `include?` | `"auto" \| "fill" \| "stroke" \| "fill-and-stroke"` | Which geometry channels to include: - `auto`: prefer fills; if no fill geometry exists, fall back to strokes - `fill`: import only filled regions - `stroke`: import only stroke geometry - `fill-and-stroke`: include both |
-| `regionSelection?` | `"all" \| "largest"` | Keep all disconnected regions, or only the largest. |
-| `maxRegions?` | `number` | Keep at most this many regions (largest-first). |
-| `minRegionArea?` | `number` | Drop regions below this absolute area threshold. |
-| `minRegionAreaRatio?` | `number` | Drop regions below this ratio of largest-region area. |
-| `flattenTolerance?` | `number` | Curve flattening tolerance in SVG user units. Smaller = more segments, higher fidelity. |
-| `arcSegments?` | `number` | Minimum segment count for arc discretization. |
-| `scale?` | `number` | Global scale applied after SVG parsing. |
-| `maxWidth?` | `number` | Maximum imported sketch width. If exceeded, geometry is uniformly downscaled to fit. |
-| `maxHeight?` | `number` | Maximum imported sketch height. If exceeded, geometry is uniformly downscaled to fit. |
-| `centerOnOrigin?` | `boolean` | Recenter imported geometry so its 2D bounds center is at CAD origin. |
-| `simplify?` | `number` | Simplification tolerance for final sketch cleanup. |
-| `invertY?` | `boolean` | Flip SVG Y-down coordinates to CAD Y-up. Enabled by default. |
-
-#### `importMesh()` — Import an external mesh file (STL, OBJ, 3MF) as a Shape.
-
-```ts
-importMesh(fileName: string, options?: { scale?: number; center?: boolean; }): Shape
-```
-
-#### `importStep()` — Import a STEP file (.step, .stp) as an exact OCCT-backed Shape. Preserves NURBS curves, B-spline surfaces, and exact topology. Requires running with the OCCT backend.
-
-```ts
-importStep(fileName: string): Shape
+```js
+// part.forge.js
+function bracket() { ... }
+if (require.main === module) {
+  return { preview: [{ name: 'Bracket', shape: bracket() }] }; // direct run: render it
+}
+return { make: { bracket } };                                  // imported: builders only
 ```
 
 ### Parameters
 
-#### `Param.number()` — Declare a numeric parameter that renders as a slider in the UI.
+#### `Param.number(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean; reverse?: boolean; }): number` — Declare a numeric parameter that renders as a slider in the UI.
 
 Each call registers a slider control. When the user moves the slider the entire script re-executes with the new value. Parameter values are also overridable from `require()` imports or the CLI `--param` flag — the `name` string is the key used in both cases.
 
@@ -520,11 +451,7 @@ const bracket = require("./bracket.forge.js", { Width: 80 });
 
 Also available as the shorthand alias `param()`.
 
-```ts
-Param.number(name: string, defaultValue: number, opts?: { min?: number; max?: number; step?: number; unit?: string; integer?: boolean; reverse?: boolean; }): number
-```
-
-#### `Param.string()` — Declare a string parameter that renders as a text input in the UI.
+#### `Param.string(name: string, defaultValue: string, opts?: { maxLength?: number; }): string` — Declare a string parameter that renders as a text input in the UI.
 
 String parameters let users type free-form text — labels, names, inscriptions, file paths, etc. The `name` string is the override key.
 
@@ -541,11 +468,7 @@ const tag = require("./tag.forge.js", { Label: "Custom Text" });
 
 Only available as `Param.string()` — no standalone alias.
 
-```ts
-Param.string(name: string, defaultValue: string, opts?: { maxLength?: number; }): string
-```
-
-#### `Param.bool()` — Declare a boolean parameter that renders as a checkbox in the UI.
+#### `Param.bool(name: string, defaultValue: boolean): boolean` — Declare a boolean parameter that renders as a checkbox in the UI.
 
 Internally stored as `0`/`1`. When overriding from CLI or `require()`, pass `1` for true and `0` for false. The `name` string is the override key.
 
@@ -561,13 +484,7 @@ Override via import:
 const pan = require("./pan.forge.js", { "Show Lid": 0 });
 ```
 
-Also available as the shorthand alias `boolParam()`.
-
-```ts
-Param.bool(name: string, defaultValue: boolean): boolean
-```
-
-#### `Param.choice()` — Declare a choice parameter that renders as a dropdown in the UI.
+#### `Param.choice(name: string, defaultValue: string, choices: string[]): string` — Declare a choice parameter that renders as a dropdown in the UI.
 
 `defaultValue` must exactly match one entry in `choices`. Returns the selected string label. Prefer `Param.choice` over `Param.number` when a slider would hide intent — named choices like `"wok"` are self-describing.
 
@@ -590,13 +507,7 @@ Override via CLI:
 forgecad run model.forge.js --param "Pan Style=wok"
 ```
 
-Also available as the shorthand alias `choiceParam()`.
-
-```ts
-Param.choice(name: string, defaultValue: string, choices: string[]): string
-```
-
-#### `Param.list()` — Declare a list parameter — an array of struct items with per-field UI controls.
+#### `Param.list<T extends Record<string, number | boolean | string>>(name: string, defaultItems: T[], opts: { ... }): T[]` — Declare a list parameter — an array of struct items with per-field UI controls.
 
 Each item in the list is a struct whose fields each render as their own control (slider, checkbox, or dropdown). The user can add/remove rows up to `minItems`/`maxItems` bounds.
 
@@ -606,15 +517,11 @@ Field types:
 - Choice fields (`choices: [...]` in field defs) return as `string`
 - All other fields return as `number`
 
-```ts
-Param.list<T extends Record<string, number | boolean | string>>(name: string, defaultItems: T[], opts: { ... }): T[]
-```
-
 `ListParamFieldDef`: `{ min?: number, max?: number, step?: number, unit?: string, integer?: boolean, boolean?: boolean, choices?: string[] }`
 
 ### Grouping & Local Coordinates
 
-#### `group()` — Group multiple shapes/sketches for joint transforms without merging into a single mesh.
+#### `group(...items: GroupInput[]): ShapeGroup` — Group multiple shapes/sketches for joint transforms without merging into a single mesh.
 
 Unlike union(), child colors and individual identities are preserved. Children can be plain shapes, named descriptors ({ name, shape/sketch/group }), or nested groups. The returned ShapeGroup supports all Shape transforms (translate, rotate, etc.).
 
@@ -633,87 +540,35 @@ const indoorUnit = group(
 ).translate(0, -18, 70);
 ```
 
-```ts
-group(...items: GroupInput[]): ShapeGroup
-```
-
 ### Section & Projection
 
-#### `intersectWithPlane()` — Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch.
+#### `intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch` — Cross-section: slice a 3D shape with a plane and return the intersection as a 2D Sketch.
 
-```ts
-intersectWithPlane(shape: Shape, plane: PlaneSpec): Sketch
-```
-
-#### `faceProfile()` — Extract the boundary profile of a named face as a 2D sketch.
+#### `faceProfile(shape: Shape, face: FaceSelector): Sketch` — Extract the boundary profile of a named face as a 2D sketch.
 
 The result is returned in the face's local 2D coordinate system, making it convenient for offsets, pocket profiles, or follow-up sketch operations driven by an existing face.
 
-```ts
-faceProfile(shape: Shape, face: FaceSelector): Sketch
-```
-
-#### `projectToPlane()` — Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch.
-
-```ts
-projectToPlane(shape: Shape, plane: PlaneSpec): Sketch
-```
-
-### Transforms
-
-#### `composeChain()` — Compose transforms in chain order. Equivalent to Transform.identity().mul(a).mul(b).mul(c)...
-
-```ts
-composeChain(...steps: TransformInput[]): Transform
-```
+#### `projectToPlane(shape: Shape, plane: PlaneSpec): Sketch` — Orthographically project a 3D shape onto a plane and return the silhouette as a 2D Sketch.
 
 ### Verification
 
-#### `verify.that()` — Custom predicate check.
+#### `verify.that(label: string, check: () => boolean, message?: string): void` — Custom predicate check.
 
-```ts
-verify.that(label: string, check: () => boolean, message?: string): void
-```
+#### `verify.equal(label: string, actual: number, expected: number, tolerance?: number, message?: string): void` — Check that two numbers are approximately equal (within tolerance).
 
-#### `verify.equal()` — Check that two numbers are approximately equal (within tolerance).
+#### `verify.notEqual(label: string, actual: number, unexpected: number, tolerance?: number, message?: string): void` — Check that two numbers are NOT equal (differ by more than tolerance).
 
-```ts
-verify.equal(label: string, actual: number, expected: number, tolerance?: number, message?: string): void
-```
+#### `verify.greaterThan(label: string, actual: number, min: number, message?: string): void` — Check that actual > min.
 
-#### `verify.notEqual()` — Check that two numbers are NOT equal (differ by more than tolerance).
+#### `verify.lessThan(label: string, actual: number, max: number, message?: string): void` — Check that actual < max.
 
-```ts
-verify.notEqual(label: string, actual: number, unexpected: number, tolerance?: number, message?: string): void
-```
+#### `verify.inRange(label: string, actual: number, min: number, max: number, message?: string): void` — Check that min <= actual <= max.
 
-#### `verify.greaterThan()` — Check that actual > min.
-
-```ts
-verify.greaterThan(label: string, actual: number, min: number, message?: string): void
-```
-
-#### `verify.lessThan()` — Check that actual < max.
-
-```ts
-verify.lessThan(label: string, actual: number, max: number, message?: string): void
-```
-
-#### `verify.inRange()` — Check that min <= actual <= max.
-
-```ts
-verify.inRange(label: string, actual: number, min: number, max: number, message?: string): void
-```
-
-#### `verify.centersCoincide()` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
-
-```ts
-verify.centersCoincide(label: string, a: ShapeLike, b: ShapeLike, tolerance?: number): void
-```
+#### `verify.centersCoincide(label: string, a: ShapeLike, b: ShapeLike, tolerance?: number): void` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
 
 `ShapeLike`: `{ min: number[], max: number[] }`
 
-#### `verify.connectorDistance()` — Check the distance between two named connectors on a shape or group.
+#### `verify.connectorDistance(label: string, target: ConnectorDistanceLike, connectorA: string, connectorB: string, expected?: number, tolerance?: number): void` — Check the distance between two named connectors on a shape or group.
 
 Use this when connectors + `matchTo()` define a static assembly interface. It proves the mate at runtime, unlike a plain source-level connector declaration. The common case is `expected = 0`, meaning the two connector origins should coincide after placement.
 
@@ -721,11 +576,7 @@ Use this when connectors + `matchTo()` define a static assembly interface. It pr
 verify.connectorDistance("leg is seated", bench, "Rail.leg_0", "Leg0.head", 0, 0.01);
 ```
 
-```ts
-verify.connectorDistance(label: string, target: ConnectorDistanceLike, connectorA: string, connectorB: string, expected?: number, tolerance?: number): void
-```
-
-#### `verify.physicalComponentCount()` — Declare the expected physical connectivity component count for the returned visible model.
+#### `verify.physicalComponentCount(label: string, expected: number): void` — Declare the expected physical connectivity component count for the returned visible model.
 
 Use this for generated mechanical models that should have a clear component graph: one connected fixture, a purchased part plus a removable cartridge, a root assembly plus named intentional ghosts, and so on. `forgecad inspect mechanical-integrity` resolves the returned visible objects with the same physical-connectivity analysis used in the quality gate and fails if the actual component count differs.
 
@@ -735,11 +586,7 @@ This catches the common generated-CAD failure where a script returns a visually 
 verify.physicalComponentCount("vise is one connected installed assembly", 1);
 ```
 
-```ts
-verify.physicalComponentCount(label: string, expected: number): void
-```
-
-#### `verify.intentionalOverlap()` — Declare that two visible objects intentionally overlap because the overlap is real manufacturing intent.
+#### `verify.intentionalOverlap(label: string, a: ShapeLike, b: ShapeLike, reason: string): void` — Declare that two visible objects intentionally overlap because the overlap is real manufacturing intent.
 
 Use this only for overlaps that a mechanical reviewer would accept as actual matter sharing volume: welded/fused regions, overmolded inserts, potted electronics, cast-in hardware, or deliberately bonded laminations. This is not a shortcut for screws without holes, shafts without bores, covers without pockets, or parts placed with collision as a positioning hack.
 
@@ -749,23 +596,13 @@ Use this only for overlaps that a mechanical reviewer would accept as actual mat
 verify.intentionalOverlap("rubber grip is overmolded on handle", rubberGrip, handleCore, "overmolded insert");
 ```
 
-```ts
-verify.intentionalOverlap(label: string, a: ShapeLike, b: ShapeLike, reason: string): void
-```
+#### `verify.notColliding(label: string, a: ShapeLike, b: ShapeLike, searchLength?: number): void` — Check that two shapes do not share positive volume.
 
-#### `verify.notColliding()` — Check that two shapes do not collide (minGap > 0).
+Face-to-face contact is allowed; use `verify.minClearance()` when an actual running gap is required.
 
-```ts
-verify.notColliding(label: string, a: ShapeLike, b: ShapeLike, searchLength?: number): void
-```
+#### `verify.minClearance(label: string, a: ShapeLike, b: ShapeLike, minGap: number, searchLength?: number): void` — Check that a minimum clearance gap exists between two shapes.
 
-#### `verify.minClearance()` — Check that a minimum clearance gap exists between two shapes.
-
-```ts
-verify.minClearance(label: string, a: ShapeLike, b: ShapeLike, minGap: number, searchLength?: number): void
-```
-
-#### `verify.clearanceBetween()` — Check that the clearance gap between two shapes is inside an allowed range.
+#### `verify.clearanceBetween(label: string, a: ShapeLike, b: ShapeLike, minGap: number, maxGap: number, searchLength?: number): void` — Check that the clearance gap between two shapes is inside an allowed range.
 
 Use this for seated and retained interfaces where a part must be close enough to be mechanically accountable, but must not collide beyond the allowed minimum. It catches both failure modes that make generated CAD look fake: parts floating away from their receiver, and parts intersecting their receiver because the pocket, bore, or running clearance was not modeled.
 
@@ -778,99 +615,39 @@ verify.clearanceBetween("cover is seated on gasket", cover, gasket, -0.01, 0.05)
 verify.clearanceBetween("carriage runs inside rail", carriage, rail, 0.2, 0.5);
 ```
 
-```ts
-verify.clearanceBetween(label: string, a: ShapeLike, b: ShapeLike, minGap: number, maxGap: number, searchLength?: number): void
-```
+#### `verify.parallel(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals are parallel (within toleranceDeg degrees).
 
-#### `verify.parallel()` — Check that two face normals are parallel (within toleranceDeg degrees).
+`FaceRefLike`: `{ normal: Vec3, center: Vec3 }`
 
-```ts
-verify.parallel(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void
-```
+#### `verify.perpendicular(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals are perpendicular (within toleranceDeg degrees).
 
-`FaceRefLike`: `{ normal: [ number, number, number ], center: [ number, number, number ] }`
+#### `verify.coplanar(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number, toleranceMm?: number): void` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.
 
-#### `verify.perpendicular()` — Check that two face normals are perpendicular (within toleranceDeg degrees).
+#### `verify.faceAt(label: string, face: FaceRefLike, expectedPos: Vec3, toleranceMm?: number): void` — Check that a face center lies at a specific position (within toleranceMm).
 
-```ts
-verify.perpendicular(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void
-```
+#### `verify.sameDirection(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals point in the same direction (not antiparallel). Stricter than parallel — both |angle| AND sign must match.
 
-#### `verify.coplanar()` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.
+#### `verify.isEmpty(label: string, shape: ShapeLike, message?: string): void` — Check that a shape is empty.
 
-```ts
-verify.coplanar(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number, toleranceMm?: number): void
-```
+#### `verify.notEmpty(label: string, shape: ShapeLike, message?: string): void` — Check that a shape is NOT empty.
 
-#### `verify.faceAt()` — Check that a face center lies at a specific position (within toleranceMm).
+#### `verify.volumeApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void` — Check that a shape's volume is approximately equal to expected (mm³).
 
-```ts
-verify.faceAt(label: string, face: FaceRefLike, expectedPos: [ number, number, number ], toleranceMm?: number): void
-```
+#### `verify.areaApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void` — Check that a shape's surface area is approximately equal to expected (mm²).
 
-#### `verify.sameDirection()` — Check that two face normals point in the same direction (not antiparallel). Stricter than parallel — both |angle| AND sign must match.
+#### `verify.boundingBoxSize(label: string, shape: ShapeLike, expectedSize: Vec3, tolerance?: number): void` — Check that a shape's bounding box has approximately the given size.
 
-```ts
-verify.sameDirection(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void
-```
-
-#### `verify.isEmpty()` — Check that a shape is empty.
-
-```ts
-verify.isEmpty(label: string, shape: ShapeLike, message?: string): void
-```
-
-#### `verify.notEmpty()` — Check that a shape is NOT empty.
-
-```ts
-verify.notEmpty(label: string, shape: ShapeLike, message?: string): void
-```
-
-#### `verify.volumeApprox()` — Check that a shape's volume is approximately equal to expected (mm³).
-
-```ts
-verify.volumeApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void
-```
-
-#### `verify.areaApprox()` — Check that a shape's surface area is approximately equal to expected (mm²).
-
-```ts
-verify.areaApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void
-```
-
-#### `verify.boundingBoxSize()` — Check that a shape's bounding box has approximately the given size.
-
-```ts
-verify.boundingBoxSize(label: string, shape: ShapeLike, expectedSize: [ number, number, number ], tolerance?: number): void
-```
-
-#### `verify.edgeContinuity()` — Check that every sampled seam on a shape meets a requested continuity threshold.
-
-```ts
-verify.edgeContinuity(label: string, shape: ShapeLike, options?: EdgeContinuityThresholds): void
-```
+#### `verify.edgeContinuity(label: string, shape: ShapeLike, options?: EdgeContinuityThresholds): void` — Check that every sampled seam on a shape meets a requested continuity threshold.
 
 **`EdgeContinuityThresholds`**: `continuity?: SurfaceContinuity`, `samples?: number`, `positionTolerance?: number`, `tangentToleranceDeg?: number`, `curvatureTolerance?: number`
 
-#### `verify.noTinyEdges()` — Check that a shape has no tiny edges below the requested threshold.
+#### `verify.noTinyEdges(label: string, shape: ShapeLike, threshold?: number): void` — Check that a shape has no tiny edges below the requested threshold.
 
-```ts
-verify.noTinyEdges(label: string, shape: ShapeLike, threshold?: number): void
-```
+#### `verify.noSliverFaces(label: string, shape: ShapeLike, threshold?: number): void` — Check that a shape has no sliver faces below the requested score threshold.
 
-#### `verify.noSliverFaces()` — Check that a shape has no sliver faces below the requested score threshold.
+#### `verify.noSelfIntersection(label: string, shape: ShapeLike): void` — Best-effort exact-shape validity guard for self-intersections or broken B-Rep topology.
 
-```ts
-verify.noSliverFaces(label: string, shape: ShapeLike, threshold?: number): void
-```
-
-#### `verify.noSelfIntersection()` — Best-effort exact-shape validity guard for self-intersections or broken B-Rep topology.
-
-```ts
-verify.noSelfIntersection(label: string, shape: ShapeLike): void
-```
-
-#### `spec()` — Create a named, reusable bundle of verification checks.
+#### `spec(name: string, checkFn: (...args: any[]) => void): Spec` — Create a named, reusable bundle of verification checks.
 
 A spec groups related `verify.*` calls under a collapsible header in the Checks panel. This makes large check suites scannable. Specs can be applied to multiple shapes and can check relationships between parts.
 
@@ -900,10 +677,6 @@ fitSpec.check(bracket, standoff);
 
 **Spec-first workflow:** Write specs before building geometry. Checks go from red to green as you build — effectively TDD for CAD.
 
-```ts
-spec(name: string, checkFn: (...args: any[]) => void): Spec
-```
-
 **`Spec`**
 - `name: string` — The display name of this spec
 
@@ -921,17 +694,13 @@ Supports transforms (translate, rotate, scale, mirror, transform, rotateAround, 
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `materialProps` | `ShapeMaterialProps | undefined` | — |
+| `materialProps` | `ShapeMaterialProps \| undefined` | — |
 
 **Appearance**
 
-#### `color()` — Set the color of this shape (hex string, e.g. "#ff0000"). Returns a new Shape with the color applied.
+#### `color(value: string | undefined): Shape` — Set the color of this shape (hex string, e.g. "#ff0000"). Returns a new Shape with the color applied.
 
-```ts
-color(value: string | undefined): Shape
-```
-
-#### `material()` — Set PBR material properties for this shape's visual appearance.
+#### `material(props: ShapeMaterialProps): Shape` — Set PBR material properties for this shape's visual appearance.
 
 Returns a new Shape with the specified material properties merged on top of any previously set properties. All properties are optional — omitted keys retain their current value. Material properties survive transforms and boolean operations.
 
@@ -946,17 +715,34 @@ cylinder(40, 20).material({ opacity: 0.4, clearcoat: 1.0, clearcoatRoughness: 0.
 box(100, 100, 10).color('#gold').material({ metalness: 0.95, roughness: 0.05 }).translate(0, 0, 50);
 ```
 
-```ts
-material(props: ShapeMaterialProps): Shape
-```
+**`ShapeMaterialProps`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `metalness?` | `number` | Metalness factor (0 = dielectric, 1 = metal). Default: 0.05 |
+| `roughness?` | `number` | Roughness factor (0 = mirror, 1 = fully diffuse). Default: 0.35 |
+| `emissive?` | `string` | Emissive glow color (hex string, e.g. "#ff6b35"). |
+| `emissiveIntensity?` | `number` | Emissive intensity multiplier. Default: 1 |
+| `opacity?` | `number` | Opacity (0 = fully transparent, 1 = fully opaque). Default: 1 |
+| `wireframe?` | `boolean` | Render as wireframe. Default: false |
+| `clearcoat?` | `number` | Clearcoat intensity (0–1). Default: 0.1 |
+| `clearcoatRoughness?` | `number` | Clearcoat roughness (0–1). Default: 0.4 |
+| `transmission?` | `number` | Glass/translucency transmission factor (0–1). Renderer support depends on target. |
+| `ior?` | `number` | Index of refraction for transmissive materials. Typical glass is ~1.45. |
+| `thickness?` | `number` | Approximate transmissive volume thickness in model units. |
+| `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
+| `specularColor?` | `string` | Specular highlight tint. |
+| `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
 
 **Face Topology**
 
-#### `face()` — Resolve a face by user-authored label or compiler-owned name. Returns a `FaceRef` that can be passed to `.onFace()`, `projectToPlane()`, or used directly in placement.
+#### `face(selector: FaceSelector): FaceRef` — Resolve a face by user-authored label or compiler-owned name. Returns a `FaceRef` that can be passed to `.onFace()`, `projectToPlane()`, or used directly in placement.
 
 `.face(name)` is a pure label lookup — it finds faces by user-authored labels, not by geometric queries. Labels are born in sketches via `.label()` / `.labelEdges()` and grow into face names through extrude, loft, revolve, and sweep. They are stable references that travel with the geometry.
 
 Labels must be unique within a shape. Use `.prefixLabels()` before combining shapes with `union()` / `difference()` to avoid collisions. Collision detection throws a clear error with a fix suggestion.
+
+Boolean survival: `union()` and `intersection()` carry labels from every operand; `difference()` carries only the base (first) operand's labels — cutter labels are dropped. A surviving label addresses whatever portion of its face survives the boolean; cutters may split or erase it, and a lineage shared by multiple union operands resolves as a face set rather than a single face.
 
 For compile-covered shapes (extrude, loft, etc.) the lookup resolves via the shape's compile plan. As a fallback, planar-faced mesh shapes (e.g. results of boolean ops) are resolved via coplanar triangle clustering.
 
@@ -984,69 +770,29 @@ const full = union(left, right);
 full.face('l/upper'); // left wing upper surface
 ```
 
-```ts
-face(selector: FaceSelector): FaceRef
-```
-
-#### `faces()` — Return faces matching a query, or label semantic faces when passed a mapping.
+#### `faces(): FaceRef[]` — Return faces matching a query, or label semantic faces when passed a mapping.
 
 Mapping form returns a new shape: `shape.faces({ lid: 'top', walls: ['front', 'back', 'left', 'right'] })`.
 
-```ts
-faces(): FaceRef[]
-```
+#### `faceNames(): string[]` — List defined semantic face names currently available on this shape.
 
-#### `faceNames()` — List defined semantic face names currently available on this shape.
+#### `prefixLabels(prefix: string): Shape` — Prefix all user-authored face labels, including semantic labels from `faces(mapping)`. Returns a new shape with modified labels.
 
-```ts
-faceNames(): string[]
-```
+#### `renameLabel(from: string, to: string): Shape` — Rename a single face label. Returns a new shape.
 
-#### `prefixLabels()` — Prefix all user-authored face labels, including semantic labels from `faces(mapping)`. Returns a new shape with modified labels.
+#### `dropLabels(...names: string[]): Shape` — Remove specific face labels. Returns a new shape.
 
-```ts
-prefixLabels(prefix: string): Shape
-```
+#### `dropAllLabels(): Shape` — Remove all face labels. Returns a new shape.
 
-#### `renameLabel()` — Rename a single face label. Returns a new shape.
-
-```ts
-renameLabel(from: string, to: string): Shape
-```
-
-#### `dropLabels()` — Remove specific face labels. Returns a new shape.
-
-```ts
-dropLabels(...names: string[]): Shape
-```
-
-#### `dropAllLabels()` — Remove all face labels. Returns a new shape.
-
-```ts
-dropAllLabels(): Shape
-```
-
-#### `faceHistory()` — Get the transformation history for a specific face.
-
-```ts
-faceHistory(name: string): FaceTransformationHistory
-```
+#### `faceHistory(name: string): FaceTransformationHistory` — Get the transformation history for a specific face.
 
 **Edge Topology**
 
-#### `edge()` — Get a named topology edge. Only available on shapes with tracked topology (from box/cylinder/extrude).
+#### `edge(name: string): EdgeRef` — Get a named topology edge. Only available on shapes with tracked topology (from box/cylinder/extrude).
 
-```ts
-edge(name: string): EdgeRef
-```
+#### `edgeNames(): string[]` — List named topology edge names. Returns empty array if shape has no tracked topology.
 
-#### `edgeNames()` — List named topology edge names. Returns empty array if shape has no tracked topology.
-
-```ts
-edgeNames(): string[]
-```
-
-#### `edgesOf()` — Return all boundary edges of a named face.
+#### `edgesOf(faceLabel: string, options?: EdgesOfOptions): EdgeSegment[]` — Return all boundary edges of a named face.
 
 Finds edges where one adjacent mesh face belongs to the target face and the other belongs to a different face. The result is coalesced (tessellation fragments merged) and can be passed directly to `fillet()` or `chamfer()`.
 
@@ -1066,11 +812,16 @@ body = fillet(body, 1.5, body.edgesOf('opening'))
 body.edgesOf('top', { concave: true })
 ```
 
-```ts
-edgesOf(faceLabel: string, options?: EdgesOfOptions): EdgeSegment[]
-```
+**`EdgesOfOptions`**
 
-#### `edgesBetween()` — Return edges shared between two named faces.
+| Option | Type | Description |
+|--------|------|-------------|
+| `exclude?` | `string \| string[]` | Exclude edges shared with these named faces. |
+| `convex?` | `boolean` | Additional geometric filter: only convex edges. |
+| `concave?` | `boolean` | Additional geometric filter: only concave edges. |
+| `minLength?` | `number` | Minimum edge length filter. |
+
+#### `edgesBetween(faceA: string, faceB: string | string[]): EdgeSegment[]` — Return edges shared between two named faces.
 
 An edge is "between" faces A and B when one of its adjacent mesh triangles belongs to A and the other belongs to B. This is the most precise topological edge selection — "fillet the edges where the top meets the wall."
 
@@ -1089,153 +840,63 @@ tube = fillet(tube, 1, tube.edgesBetween('cap', 'barrel'))
 body.edgesBetween('lid', ['left-wall', 'right-wall', 'front-wall', 'back-wall'])
 ```
 
-```ts
-edgesBetween(faceA: string, faceB: string | string[]): EdgeSegment[]
-```
-
 **Transforms**
 
-#### `translate()` — Move the shape relative to its current position. All transforms are immutable and return new shapes.
+#### `translate(x: number, y: number, z: number): Shape` — Move the shape relative to its current position. All transforms are immutable and return new shapes.
 
-```ts
-translate(x: number, y: number, z: number): Shape
-```
-
-#### `translatePolar()` — Translate using polar coordinates (radius + angle in degrees). Eliminates manual `r * Math.cos(angle * PI/180)` calculations.
+#### `translatePolar(radius: number, angleDeg: number, z?: number): Shape` — Translate using polar coordinates (radius + angle in degrees). Eliminates manual `r * Math.cos(angle * PI/180)` calculations.
 
 Example: `shape.translatePolar(50, 30)` moves 50mm at 30 degrees from +X.
 
-```ts
-translatePolar(radius: number, angleDeg: number, z?: number): Shape
-```
+#### `moveTo(x: number, y: number, z: number): Shape` — Position the shape so its bounding box min corner is at the given global coordinate.
 
-#### `moveTo()` — Position the shape so its bounding box min corner is at the given global coordinate.
+#### `moveToLocal(target: Shape | { toShape(): Shape; }, x: number, y: number, z: number): Shape` — Position the shape relative to another shape's local coordinate system (bounding box min corner).
 
-```ts
-moveTo(x: number, y: number, z: number): Shape
-```
+#### `rotate(axis: Vec3, angleDeg: number, options?: { pivot?: Vec3; }): Shape` — Rotate around an arbitrary axis through the origin. Unlike `Sketch.rotate()` (bounding-box center), this pivots at the world origin — pass `options.pivot` to rotate in place.
 
-#### `moveToLocal()` — Position the shape relative to another shape's local coordinate system (bounding box min corner).
+#### `rotateX(angleDeg: number, options?: { pivot?: Vec3; }): Shape` — Rotate around the X axis by the given angle in degrees.
 
-```ts
-moveToLocal(target: Shape | { toShape(): Shape; }, x: number, y: number, z: number): Shape
-```
+#### `rotateY(angleDeg: number, options?: { pivot?: Vec3; }): Shape` — Rotate around the Y axis by the given angle in degrees.
 
-#### `rotate()` — Rotate around an arbitrary axis through the origin.
+#### `rotateZ(angleDeg: number, options?: { pivot?: Vec3; }): Shape` — Rotate around the Z axis by the given angle in degrees.
 
-```ts
-rotate(axis: [ number, number, number ], angleDeg: number, options?: { pivot?: [ number, number, number ]; }): Shape
-```
+#### `rotateAroundTo(axis: Vec3, pivot: Vec3, movingPoint: RotationPointLike, targetPoint: RotationPointLike, options?: RotateAroundToOptions): Shape` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. `movingPoint` / `targetPoint` may be raw world points or this shape's anchors/references.
 
-#### `rotateX()` — Rotate around the X axis by the given angle in degrees.
+`RotateAroundToOptions`: `{ mode?: RotateAroundToMode }`
 
-```ts
-rotateX(angleDeg: number, options?: { pivot?: [ number, number, number ]; }): Shape
-```
+#### `transform(m: Mat4 | Transform): Shape` — Apply a 4x4 affine transform matrix (column-major) or a Transform object.
 
-#### `rotateY()` — Rotate around the Y axis by the given angle in degrees.
+#### `scale(v: number | Vec3): Shape` — Scale the shape uniformly or per-axis from the shape's bounding box center. Accepts a single number or [x, y, z] array.
 
-```ts
-rotateY(angleDeg: number, options?: { pivot?: [ number, number, number ]; }): Shape
-```
+#### `scaleAround(pivot: Vec3, v: number | Vec3): Shape` — Scale the shape uniformly or per-axis from an explicit pivot point.
 
-#### `rotateZ()` — Rotate around the Z axis by the given angle in degrees.
+#### `mirror(normal: Vec3): Shape` — Mirror across a plane through the shape's bounding box center, defined by its normal vector.
 
-```ts
-rotateZ(angleDeg: number, options?: { pivot?: [ number, number, number ]; }): Shape
-```
+#### `mirrorThrough(point: Vec3, normal: Vec3): Shape` — Mirror across a plane through an explicit point, defined by its normal vector.
 
-#### `rotateAroundTo()` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. `movingPoint` / `targetPoint` may be raw world points or this shape's anchors/references.
-
-```ts
-rotateAroundTo(axis: [ number, number, number ], pivot: [ number, number, number ], movingPoint: RotationPointLike, targetPoint: RotationPointLike, options?: RotateAroundToOptions): Shape
-```
-
-#### `transform()` — Apply a 4x4 affine transform matrix (column-major) or a Transform object.
-
-```ts
-transform(m: Mat4 | Transform): Shape
-```
-
-#### `scale()` — Scale the shape uniformly or per-axis from the shape's bounding box center. Accepts a single number or [x, y, z] array.
-
-```ts
-scale(v: number | [ number, number, number ]): Shape
-```
-
-#### `scaleAround()` — Scale the shape uniformly or per-axis from an explicit pivot point.
-
-```ts
-scaleAround(pivot: [ number, number, number ], v: number | [ number, number, number ]): Shape
-```
-
-#### `mirror()` — Mirror across a plane through the shape's bounding box center, defined by its normal vector.
-
-```ts
-mirror(normal: [ number, number, number ]): Shape
-```
-
-#### `mirrorThrough()` — Mirror across a plane through an explicit point, defined by its normal vector.
-
-```ts
-mirrorThrough(point: [ number, number, number ], normal: [ number, number, number ]): Shape
-```
-
-#### `pointAlong()` — Reorient a shape so its primary axis (Z) points along the given direction. Useful for laying cylinders/extrusions along X or Y without thinking about Euler angles. The shape's origin stays at [0,0,0] — translate after pointAlong to position it.
+#### `pointAlong(direction: Vec3): Shape` — Reorient a shape so its primary axis (Z) points along the given direction. Useful for laying cylinders/extrusions along X or Y without thinking about Euler angles. The shape's origin stays at [0,0,0] — translate after pointAlong to position it.
 
 Example: cylinder(40, 5).pointAlong([1, 0, 0]) — lays cylinder along X, starting at origin
 
-```ts
-pointAlong(direction: [ number, number, number ]): Shape
-```
-
 **Booleans & Cutting**
 
-#### `add()` — Union this shape with others (additive boolean). Method form of union().
+#### `add(...others: ShapeOperandInput[]): Shape` — Union this shape with others (additive boolean). Method form of union().
 
-```ts
-add(...others: ShapeOperandInput[]): Shape
-```
+#### `subtract(...others: ShapeOperandInput[]): Shape` — Subtract other shapes from this one. Method form of difference().
 
-#### `subtract()` — Subtract other shapes from this one. Method form of difference().
+#### `intersect(...others: ShapeOperandInput[]): Shape` — Keep only the overlap with other shapes. Method form of intersection().
 
-```ts
-subtract(...others: ShapeOperandInput[]): Shape
-```
+#### `split(cutter: Shape | { toShape(): Shape; }): [ Shape, Shape ]` — Split into [inside, outside] by another shape.
 
-#### `intersect()` — Keep only the overlap with other shapes. Method form of intersection().
+#### `splitByPlane(normal: Vec3, originOffset?: number): [ Shape, Shape ]` — Split by infinite plane. Returns [positive-side, negative-side].
 
-```ts
-intersect(...others: ShapeOperandInput[]): Shape
-```
-
-#### `split()` — Split into [inside, outside] by another shape.
-
-```ts
-split(cutter: Shape | { toShape(): Shape; }): [ Shape, Shape ]
-```
-
-#### `splitByPlane()` — Split by infinite plane. Returns [positive-side, negative-side].
-
-```ts
-splitByPlane(normal: [ number, number, number ], originOffset?: number): [ Shape, Shape ]
-```
-
-#### `trimByPlane()` — Keep the positive side of the plane and discard the opposite side.
-
-```ts
-trimByPlane(normal: [ number, number, number ], originOffset?: number): Shape
-```
+#### `trimByPlane(normal: Vec3, originOffset?: number): Shape` — Keep the positive side of the plane and discard the opposite side.
 
 **Features**
 
-#### `shell()` — Hollow out compile-covered boxes, cylinders, and straight extrudes. `openFaces` names any subset of the base shape's labeled faces to leave open (no wall).
+#### `shell(thickness: number, opts?: { openFaces?: string[]; }): Shape` — Hollow out compile-covered boxes, cylinders, and straight extrudes. `openFaces` names any subset of the base shape's labeled faces to leave open (no wall).
 
-```ts
-shell(thickness: number, opts?: { openFaces?: string[]; }): Shape
-```
-
-#### `pocket()` — Cut a pocket (cavity) into this solid through the named face.
+#### `pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape` — Cut a pocket (cavity) into this solid through the named face.
 
 ```js
 box(100, 100, 20).pocket('top', 8)
@@ -1243,33 +904,51 @@ box(100, 100, 20).pocket('top', 8, { inset: 5 })
 box(100, 100, 20).pocket('top', 8, { scale: 0.8 })
 ```
 
-```ts
-pocket(face: FaceSelector, depth: number, opts?: PocketOptions): Shape
-```
+**`PocketOptions`**
+- `inset?: number` — Shrink the face boundary inward by this many mm before extruding. Produces angled walls when combined with depth. Default: 0 (full face).
+- `scale?: number` — Scale the face profile uniformly (e.g. 0.8 = 80% of the face area). Mutually exclusive with `inset`; `inset` takes precedence if both are set.
+- `join?: "Square" | "Round" | "Miter"` — Corner join style when using `inset`. Default: 'Round'.
 
-#### `boss()` — Add a boss (protrusion) from the named face.
+#### `boss(face: FaceSelector, height: number, opts?: BossOptions): Shape` — Add a boss (protrusion) from the named face.
 
 ```js
 box(100, 100, 20).boss('top', 5)
 box(100, 100, 20).boss('top', 10, { scale: 0.6 })
 ```
 
-```ts
-boss(face: FaceSelector, height: number, opts?: BossOptions): Shape
-```
-
-#### `hole()` — Drill a hole into this solid at a face.
+#### `hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape` — Drill a hole into this solid at a face.
 
 ```js
 box(50, 50, 20).hole('top', { diameter: 8, depth: 10 })
 box(50, 50, 20).hole('top', { diameter: 6, counterbore: { diameter: 12, depth: 3 } })
 ```
 
-```ts
-hole(faceOrRef: SketchFaceTarget | FaceRef, opts: ShapeHoleOptions): Shape
-```
+**`FaceRef`**
 
-#### `cutout()` — Cut a profile-shaped pocket through a face using a placed sketch.
+| Option | Type | Description |
+|--------|------|-------------|
+| `normal` | `Vec3` | Normal direction of the face |
+| `center` | `Vec3` | Center point of the face |
+| `query?` | `FaceQueryRef` | Compiler-owned face query when available. |
+| `planar?` | `boolean` | True when the face can host a 2D sketch placement frame |
+| `uAxis?` | `Vec3` | Face-local horizontal axis for planar faces |
+| `vAxis?` | `Vec3` | Face-local vertical axis for planar faces |
+| `surface?` | `FaceSurface` | Analytic surface family when the backend can identify one. |
+| `descendant?` | `FaceDescendantMetadata` | Shared descendant-resolution metadata when this face is a semantic region/set. |
+
+Also: `name: FaceName`.
+
+**`FaceDescendantMetadata`**: `kind: "single" | "face-set"`, `semantic: FaceDescendantSemantic`, `memberCount: number`, `memberNames: string[]`, `coplanar: boolean`
+
+**`ShapeHoleOptions`**: `diameter: number`, `depth?: number`, `upToFace?: SketchFaceTarget | FaceRef`, `extent?: ShapeFeatureExtentOptions`, `u?: number`, `v?: number`, `counterbore?: { diameter: number; depth: number; }`, `countersink?: { diameter: number; angleDeg?: number; }`, `thread?: ShapeHoleThreadOptions`
+
+`ShapeFeatureExtentOptions`: `{ forward: ShapeFeatureExtentSideOptions, reverse?: ShapeFeatureExtentSideOptions }`
+
+`ShapeFeatureExtentSideOptions`: `{ depth?: number, upToFace?: SketchFaceTarget | FaceRef, through?: boolean }`
+
+**`ShapeHoleThreadOptions`**: `designation?: string`, `pitch?: number`, `class?: string`, `handedness?: "right" | "left"`, `depth?: number`, `modeled?: boolean`
+
+#### `cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape` — Cut a profile-shaped pocket through a face using a placed sketch.
 
 The sketch must be placed on a face with `Sketch.onFace(...)`. The cut follows the sketch's 2D profile.
 
@@ -1278,13 +957,11 @@ const profile = circle2d(10).onFace(body, 'top');
 body.cutout(profile, { depth: 5 })
 ```
 
-```ts
-cutout(sketch: Sketch, opts?: ShapeCutoutOptions): Shape
-```
+**`ShapeCutoutOptions`**: `depth?: number`, `upToFace?: SketchFaceTarget | FaceRef`, `extent?: ShapeFeatureExtentOptions`, `taperScale?: number | Vec2`
 
 **Placement**
 
-#### `placeReference()` — Translate the shape so the given anchor or reference lands on the target coordinate.
+#### `placeReference(ref: PlacementAnchorLike, target: Vec3, offset?: Vec3): Shape` — Translate the shape so the given anchor or reference lands on the target coordinate.
 
 Accepts any built-in anchor name (`'bottom'`, `'center'`, `'top-front-left'`, etc.) or a custom placement reference attached via `withReferences()`.
 
@@ -1299,19 +976,11 @@ shape.placeReference('center', [0, 0, 0])
 shape.placeReference('left', [10, 0, 0])
 ```
 
-```ts
-placeReference(ref: PlacementAnchorLike, target: [ number, number, number ], offset?: [ number, number, number ]): Shape
-```
-
-#### `attachTo()` — Position this shape relative to another using named 3D anchor points.
+#### `attachTo(target: ShapeAnchorTarget, targetAnchor: PlacementAnchorLike, selfAnchor?: PlacementAnchorLike, offset?: Vec3): Shape` — Position this shape relative to another using named 3D anchor points.
 
 Anchors are bounding-box-relative: 'center', face centers ('top', 'front', ...), edge midpoints ('top-front', 'back-left', ...), and corners ('top-front-left', ...). Anchor word order is flexible: 'front-left' and 'left-front' are equivalent. Named placement references (from withReferences) can also be used as anchors.
 
-```ts
-attachTo(target: ShapeAnchorTarget, targetAnchor: PlacementAnchorLike, selfAnchor?: PlacementAnchorLike, offset?: [ number, number, number ]): Shape
-```
-
-#### `onFace()` — Place this shape on a face of a parent shape.
+#### `onFace(parent: ShapeAnchorTarget, face: "front" | "back" | "left" | "right" | "top" | "bottom", opts?: { u?: number; v?: number; protrude?: number; }): Shape` — Place this shape on a face of a parent shape.
 
 Think of it like sticking a label on a box surface:
 
@@ -1322,11 +991,7 @@ Think of it like sticking a label on a box surface:
 - top/bottom: u = left/right (X), v = forward/back (Y)
 - `protrude` = how far the child sticks out (positive = outward from face)
 
-```ts
-onFace(parent: ShapeAnchorTarget, face: "front" | "back" | "left" | "right" | "top" | "bottom", opts?: { u?: number; v?: number; protrude?: number; }): Shape
-```
-
-#### `seatInto()` — Slide this shape along an axis until a labeled face is embedded in the target body.
+#### `seatInto(target: Shape, surface: string, options?: SeatIntoOptions): Shape` — Slide this shape along an axis until a labeled face is embedded in the target body.
 
 Position the shape roughly first (translate/rotate), then call seatInto to auto-adjust the penetration depth. No manual coordinate math needed.
 
@@ -1341,11 +1006,12 @@ pod.translate(0, station, radius + 20).seatInto(fuselage, 'base', { depth: 'flus
 mast.translate(0, station, radius + 50).seatInto(fuselage, 'mount', { depth: 'flush', gap: 3 });
 ```
 
-```ts
-seatInto(target: Shape, surface: string, options?: SeatIntoOptions): Shape
-```
+**`SeatIntoOptions`**
+- `along?: Vec3` — Movement axis. Default: inverted face normal (points into target).
+- `depth?: "full" | "flush" | number` — How deep to embed. 'full' = entire face inside. 'flush' = nearest point touches. number = mm past flush. Default: 'full'.
+- `gap?: number` — Standoff gap in mm. Positive = gap between face and target. Negative = extra penetration. Default: 0.
 
-#### `seatOver()` — Slide this shape until a target's labeled face is fully covered (inside this shape).
+#### `seatOver(target: Shape, targetSurface: string, options?: SeatIntoOptions): Shape` — Slide this shape until a target's labeled face is fully covered (inside this shape).
 
 The inverse of `seatInto`: instead of embedding *your* face into the target, you move until the *target's* face is embedded inside you.
 
@@ -1357,43 +1023,25 @@ nacelle.translate(rough).seatOver(pylon, 'bottom');
 cap.translate(rough).seatOver(post, 'top');
 ```
 
-```ts
-seatOver(target: Shape, targetSurface: string, options?: SeatIntoOptions): Shape
-```
-
 **Connectors**
 
-#### `withConnectors()` — Attach named connectors — attachment points that survive transforms and imports. Connectors can be bare (position + orientation) or typed (with connectorType/gender for compatibility matching).
+#### `withConnectors(connectors: Record<string, ConnectorInput>): Shape` — Attach named connectors — attachment points that survive transforms and imports. Connectors can be bare (position + orientation) or typed (with connectorType/gender for compatibility matching).
 
-```ts
-withConnectors(connectors: Record<string, ConnectorInput>): Shape
-```
+`PortInput`: `{ origin?: Vec3, axis?: Vec3, start?: Vec3, end?: Vec3, up?: Vec3, kind?: JointType, min?: number, max?: number }`
 
-#### `connectorNames()` — List all connector names on this shape.
+`ConnectorInput`: `{ connectorType?: string, gender?: ConnectorGender, measurements?: Record<string, number | string> }`
 
-```ts
-connectorNames(): string[]
-```
+#### `connectorNames(): string[]` — List all connector names on this shape.
 
-#### `connectorsByType()` — Get all connectors of a given type.
+#### `connectorsByType(type: string): Array<{ name: string; port: ConnectorDef; }>` — Get all connectors of a given type.
 
-```ts
-connectorsByType(type: string): Array<{ name: string; port: ConnectorDef; }>
-```
+#### `connectorDistance(nameA: string, nameB: string): number` — Distance between two connector origins on this shape.
 
-#### `connectorDistance()` — Distance between two connector origins on this shape.
+#### `connectorMeasurements(name: string): Record<string, number | string>` — Get measurements metadata from a connector.
 
-```ts
-connectorDistance(nameA: string, nameB: string): number
-```
+#### `matchTo(targetOrPairs: Shape | MatchTarget | Array<[ Shape | MatchTarget, string, string ]>, selfConnOrDict?: string | Record<string, string>, targetConnOrOptions?: string | MatchToOptions, maybeOptions?: MatchToOptions): Shape` — Position this shape by matching connectors to a target.
 
-#### `connectorMeasurements()` — Get measurements metadata from a connector.
-
-```ts
-connectorMeasurements(name: string): Record<string, number | string>
-```
-
-#### `matchTo()` — Position this shape by matching connectors to a target.
+Alignment: with a single connector pair, the shape translates and rotates so the connector origins coincide and the axes oppose (plug-in model); `up` pins the roll. With multiple pairs, the connector origins define the rigid transform — still author meaningful `axis`/`up` values so the same connectors remain useful for `connect()`, audits, and future matching.
 
 Overloads:
 
@@ -1401,202 +1049,100 @@ Overloads:
 - Dictionary (same target): `matchTo(target, { selfConn: targetConn, ... }, options?)`
 - Multi-target: `matchTo([ [target1, selfConn1, targetConn1], ... ], options?)`
 
-```ts
-matchTo(targetOrPairs: Shape | MatchTarget | Array<[ Shape | MatchTarget, string, string ]>, selfConnOrDict?: string | Record<string, string>, targetConnOrOptions?: string | MatchToOptions, maybeOptions?: MatchToOptions): Shape
-```
+`MatchToOptions`: `{ force?: boolean, angle?: number, distance?: number }`
 
 **References**
 
-#### `withReferences()` — Attach named placement references that survive normal transforms and imports.
+#### `withReferences(refs: PlacementReferenceInput): Shape` — Attach named placement references that survive normal transforms and imports.
 
-```ts
-withReferences(refs: PlacementReferenceInput): Shape
-```
+**`PlacementReferenceInput`**: `points?: Record<string, Vec3>`, `edges?: Record<string, PlacementEdgeRef>`, `surfaces?: Record<string, PlacementSurfaceRef>`, `objects?: Record<string, PlacementObjectInput>`
 
-#### `referenceNames()` — List named placement references carried by this shape.
+`PlacementEdgeRef`: `{ start: Vec3, end: Vec3 }`
 
-```ts
-referenceNames(kind?: PlacementReferenceKind): string[]
-```
+`PlacementSurfaceRef`: `{ center: Vec3, normal: Vec3 }`
 
-#### `referencePoint()` — Resolve a named placement reference or built-in anchor to a 3D point.
+#### `referenceNames(kind?: PlacementReferenceKind): string[]` — List named placement references carried by this shape.
 
-```ts
-referencePoint(ref: PlacementAnchorLike): [ number, number, number ]
-```
+#### `referencePoint(ref: PlacementAnchorLike): Vec3` — Resolve a named placement reference or built-in anchor to a 3D point.
 
 **Measurement**
 
-#### `boundingBox()` — Get the axis-aligned bounding box as { min: [x,y,z], max: [x,y,z] }.
+#### `boundingBox(): ShapeRuntimeBounds` — Get the axis-aligned bounding box as { min: [x,y,z], max: [x,y,z] }.
 
-```ts
-boundingBox(): ShapeRuntimeBounds
-```
+#### `volume(): number` — Volume in mm cubed.
 
-#### `volume()` — Volume in mm cubed.
+#### `surfaceArea(): number` — Surface area in mm squared.
 
-```ts
-volume(): number
-```
+#### `isEmpty(): boolean` — True if the shape contains no geometry.
 
-#### `surfaceArea()` — Surface area in mm squared.
+#### `numBodies(): number` — Number of disconnected solid bodies in this shape.
 
-```ts
-surfaceArea(): number
-```
-
-#### `isEmpty()` — True if the shape contains no geometry.
-
-```ts
-isEmpty(): boolean
-```
-
-#### `numBodies()` — Number of disconnected solid bodies in this shape.
-
-```ts
-numBodies(): number
-```
-
-#### `numTri()` — Triangle count of the mesh representation.
-
-```ts
-numTri(): number
-```
+#### `numTri(): number` — Triangle count of the mesh representation.
 
 **Other**
 
-#### `clone()` — Return a new Shape wrapper for explicit duplication in scripts.
+#### `clone(): Shape` — Return a new Shape wrapper for explicit duplication in scripts.
 
-```ts
-clone(): Shape
-```
+#### `geometryInfo(): GeometryInfo` — Inspect which backend/representation produced this solid.
 
-#### `geometryInfo()` — Inspect which backend/representation produced this solid.
+#### `as(name: string): Shape` — Name this shape as a reference namespace for diagnostics and future published refs.
 
-```ts
-geometryInfo(): GeometryInfo
-```
+#### `ref(path: string): ShapeRef` — Resolve a semantic reference path like `lid`, `lid/back`, or a midpoint selector on `lid/back`.
 
-#### `as()` — Name this shape as a reference namespace for diagnostics and future published refs.
+#### `thicken(thickness: number): Shape` — Offset-thicken an exact open surface or shell into a solid.
 
-```ts
-as(name: string): Shape
-```
+#### `getMesh(): ShapeRuntimeMesh` — Extract triangle mesh for Three.js rendering
 
-#### `ref()` — Resolve a semantic reference path like `lid`, `lid/back`, or a midpoint selector on `lid/back`.
+#### `slice(offset?: number): any` — Slice the runtime solid by a plane normal to local Z at the given offset.
 
-```ts
-ref(path: string): ShapeRef
-```
+#### `project(): any` — Orthographically project the runtime solid onto the local XY plane.
 
-#### `thicken()` — Offset-thicken an exact open surface or shell into a solid.
-
-```ts
-thicken(thickness: number): Shape
-```
-
-#### `getMesh()` — Extract triangle mesh for Three.js rendering
-
-```ts
-getMesh(): ShapeRuntimeMesh
-```
-
-#### `slice()` — Slice the runtime solid by a plane normal to local Z at the given offset.
-
-```ts
-slice(offset?: number): any
-```
-
-#### `project()` — Orthographically project the runtime solid onto the local XY plane.
-
-```ts
-project(): any
-```
-
-**Legacy Aliases**
+**Compatibility Aliases**
 
 - `withPorts()` -> `withConnectors()`
 - `portNames()` -> `connectorNames()`
 
 ### `Transform`
 
-#### `identity()` — Return the identity transform.
+#### `static identity(): Transform` — Return the identity transform.
+
+#### `static from(input: TransformInput): Transform` — Wrap an existing `Transform` or raw 4x4 matrix as a `Transform`.
+
+#### `static compose(...steps: TransformInput[]): Transform` — Compose transforms in chain order: `Transform.compose(a, b, c)` applies `a`, then `b`, then `c` — the same left-to-right order as `Transform.from(a).mul(b).mul(c)`.
+
+Prefer this over manual `.mul()` chains when composing 3+ transforms (e.g. kinematics: `local -> childBase -> jointMotion -> jointFrame -> parentWorld`); the variadic form makes the application order explicit and prevents order mistakes.
 
 ```ts
-static identity(): Transform
+const world = Transform.compose(childBase, jointMotion, jointFrame, parentWorld);
 ```
 
-#### `from()` — Wrap an existing `Transform` or raw 4x4 matrix as a `Transform`.
+#### `static translation(x: number, y: number, z: number): Transform` — Create a translation transform.
 
-```ts
-static from(input: TransformInput): Transform
-```
+#### `static scale(v: number | Vec3): Transform` — Create a uniform or per-axis scale transform.
 
-#### `translation()` — Create a translation transform.
+#### `static rotationAxis(axis: Vec3, angleDeg: number, pivot?: Vec3): Transform` — Create a rotation around an arbitrary axis, optionally about a pivot.
 
-```ts
-static translation(x: number, y: number, z: number): Transform
-```
+#### `static rotateAroundTo(axis: Vec3, pivot: Vec3, movingPoint: Vec3, targetPoint: Vec3, options?: RotateAroundToOptions): Transform` — Solve the rotation needed to move one point onto a target line or plane.
 
-#### `scale()` — Create a uniform or per-axis scale transform.
+#### `mul(other: TransformInput): Transform` — Compose transforms in chain order: `a.mul(b)` applies `a`, then `b`.
 
-```ts
-static scale(v: number | Vec3): Transform
-```
+#### `translate(x: number, y: number, z: number): Transform` — Translate after the current transform.
 
-#### `rotationAxis()` — Create a rotation around an arbitrary axis, optionally about a pivot.
+#### `rotateAxis(axis: Vec3, angleDeg: number, pivot?: Vec3): Transform` — Rotate after the current transform.
 
-```ts
-static rotationAxis(axis: Vec3, angleDeg: number, pivot?: Vec3): Transform
-```
+#### `rotateX(angleDeg: number, pivot?: Vec3): Transform` — Rotate about the X axis after the current transform (parity with `Shape.rotateX`).
 
-#### `rotateAroundTo()` — Solve the rotation needed to move one point onto a target line or plane.
+#### `rotateY(angleDeg: number, pivot?: Vec3): Transform` — Rotate about the Y axis after the current transform (parity with `Shape.rotateY`).
 
-```ts
-static rotateAroundTo(axis: Vec3, pivot: Vec3, movingPoint: Vec3, targetPoint: Vec3, options?: RotateAroundToOptions): Transform
-```
+#### `rotateZ(angleDeg: number, pivot?: Vec3): Transform` — Rotate about the Z axis after the current transform (parity with `Shape.rotateZ`).
 
-#### `mul()` — Compose transforms in chain order: `a.mul(b)` applies `a`, then `b`.
+#### `inverse(): Transform` — Return the inverse transform.
 
-```ts
-mul(other: TransformInput): Transform
-```
+#### `point(p: Vec3): Vec3` — Transform a point using homogeneous coordinates.
 
-#### `translate()` — Translate after the current transform.
+#### `vector(v: Vec3): Vec3` — Transform a direction vector without translation.
 
-```ts
-translate(x: number, y: number, z: number): Transform
-```
-
-#### `rotateAxis()` — Rotate after the current transform.
-
-```ts
-rotateAxis(axis: Vec3, angleDeg: number, pivot?: Vec3): Transform
-```
-
-#### `inverse()` — Return the inverse transform.
-
-```ts
-inverse(): Transform
-```
-
-#### [`point()`](/docs/sketch#point) — Transform a point using homogeneous coordinates.
-
-```ts
-point(p: Vec3): Vec3
-```
-
-#### `vector()` — Transform a direction vector without translation.
-
-```ts
-vector(v: Vec3): Vec3
-```
-
-#### `toArray()` — Return the transform as a raw 4x4 matrix array.
-
-```ts
-toArray(): Mat4
-```
+#### `toArray(): Mat4` — Return the transform as a raw 4x4 matrix array.
 
 ### `ShapeGroup`
 
@@ -1605,117 +1151,49 @@ toArray(): Mat4
 | Property | Type | Description |
 |----------|------|-------------|
 | `children` | `GroupChild[]` | — |
-| `childNames` | `Array<string | undefined>` | — |
+| `childNames` | `Array<string \| undefined>` | — |
 
 **Children**
 
-#### `child()` — Return the named child by name. Throws if not found. Useful when importing a multipart group and working on components individually.
+#### `child(name: string): GroupChild` — Return the named child by name. Throws if not found. Useful when importing a multipart group and working on components individually.
 
-```ts
-child(name: string): GroupChild
-```
-
-#### `childName()` — Return the optional name of the child at `index`.
-
-```ts
-childName(index: number): string | undefined
-```
+#### `childName(index: number): string | undefined` — Return the optional name of the child at `index`.
 
 **Transforms**
 
-#### `translate()` — Move the entire group by (x, y, z). All children move together as a unit.
+#### `translate(x: number, y: number, z: number): ShapeGroup` — Move the entire group by (x, y, z). All children move together as a unit.
 
-```ts
-translate(x: number, y: number, z: number): ShapeGroup
-```
+#### `moveTo(x: number, y: number, z: number): ShapeGroup` — Move the group so its bounding-box min corner lands at the given coordinate.
 
-#### `moveTo()` — Move the group so its bounding-box min corner lands at the given coordinate.
+#### `moveToLocal(target: Shape | ShapeGroup, x: number, y: number, z: number): ShapeGroup` — Move the group relative to another part's bounding-box min corner.
 
-```ts
-moveTo(x: number, y: number, z: number): ShapeGroup
-```
+#### `rotate(axis: Vec3, angleDeg: number, options?: { pivot?: Vec3; }): ShapeGroup` — Rotate the group around an arbitrary axis through the origin. Unlike `scale()`/`mirror()` (bounding-box center) and `Sketch.rotate()`, this pivots at the world origin — pass `options.pivot` to rotate in place.
 
-#### `moveToLocal()` — Move the group relative to another part's bounding-box min corner.
+#### `rotateX(angleDeg: number, options?: { pivot?: Vec3; }): ShapeGroup` — Rotate the group around the X axis.
 
-```ts
-moveToLocal(target: Shape | ShapeGroup, x: number, y: number, z: number): ShapeGroup
-```
+#### `rotateY(angleDeg: number, options?: { pivot?: Vec3; }): ShapeGroup` — Rotate the group around the Y axis.
 
-#### `rotate()` — Rotate the group around an arbitrary axis through the origin.
+#### `rotateZ(angleDeg: number, options?: { pivot?: Vec3; }): ShapeGroup` — Rotate the group around the Z axis.
 
-```ts
-rotate(axis: [ number, number, number ], angleDeg: number, options?: { pivot?: [ number, number, number ]; }): ShapeGroup
-```
+#### `rotateAroundAxis(axis: Vec3, angleDeg: number, pivot?: Vec3): ShapeGroup` — Rotate around an arbitrary axis, optionally through a pivot point.
 
-#### `rotateX()` — Rotate the group around the X axis.
+#### `rotateAroundTo(axis: Vec3, pivot: Vec3, movingPoint: Anchor3D | Vec3, targetPoint: Anchor3D | Vec3, options?: RotateAroundToOptions): ShapeGroup` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. ShapeGroup string points use built-in anchors only.
 
-```ts
-rotateX(angleDeg: number, options?: { pivot?: [ number, number, number ]; }): ShapeGroup
-```
+#### `pointAlong(direction: Vec3): ShapeGroup` — Reorient the group so its local Z axis points along `direction`.
 
-#### `rotateY()` — Rotate the group around the Y axis.
+#### `transform(m: Mat4 | Transform): ShapeGroup` — Apply a 4x4 transform matrix or `Transform` to all 3D children.
 
-```ts
-rotateY(angleDeg: number, options?: { pivot?: [ number, number, number ]; }): ShapeGroup
-```
+#### `scale(v: number | Vec3): ShapeGroup` — Scale uniformly or per-axis from the group's bounding-box center.
 
-#### `rotateZ()` — Rotate the group around the Z axis.
+#### `scaleAround(pivot: Vec3, v: number | Vec3): ShapeGroup` — Scale uniformly or per-axis from an explicit pivot point.
 
-```ts
-rotateZ(angleDeg: number, options?: { pivot?: [ number, number, number ]; }): ShapeGroup
-```
+#### `mirror(normal: Vec3): ShapeGroup` — Mirror across a plane through the group's bounding-box center.
 
-#### `rotateAroundAxis()` — Rotate around an arbitrary axis, optionally through a pivot point.
-
-```ts
-rotateAroundAxis(axis: [ number, number, number ], angleDeg: number, pivot?: [ number, number, number ]): ShapeGroup
-```
-
-#### `rotateAroundTo()` — Rotate around an axis until a moving point reaches the target line/plane defined by the axis and target point. ShapeGroup string points use built-in anchors only.
-
-```ts
-rotateAroundTo(axis: [ number, number, number ], pivot: [ number, number, number ], movingPoint: Anchor3D | [ number, number, number ], targetPoint: Anchor3D | [ number, number, number ], options?: RotateAroundToOptions): ShapeGroup
-```
-
-#### `pointAlong()` — Reorient the group so its local Z axis points along `direction`.
-
-```ts
-pointAlong(direction: [ number, number, number ]): ShapeGroup
-```
-
-#### `transform()` — Apply a 4x4 transform matrix or `Transform` to all 3D children.
-
-```ts
-transform(m: Mat4 | Transform): ShapeGroup
-```
-
-#### `scale()` — Scale uniformly or per-axis from the group's bounding-box center.
-
-```ts
-scale(v: number | [ number, number, number ]): ShapeGroup
-```
-
-#### `scaleAround()` — Scale uniformly or per-axis from an explicit pivot point.
-
-```ts
-scaleAround(pivot: [ number, number, number ], v: number | [ number, number, number ]): ShapeGroup
-```
-
-#### `mirror()` — Mirror across a plane through the group's bounding-box center.
-
-```ts
-mirror(normal: [ number, number, number ]): ShapeGroup
-```
-
-#### `mirrorThrough()` — Mirror across a plane through an explicit point.
-
-```ts
-mirrorThrough(point: [ number, number, number ], normal: [ number, number, number ]): ShapeGroup
-```
+#### `mirrorThrough(point: Vec3, normal: Vec3): ShapeGroup` — Mirror across a plane through an explicit point.
 
 **Placement**
 
-#### `placeReference()` — Translate the group so the given anchor or reference lands on the target coordinate.
+#### `placeReference(ref: PlacementAnchorLike, target: Vec3, offset?: Vec3): ShapeGroup` — Translate the group so the given anchor or reference lands on the target coordinate.
 
 Accepts any built-in anchor name (`'bottom'`, `'center'`, `'top-front-left'`, etc.) or a custom placement reference attached via `withReferences()`.
 
@@ -1728,57 +1206,27 @@ const placed = require('./bracket-assembly.forge.js').group
   .placeReference('mountCenter', [0, 0, 50]);
 ```
 
-```ts
-placeReference(ref: PlacementAnchorLike, target: [ number, number, number ], offset?: [ number, number, number ]): ShapeGroup
-```
-
-#### `attachTo()` — Attach this group to a face or anchor on another part.
+#### `attachTo(target: Shape | ShapeGroup, targetAnchor: Anchor3D | string, selfAnchor?: Anchor3D, offset?: Vec3): ShapeGroup` — Attach this group to a face or anchor on another part.
 
 `targetAnchor` can be a built-in anchor name or a custom reference name on the target. `selfAnchor` selects the anchor on this group to align.
 
-```ts
-attachTo(target: Shape | ShapeGroup, targetAnchor: Anchor3D | string, selfAnchor?: Anchor3D, offset?: [ number, number, number ]): ShapeGroup
-```
-
-#### `onFace()` — Place this group on a face of a parent shape. See Shape.onFace() for full documentation.
-
-```ts
-onFace(parent: Shape | ShapeGroup, face: "front" | "back" | "left" | "right" | "top" | "bottom", opts?: { u?: number; v?: number; protrude?: number; }): ShapeGroup
-```
+#### `onFace(parent: Shape | ShapeGroup, face: "front" | "back" | "left" | "right" | "top" | "bottom", opts?: { u?: number; v?: number; protrude?: number; }): ShapeGroup` — Place this group on a face of a parent shape. See Shape.onFace() for full documentation.
 
 **Connectors**
 
-#### `withConnectors()` — Attach named connectors — attachment points that survive transforms. Connectors can be bare (position + orientation) or typed (with connectorType/gender for compatibility matching).
+#### `withConnectors(connectors: Record<string, ConnectorInput>): ShapeGroup` — Attach named connectors — attachment points that survive transforms. Connectors can be bare (position + orientation) or typed (with connectorType/gender for compatibility matching).
 
-```ts
-withConnectors(connectors: Record<string, ConnectorInput>): ShapeGroup
-```
+#### `connectorNames(): string[]` — List all connector names, including "ChildName.connectorName" from named children.
 
-#### `connectorNames()` — List all connector names, including "ChildName.connectorName" from named children.
+#### `connectorsByType(type: string): Array<{ name: string; port: ConnectorDef; }>` — Get all connectors of a given type, including from named children.
 
-```ts
-connectorNames(): string[]
-```
+#### `connectorDistance(nameA: string, nameB: string): number` — Distance between two connector origins on this group (supports dotted child paths).
 
-#### `connectorsByType()` — Get all connectors of a given type, including from named children.
+#### `connectorMeasurements(name: string): Record<string, number | string>` — Get measurements metadata from a connector (supports dotted child paths).
 
-```ts
-connectorsByType(type: string): Array<{ name: string; port: ConnectorDef; }>
-```
+#### `matchTo(targetOrPairs: Shape | ShapeGroup | Array<[ Shape | ShapeGroup, string, string ]>, selfConnOrDict?: string | Record<string, string>, targetConnOrOptions?: string | MatchToOptions, maybeOptions?: MatchToOptions): ShapeGroup` — Position this group by matching connectors to a target. Connector names support dotted paths into named children: "ChildName.connectorName".
 
-#### `connectorDistance()` — Distance between two connector origins on this group (supports dotted child paths).
-
-```ts
-connectorDistance(nameA: string, nameB: string): number
-```
-
-#### `connectorMeasurements()` — Get measurements metadata from a connector (supports dotted child paths).
-
-```ts
-connectorMeasurements(name: string): Record<string, number | string>
-```
-
-#### `matchTo()` — Position this group by matching connectors to a target. Connector names support dotted paths into named children: "ChildName.connectorName".
+Alignment: with a single connector pair, the group translates and rotates so the connector origins coincide and the axes oppose (plug-in model); `up` pins the roll. With multiple pairs, the connector origins define the rigid transform — still author meaningful `axis`/`up` values so the same connectors remain useful for `connect()`, audits, and future matching.
 
 Overloads:
 
@@ -1786,13 +1234,9 @@ Overloads:
 - Dictionary (same target): `matchTo(target, { selfConn: targetConn, ... }, options?)`
 - Multi-target: `matchTo([ [target1, selfConn1, targetConn1], ... ], options?)`
 
-```ts
-matchTo(targetOrPairs: Shape | ShapeGroup | Array<[ Shape | ShapeGroup, string, string ]>, selfConnOrDict?: string | Record<string, string>, targetConnOrOptions?: string | MatchToOptions, maybeOptions?: MatchToOptions): ShapeGroup
-```
-
 **References**
 
-#### `withReferences()` — Attach named placement references to this group. References survive normal transforms (translate/rotate/scale/mirror/transform).
+#### `withReferences(refs: PlacementReferenceInput): ShapeGroup` — Attach named placement references to this group. References survive normal transforms (translate/rotate/scale/mirror/transform).
 
 ```javascript
 const bracket = group(
@@ -1803,43 +1247,19 @@ const bracket = group(
 });
 ```
 
-```ts
-withReferences(refs: PlacementReferenceInput): ShapeGroup
-```
+#### `referenceNames(kind?: PlacementReferenceKind): string[]` — List named placement references carried by this group.
 
-#### `referenceNames()` — List named placement references carried by this group.
-
-```ts
-referenceNames(kind?: PlacementReferenceKind): string[]
-```
-
-#### `referencePoint()` — Resolve a named placement reference or built-in Anchor3D to a 3D point. Named refs take priority over built-in anchors.
-
-```ts
-referencePoint(ref: PlacementAnchorLike): [ number, number, number ]
-```
+#### `referencePoint(ref: PlacementAnchorLike): Vec3` — Resolve a named placement reference or built-in Anchor3D to a 3D point. Named refs take priority over built-in anchors.
 
 **Other**
 
-#### `clone()` — Return a deep-cloned ShapeGroup tree (refs copied).
+#### `clone(): ShapeGroup` — Return a deep-cloned ShapeGroup tree (refs copied).
 
-```ts
-clone(): ShapeGroup
-```
+#### `boundingBox(): { min: Vec3; max: Vec3; }` — Return the combined 3D bounding box of all children.
 
-#### `boundingBox()` — Return the combined 3D bounding box of all children.
+#### `color(hex: string): ShapeGroup` — Return a copy of the group with the given display color applied to each child.
 
-```ts
-boundingBox(): { min: [ number, number, number ]; max: [ number, number, number ]; }
-```
-
-#### `color()` — Return a copy of the group with the given display color applied to each child.
-
-```ts
-color(hex: string): ShapeGroup
-```
-
-**Legacy Aliases**
+**Compatibility Aliases**
 
 - `withPorts()` -> `withConnectors()`
 - `portNames()` -> `connectorNames()`
@@ -1855,79 +1275,59 @@ color(hex: string): ShapeGroup
 
 ### `Pattern2D`
 
-#### `add()` — Add this pattern to one or more patterns or constant height offsets.
+#### `add(...patterns: Pattern2DInput[]): Pattern2D` — Add this pattern to one or more patterns or constant height offsets.
 
-```ts
-add(...patterns: Pattern2DInput[]): Pattern2D
-```
+#### `subtract(pattern: Pattern2DInput): Pattern2D` — Subtract another pattern or constant height offset from this pattern.
 
-#### `subtract()` — Subtract another pattern or constant height offset from this pattern.
+#### `multiply(...patterns: Pattern2DInput[]): Pattern2D` — Multiply this pattern by one or more patterns or numeric scale factors.
 
-```ts
-subtract(pattern: Pattern2DInput): Pattern2D
-```
+#### `min(...patterns: Pattern2DInput[]): Pattern2D` — Keep the lower height between this pattern and one or more other patterns.
 
-#### `multiply()` — Multiply this pattern by one or more patterns or numeric scale factors.
+#### `max(...patterns: Pattern2DInput[]): Pattern2D` — Keep the higher height between this pattern and one or more other patterns.
 
-```ts
-multiply(...patterns: Pattern2DInput[]): Pattern2D
-```
+#### `clamp(min: number, max: number): Pattern2D` — Limit pattern height to the inclusive `[min, max]` range in millimeters.
 
-#### `min()` — Keep the lower height between this pattern and one or more other patterns.
+#### `abs(): Pattern2D` — Convert negative heights to positive heights.
 
-```ts
-min(...patterns: Pattern2DInput[]): Pattern2D
-```
-
-#### `max()` — Keep the higher height between this pattern and one or more other patterns.
-
-```ts
-max(...patterns: Pattern2DInput[]): Pattern2D
-```
-
-#### `clamp()` — Limit pattern height to the inclusive `[min, max]` range in millimeters.
-
-```ts
-clamp(min: number, max: number): Pattern2D
-```
-
-#### `abs()` — Convert negative heights to positive heights.
-
-```ts
-abs(): Pattern2D
-```
-
-#### `negate()` — Flip the pattern height sign.
-
-```ts
-negate(): Pattern2D
-```
+#### `negate(): Pattern2D` — Flip the pattern height sign.
 
 ### `Pattern2DBuilder`
 
-#### `constant()` — Create a constant-height pattern in millimeters.
+#### `constant(value?: number): Pattern2D` — Create a constant-height pattern in millimeters.
 
-```ts
-constant(value?: number): Pattern2D
-```
+#### `sineWave(options: Pattern2DSineWaveOptions): Pattern2D` — Create a sinusoidal wave pattern in UV space.
 
-#### `sineWave()` — Create a sinusoidal wave pattern in UV space.
+**`Pattern2DSineWaveOptions`**
 
-```ts
-sineWave(options: Pattern2DSineWaveOptions): Pattern2D
-```
+| Option | Type | Description |
+|--------|------|-------------|
+| `direction?` | `Vec2` | Direction the wave advances in UV space. Default: [1, 0]. |
+| `wavelength` | `number` | Distance between wave peaks in surface millimeters. |
+| `amplitude?` | `number` | Height amplitude in millimeters. Default: 1. |
+| `phase?` | `number` | Phase offset in radians. Default: 0. |
+| `bias?` | `number` | Constant height offset in millimeters. Default: 0. |
 
-#### `stripes()` — Create recessed stripe bands in UV space.
+#### `stripes(options: Pattern2DStripesOptions): Pattern2D` — Create recessed stripe bands in UV space.
 
-```ts
-stripes(options: Pattern2DStripesOptions): Pattern2D
-```
+**`Pattern2DStripesOptions`**
 
-#### `overUnderWeave()` — Create an over-under woven relief pattern in UV space.
+| Option | Type | Description |
+|--------|------|-------------|
+| `direction?` | `Vec2` | Direction perpendicular to the stripe bands in UV space. Default: [1, 0]. |
+| `spacing` | `number` | Center-to-center spacing in surface millimeters. |
+| `width` | `number` | Stripe width in surface millimeters. |
+| `depth?` | `number` | Stripe groove depth in millimeters. Default: 1. |
 
-```ts
-overUnderWeave(options: Pattern2DOverUnderWeaveOptions): Pattern2D
-```
+#### `overUnderWeave(options: Pattern2DOverUnderWeaveOptions): Pattern2D` — Create an over-under woven relief pattern in UV space.
+
+**`Pattern2DOverUnderWeaveOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `spacing` | `number \| Vec2` | Thread center-to-center spacing. A number uses the same spacing for U and V. |
+| `threadWidth` | `number \| Vec2` | Thread width. A number uses the same width for U and V. |
+| `depth?` | `number` | Thread groove depth in millimeters. Default: 0.8. |
+| `underScale?` | `number` | Relative height of the under-crossing thread. Default: 0.15. |
 
 ### `ShapeRef`
 
@@ -1943,107 +1343,39 @@ Created with `shape.ref("lid/back")`, then refined through methods such as `.poi
 
 **Methods:**
 
-#### `resolve()` — Resolve this reference into its current faces, edges, or points.
+#### `resolve(): ShapeReferenceResolution` — Resolve this reference into its current faces, edges, or points.
 
-```ts
-resolve(): ShapeReferenceResolution
-```
+#### `get kind(): ShapeReferenceKind` — The resolved reference kind, such as `face`, `edge-set`, or `point`.
 
-#### `kind()` — The resolved reference kind, such as `face`, `edge-set`, or [`point`](/docs/sketch#point).
+#### `get cardinality(): ShapeReferenceCardinality` — Whether the reference currently resolves to zero, one, or many matches.
 
-```ts
-get kind(): ShapeReferenceKind
-```
+#### `status(): ShapeReferenceStatus` — Return the reference lifecycle status for the current shape state.
 
-#### `cardinality()` — Whether the reference currently resolves to zero, one, or many matches.
+#### `explain(): string` — Return a human-readable explanation of how this reference resolved.
 
-```ts
-get cardinality(): ShapeReferenceCardinality
-```
+#### `as(name: string): ShapeRef` — Name this derived reference so the same shape can resolve it by `shape.ref(name)`.
 
-#### `status()` — Return the reference lifecycle status for the current shape state.
+#### `maybe(): ShapeRef` — Return an optional reference that resolves to zero matches instead of throwing when missing.
 
-```ts
-status(): ShapeReferenceStatus
-```
+#### `all(): ShapeRef` — Mark that a multi-match reference is intentionally being used as a set.
 
-#### `explain()` — Return a human-readable explanation of how this reference resolved.
+#### `one(): ShapeRef` — Require this reference to resolve to exactly one match.
 
-```ts
-explain(): string
-```
+#### `faces(): FaceRef[]` — Resolve this reference as one or more faces.
 
-#### `as()` — Name this derived reference so the same shape can resolve it by `shape.ref(name)`.
+#### `face(): FaceRef` — Resolve this reference as exactly one face.
 
-```ts
-as(name: string): ShapeRef
-```
+#### `edges(): EdgeSegment[]` — Resolve this reference as one or more edges. Face references return boundary edges.
 
-#### `maybe()` — Return an optional reference that resolves to zero matches instead of throwing when missing.
+#### `edge(): EdgeSegment` — Resolve this reference as exactly one edge.
 
-```ts
-maybe(): ShapeRef
-```
+#### `points(): Vec3[]` — Resolve this reference as one or more points. Faces use centers and edges use midpoints.
 
-#### `all()` — Mark that a multi-match reference is intentionally being used as a set.
+#### `point(): Vec3` — Resolve this reference as exactly one point.
 
-```ts
-all(): ShapeRef
-```
+#### `toJSON(): ShapeReferenceResolution` — Return the structured JSON-friendly reference resolution.
 
-#### `one()` — Require this reference to resolve to exactly one match.
-
-```ts
-one(): ShapeRef
-```
-
-#### `faces()` — Resolve this reference as one or more faces.
-
-```ts
-faces(): FaceRef[]
-```
-
-#### `face()` — Resolve this reference as exactly one face.
-
-```ts
-face(): FaceRef
-```
-
-#### `edges()` — Resolve this reference as one or more edges. Face references return boundary edges.
-
-```ts
-edges(): EdgeSegment[]
-```
-
-#### `edge()` — Resolve this reference as exactly one edge.
-
-```ts
-edge(): EdgeSegment
-```
-
-#### `points()` — Resolve this reference as one or more points. Faces use centers and edges use midpoints.
-
-```ts
-points(): Vec3[]
-```
-
-#### [`point()`](/docs/sketch#point) — Resolve this reference as exactly one point.
-
-```ts
-point(): Vec3
-```
-
-#### `toJSON()` — Return the structured JSON-friendly reference resolution.
-
-```ts
-toJSON(): ShapeReferenceResolution
-```
-
-#### `toString()` — Return a compact display form for this reference path.
-
-```ts
-toString(): string
-```
+#### `toString(): string` — Return a compact display form for this reference path.
 
 ---
 
@@ -2053,46 +1385,7 @@ toString(): string
 
 ### `verify`
 
-- `that(label: string, check: () => boolean, message?: string): void` — Custom predicate check.
-- `equal(label: string, actual: number, expected: number, tolerance?: number, message?: string): void` — Check that two numbers are approximately equal (within tolerance).
-- `notEqual(label: string, actual: number, unexpected: number, tolerance?: number, message?: string): void` — Check that two numbers are NOT equal (differ by more than tolerance).
-- `greaterThan(label: string, actual: number, min: number, message?: string): void` — Check that actual > min.
-- `lessThan(label: string, actual: number, max: number, message?: string): void` — Check that actual < max.
-- `inRange(label: string, actual: number, min: number, max: number, message?: string): void` — Check that min <= actual <= max.
-- `centersCoincide(label: string, a: ShapeLike, b: ShapeLike, tolerance?: number): void` — Check that the bounding-box centers of two shapes coincide within tolerance (mm).
-- `connectorDistance(label: string, target: ConnectorDistanceLike, connectorA: string, connectorB: string, expected?: number, tolerance?: number): void` — Check the distance between two named connectors on a shape or group. Use this when connectors + `matchTo()` define a static assembly interface. It proves the mate at runtime, unlike a plain source-level connector declaration. The common case is `expected = 0`, meaning the two connector origins should coincide after placement. **Example** ```ts verify.connectorDistance("leg is seated", bench, "Rail.leg_0", "Leg0.head", 0, 0.01); ```
-- `physicalComponentCount(label: string, expected: number): void` — Declare the expected physical connectivity component count for the returned visible model. **Details** Use this for generated mechanical models that should have a clear component graph: one connected fixture, a purchased part plus a removable cartridge, a root assembly plus named intentional ghosts, and so on. `forgecad inspect mechanical-integrity` resolves the returned visible objects with the same physical-connectivity analysis used in the quality gate and fails if the actual component count differs. This catches the common generated-CAD failure where a script returns a visually plausible artifact but the handle, screw, washer, cover, or terminal block is actually a separate island. **Example** ```ts verify.physicalComponentCount("vise is one connected installed assembly", 1); ```
-- `intentionalOverlap(label: string, a: ShapeLike, b: ShapeLike, reason: string): void` — Declare that two visible objects intentionally overlap because the overlap is real manufacturing intent. **Details** Use this only for overlaps that a mechanical reviewer would accept as actual matter sharing volume: welded/fused regions, overmolded inserts, potted electronics, cast-in hardware, or deliberately bonded laminations. This is not a shortcut for screws without holes, shafts without bores, covers without pockets, or parts placed with collision as a positioning hack. `forgecad inspect mechanical-integrity --collisions` only honors this declaration when both shapes are returned as visible objects and the exact collision report finds that same object pair. Unused or non-visible declarations fail the quality gate so annotations cannot hide unrelated collisions. **Example** ```ts verify.intentionalOverlap("rubber grip is overmolded on handle", rubberGrip, handleCore, "overmolded insert"); ```
-- `notColliding(label: string, a: ShapeLike, b: ShapeLike, searchLength?: number): void` — Check that two shapes do not collide (minGap > 0).
-- `minClearance(label: string, a: ShapeLike, b: ShapeLike, minGap: number, searchLength?: number): void` — Check that a minimum clearance gap exists between two shapes.
-- `clearanceBetween(label: string, a: ShapeLike, b: ShapeLike, minGap: number, maxGap: number, searchLength?: number): void` — Check that the clearance gap between two shapes is inside an allowed range. **Details** Use this for seated and retained interfaces where a part must be close enough to be mechanically accountable, but must not collide beyond the allowed minimum. It catches both failure modes that make generated CAD look fake: parts floating away from their receiver, and parts intersecting their receiver because the pocket, bore, or running clearance was not modeled. For contact, use a narrow range such as `[-0.01, 0.05]` to tolerate tiny numerical noise. For a running fit, use the intended clearance band. Manifold-backed shapes use exact min-gap distance. Other backends use a mesh-derived min-gap check and say so in the verification message; keep `forgecad inspect mechanical-integrity --collisions` in the acceptance gate for positive-volume interference. **Example** ```ts verify.clearanceBetween("cover is seated on gasket", cover, gasket, -0.01, 0.05); verify.clearanceBetween("carriage runs inside rail", carriage, rail, 0.2, 0.5); ```
-- `parallel(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals are parallel (within toleranceDeg degrees).
-- `perpendicular(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals are perpendicular (within toleranceDeg degrees).
-- `coplanar(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number, toleranceMm?: number): void` — Check that a face is coplanar with (same plane as) another face, meaning they are parallel AND their centers lie on the same plane.
-- `faceAt(label: string, face: FaceRefLike, expectedPos: [ number, number, number ], toleranceMm?: number): void` — Check that a face center lies at a specific position (within toleranceMm).
-- `sameDirection(label: string, faceA: FaceRefLike, faceB: FaceRefLike, toleranceDeg?: number): void` — Check that two face normals point in the same direction (not antiparallel). Stricter than parallel — both |angle| AND sign must match.
-- `isEmpty(label: string, shape: ShapeLike, message?: string): void` — Check that a shape is empty.
-- `notEmpty(label: string, shape: ShapeLike, message?: string): void` — Check that a shape is NOT empty.
-- `volumeApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void` — Check that a shape's volume is approximately equal to expected (mm³).
-- `areaApprox(label: string, shape: ShapeLike, expected: number, tolerance?: number): void` — Check that a shape's surface area is approximately equal to expected (mm²).
-- `boundingBoxSize(label: string, shape: ShapeLike, expectedSize: [ number, number, number ], tolerance?: number): void` — Check that a shape's bounding box has approximately the given size.
-- `edgeContinuity(label: string, shape: ShapeLike, options?: EdgeContinuityThresholds): void` — Check that every sampled seam on a shape meets a requested continuity threshold.
-- `noTinyEdges(label: string, shape: ShapeLike, threshold?: number): void` — Check that a shape has no tiny edges below the requested threshold.
-- `noSliverFaces(label: string, shape: ShapeLike, threshold?: number): void` — Check that a shape has no sliver faces below the requested score threshold.
-- `noSelfIntersection(label: string, shape: ShapeLike): void` — Best-effort exact-shape validity guard for self-intersections or broken B-Rep topology.
-
-### `Constraint`
-
-- `makeParallel(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg): ConstrainedSketchBuilder` — Constrain two lines to be parallel.
-- `enforceAngle(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg, angleDeg: number): ConstrainedSketchBuilder` — Constrain the signed angle from line `a` to line `b`.
-- `horizontal(builder: ConstrainedSketchBuilder, line: LineArg): ConstrainedSketchBuilder` — Constrain a line to be horizontal.
-- `vertical(builder: ConstrainedSketchBuilder, line: LineArg): ConstrainedSketchBuilder` — Constrain a line to be vertical.
-- `equalLength(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg): ConstrainedSketchBuilder` — Constrain two lines to have equal length.
-- `distance(builder: ConstrainedSketchBuilder, a: PointArg, b: PointArg, value: number): ConstrainedSketchBuilder` — Constrain the distance between two points.
-- `fix(builder: ConstrainedSketchBuilder, pt: PointArg, x: number, y: number): ConstrainedSketchBuilder` — Fix a point at a specific coordinate.
-- `coincident(builder: ConstrainedSketchBuilder, a: PointArg, b: PointArg): ConstrainedSketchBuilder` — Constrain two points to occupy the same location.
-- `perpendicular(builder: ConstrainedSketchBuilder, a: LineArg, b: LineArg): ConstrainedSketchBuilder` — Constrain two lines to be perpendicular.
-- `length(builder: ConstrainedSketchBuilder, line: LineArg, value: number): ConstrainedSketchBuilder` — Constrain the length of a line.
+Members (full entries under [Verification](#verification)): `verify.that`, `verify.equal`, `verify.notEqual`, `verify.greaterThan`, `verify.lessThan`, `verify.inRange`, `verify.centersCoincide`, `verify.connectorDistance`, `verify.physicalComponentCount`, `verify.intentionalOverlap`, `verify.notColliding`, `verify.minClearance`, `verify.clearanceBetween`, `verify.parallel`, `verify.perpendicular`, `verify.coplanar`, `verify.faceAt`, `verify.sameDirection`, `verify.isEmpty`, `verify.notEmpty`, `verify.volumeApprox`, `verify.areaApprox`, `verify.boundingBoxSize`, `verify.edgeContinuity`, `verify.noTinyEdges`, `verify.noSliverFaces`, `verify.noSelfIntersection`.
 
 ### `Points`
 
@@ -2101,8 +1394,27 @@ toString(): string
 - `lerp(a: Vec3, b: Vec3, t: number): Vec3` — Linearly interpolate between two 3D points. t=0 returns a, t=1 returns b.
 - `direction(a: Vec3, b: Vec3): Vec3` — Unit direction vector from a to b. Throws if a and b are the same point.
 - `offset(point: Vec3, dir: Vec3, amount: number): Vec3` — Move a point along a direction vector by a given amount.
-- `polar(length: number, angleDeg: number, from?: [ number, number ]): [ number, number ]` — Compute a 2D point at distance and angle (degrees) from an optional origin.
+- `polar(length: number, angleDeg: number, from?: Vec2): Vec2` — Compute a 2D point at distance and angle (degrees) from an optional origin.
 
 ### `connector`
 
 Connector factory. Create attachment points: `connector({...})`, `connector.male(type, {...})`, etc.
+
+### `Import`
+
+Namespaced file-format import helpers — the single vocabulary for bringing external geometry files into a model.
+
+- `dxfSketch(fileName: string, options?: DxfImportOptions): Sketch` — Parse a DXF file and return closed 2D profile geometry as a Sketch. The result can be extruded directly.
+- `svgSketch(fileName: string, options?: SvgImportOptions): Sketch` — Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification.
+- `mesh(fileName: string, options?: { scale?: number; center?: boolean; object?: string; separateObjects?: boolean; }): Shape | ShapeGroup` — Import an external mesh file (STL, OBJ, 3MF).
+
+  By default, 3MF build items are flattened into one Shape for compatibility. Use `separateObjects: true` to import 3MF build items/resource objects as a named ShapeGroup whose children are targetable by `forgecad ls`. Use `object` to import one item by the stable ref/name reported by `forgecad run`.
+
+  For 3MF sources, `forgecad run` prints a source-structure table with one line per build item: `[3mf:build:NNN:object:N] name type=... verts=... tris=... bbox=[min] → [max]`. Build items are numbered from `001`; files with no build items list resource objects as `3mf:object:N` instead. Per-item bboxes reveal multi-part structure — account for every substantial item before flattening. Pass any listed stable ref or name as `object` to import that item alone.
+
+  ```js
+  const all = Import.mesh("./assembly.3mf", { separateObjects: true });
+  const pin = all.child("Pin #001");
+  const plate = Import.mesh("./assembly.3mf", { object: "3mf:build:001:object:7" });
+  ```
+- `step(fileName: string): Shape` — Import a STEP file (.step, .stp) as an exact OCCT-backed Shape. Preserves NURBS curves, B-spline surfaces, and exact topology. Requires running with the OCCT backend.

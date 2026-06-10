@@ -36,59 +36,23 @@ WoodBoard operations are immutable. Joint operations return new boards instead o
 
 **Methods:**
 
-#### `cut()` — Subtract a cutter from this board, returning a new board. Used by joint functions (dado, rabbet, mortiseAndTenon).
+#### `cut(cutter: Shape): WoodBoard` — Subtract a cutter from this board, returning a new board. Used by joint functions (dado, rabbet, mortiseAndTenon).
 
-```ts
-cut(cutter: Shape): WoodBoard
-```
+#### `translate(x: number, y: number, z: number): WoodBoard` — Translate the board in 3D space.
 
-#### `translate()` — Translate the board in 3D space.
+#### `rotate(axis: Vec3, angleDeg: number, options?: { pivot?: Vec3; }): WoodBoard` — Rotate the board around an axis by a given angle in degrees.
 
-```ts
-translate(x: number, y: number, z: number): WoodBoard
-```
+#### `rotateX(angleDeg: number): WoodBoard` — Rotate the board around the X axis by a given angle in degrees.
 
-#### `rotate()` — Rotate the board around an axis by a given angle in degrees.
+#### `rotateY(angleDeg: number): WoodBoard` — Rotate the board around the Y axis by a given angle in degrees.
 
-```ts
-rotate(axis: [ number, number, number ], angleDeg: number, options?: { pivot?: [ number, number, number ]; }): WoodBoard
-```
+#### `rotateZ(angleDeg: number): WoodBoard` — Rotate the board around the Z axis by a given angle in degrees.
 
-#### `rotateX()` — Rotate the board around the X axis by a given angle in degrees.
+#### `mirror(normal: Vec3): WoodBoard` — Mirror the board across a plane defined by its normal.
 
-```ts
-rotateX(angleDeg: number): WoodBoard
-```
+#### `color(value: string): WoodBoard` — Set the board's display color.
 
-#### `rotateY()` — Rotate the board around the Y axis by a given angle in degrees.
-
-```ts
-rotateY(angleDeg: number): WoodBoard
-```
-
-#### `rotateZ()` — Rotate the board around the Z axis by a given angle in degrees.
-
-```ts
-rotateZ(angleDeg: number): WoodBoard
-```
-
-#### `mirror()` — Mirror the board across a plane defined by its normal.
-
-```ts
-mirror(normal: [ number, number, number ]): WoodBoard
-```
-
-#### `color()` — Set the board's display color.
-
-```ts
-color(value: string): WoodBoard
-```
-
-#### `clone()` — Clone the board (creates an independent copy of the underlying shape).
-
-```ts
-clone(): WoodBoard
-```
+#### `clone(): WoodBoard` — Clone the board (creates an independent copy of the underlying shape).
 
 ---
 
@@ -102,7 +66,15 @@ Woodworking namespace — create boards and cut joints.
 
 **Joints:** `Wood.dado()`, `Wood.rabbet()`, and `Wood.mortiseAndTenon()` are immutable — they return new board value(s) with the joint cut applied.
 
-- `readonly board: (width: number, height: number, thickness: number, opts?: WoodBoardOptions) => WoodBoard` — Create a wood board with metadata for manufacturing. The board is a box(width, height, thickness) centered on XY, base at Z=0. Width along X, height along Y, thickness along Z (0 to thickness).
-- `dado(host: WoodBoard, guest: WoodBoard, opts: DadoOptions): WoodBoard` — Cut a dado (channel) across the face of a host board for a guest board to sit in. Returns a new host board with the dado cut applied.
-- `rabbet(board: WoodBoard, opts: RabbetOptions): WoodBoard` — Cut a rabbet (L-shaped step) along an edge of a board. Returns a new board with the rabbet cut applied.
-- `mortiseAndTenon(mortiseBoard: WoodBoard, tenonBoard: WoodBoard, opts?: MortiseAndTenonOptions): MortiseAndTenonResult` — Cut a mortise in one board and shape a tenon on another. Returns new boards with the mortise pocket and tenon cuts applied.
+- `board: (width: number, height: number, thickness: number, opts?: WoodBoardOptions) => WoodBoard` — Create a wood board with metadata for manufacturing.
+
+  The board is a box(width, height, thickness) centered on XY, base at Z=0. Width along X, height along Y, thickness along Z (0 to thickness).
+- `dado(host: WoodBoard, guest: WoodBoard, opts: DadoOptions): WoodBoard` — Cut a dado (channel) across the face of a host board for a guest board to sit in.
+
+  Returns a new host board with the dado cut applied.
+- `rabbet(board: WoodBoard, opts: RabbetOptions): WoodBoard` — Cut a rabbet (L-shaped step) along an edge of a board.
+
+  Returns a new board with the rabbet cut applied.
+- `mortiseAndTenon(mortiseBoard: WoodBoard, tenonBoard: WoodBoard, opts?: MortiseAndTenonOptions): MortiseAndTenonResult` — Cut a mortise in one board and shape a tenon on another.
+
+  Returns new boards with the mortise pocket and tenon cuts applied.

@@ -9,14 +9,14 @@ Dimensions, BOM entries, verification checks, and sketch export.
 
 ## Contents
 
-- [Annotations & Output](#annotations-output) — `bom`, `robotExport`, `dim`, `dimLine`
-- [Sketch Export](#sketch-export) — `sketchToDxf`, `sketchToSvg`
+- [Annotations & Output](#annotations-output)
+- [Sketch Export](#sketch-export)
 
 ## Functions
 
 ### Annotations & Output
 
-#### `bom()` — Register a Bill of Materials entry for report export.
+#### `bom(quantity: number, description: string, opts?: BomOpts): void` — Register a Bill of Materials entry for report export.
 
 BOM entries are accumulated during script execution and exported alongside the model in report views. Rows are grouped by normalized `description + unit`. Pass an explicit `key` to force multiple descriptions to collapse into a single line item.
 
@@ -42,10 +42,6 @@ bom(tubeLen, "rectangular steel tube", {
 });
 ```
 
-```ts
-bom(quantity: number, description: string, opts?: BomOpts): void
-```
-
 **`BomOpts`**
 
 | Option | Type | Description |
@@ -62,13 +58,13 @@ bom(quantity: number, description: string, opts?: BomOpts): void
 | `notes?` | `string` | Free-form notes |
 | `grain?` | `string` | Wood grain direction, e.g. "long", "cross" |
 
-#### `robotExport()` — Declare that this script should export the assembly as a SDF/URDF robot package.
+#### `robotExport(options: RobotExportOptions): CollectedRobotExport` — Declare that this script should export the assembly as a SDF/URDF robot package.
 
-Call `robotExport()` alongside your assembly definition. The CLI commands `forgecad export sdf` and `forgecad export urdf` pick up the declaration and produce a robot package with:
+Call `robotExport()` alongside your assembly definition. `forgecad export sdf` / `forgecad export urdf` pick up the declaration (see the CLI docs for flags) and produce a robot package with:
 
 - Mesh-based inertia tensors (full 6-component, not bounding-box approximations)
 - Separate collision meshes (convex hull by default — ~50–80% smaller)
-- Joint mimic elements derived from `addJointCoupling` / `addGearCoupling`
+- Joint limits, effort/velocity/damping/friction metadata from assembly joints
 
 **Collision mesh modes** (set per-link via `links["PartName"].collision`):
 
@@ -84,25 +80,13 @@ Call `robotExport()` alongside your assembly definition. The CLI commands `forge
 - Revolute `velocity` is in degrees/second in Forge; exporters convert to rad/s.
 - Prismatic distances are in mm in Forge; exported in meters.
 - `massKg` is preferred; `densityKgM3` is used when mass is unknown.
-- Couplings with multiple terms: only the primary term (largest ratio) maps to `<mimic>` — SDF/URDF support single-leader mimic only. Dropped terms emit a warning.
+- Compatibility coupling metadata, when present, maps only the primary term (largest ratio) to `<mimic>` — SDF/URDF support single-leader mimic only. Dropped terms emit a warning.
 
 ```ts
-const rover = assembly("Scout")
-  .addPart("Chassis", box(300, 220, 50).translate(0, 0, -25))
-  .addPart("Left Wheel", cylinder(30, 60, undefined, 48).translate(0, 0, -15))
-  .addRevolute("leftWheel", "Chassis", "Left Wheel", {
-    axis: [0, 1, 0],
-    frame: Transform.identity().translate(90, 140, 60),
-    effort: 20, velocity: 1080,
-  });
-
 robotExport({
-  assembly: rover,
+  assembly: rover, // assembly() with parts + revolute wheel joints
   modelName: "Scout",
-  links: {
-    Chassis: { massKg: 10 },
-    "Left Wheel": { massKg: 0.8 },
-  },
+  links: { Chassis: { massKg: 10 }, "Left Wheel": { massKg: 0.8 } },
   plugins: {
     diffDrive: {
       leftJoints: ["leftWheel"], rightJoints: ["rightWheel"],
@@ -111,17 +95,6 @@ robotExport({
   },
   world: { generateDemoWorld: true },
 });
-```
-
-**CLI usage**
-
-```bash
-forgecad export sdf model.forge.js   # SDF package (Gazebo/Ignition)
-forgecad export urdf model.forge.js  # URDF package (ROS/PyBullet/MuJoCo)
-```
-
-```ts
-robotExport(options: RobotExportOptions): CollectedRobotExport
 ```
 
 **`RobotExportOptions`**: `assembly: Assembly`, `modelName?: string`, `state?: JointState`, `static?: boolean`, `selfCollide?: boolean`, `allowAutoDisable?: boolean`, `links?: Record<string, RobotLinkExportOptions>`, `joints?: Record<string, RobotJointExportOptions>`, `plugins?: { diffDrive?: RobotDiffDrivePluginOptions; jointStatePublisher?: RobotJointStatePublisherOptions; }`, `world?: RobotWorldOptions`
@@ -140,30 +113,57 @@ robotExport(options: RobotExportOptions): CollectedRobotExport
 
 **`CollectedRobotExport`**: `modelName: string`, `assembly: AssemblyDefinition`, `state: JointState`, `static: boolean`, `selfCollide: boolean`, `allowAutoDisable: boolean`, `links: Record<string, RobotLinkExportOptions>`, `joints: Record<string, RobotJointExportOptions>`, `plugins: { diffDrive?: RobotDiffDrivePluginOptions; jointStatePublisher?: RobotJointStatePublisherOptions; }`, `world: RobotWorldOptions | null`
 
-`AssemblyDefinition`: `{ name: string, parts: AssemblyPartDef[], joints: AssemblyJointDef[], jointCouplings: AssemblyJointCouplingDef[] }`
+**`AssemblyDefinition`**: `name: string`, `parts: AssemblyPartDef[]`, `joints: AssemblyJointDef[]`, `jointCouplings: AssemblyJointCouplingDef[]`, `kinematics: AssemblyKinematicGraphDef`, `frames: AssemblyFrameDef[]`, `frameJoints: AssemblyFrameJointDef[]`, `frameEdges: AssemblyFrameEdgeDef[]`
 
-`AssemblyPartDef`: `{ name: string, part: AssemblyPart, base: Transform, metadata?: PartMetadata }`
+**`AssemblyPartDef`**: `name: string`, `part: AssemblyPart`, `base: Transform`, `metadata?: PartMetadata`, `mates: AssemblyPartMateInput[]`, `bindToFrame?: string`
 
-**`PartMetadata`**
+`PartMetadata` — defined in [assembly](/docs/assembly).
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `tags?` | `string \| readonly string[]` | Viewport organization tags applied to scene objects produced from this part. |
-| `material?`, `process?`, `tolerance?`, `qty?`, `notes?`, `densityKgM3?`, `massKg?` | | — |
+`AssemblyPartMateInput` — defined in [assembly](/docs/assembly).
 
 **`AssemblyJointDef`**: `name: string`, `type: JointType`, `parent: string`, `child: string`, `frame: Transform`, `axis: Vec3`, `min?: number`, `max?: number`, `defaultValue: number`, `unit?: string`, `effort?: number`, `velocity?: number`, `damping?: number`, `friction?: number`, `connectorRefs?: JointConnectorRefs`
 
-`JointConnectorRefs`: `{ parent: string, child: string, parentAlign?: PortAlign, childAlign?: PortAlign }`
+`JointConnectorRefs` — defined in [assembly](/docs/assembly).
 
 `AssemblyJointCouplingDef`: `{ joint: string, terms: JointCouplingTermRecord[], offset: number }`
 
 `JointCouplingTermRecord`: `{ joint: string, ratio: number }`
 
-#### `dim()` — Add a dimension annotation between two points.
+**`AssemblyKinematicGraphDef`**: `links: AssemblyLinkDef[]`, `edges: AssemblyEdgeBetweenLinksDef[]`, `angles: AssemblyAngleBetweenLinksDef[]`, `derivedLinks: AssemblyDerivedLinkDef[]`
+
+`AssemblyLinkDef`: `{ name: string, at: Vec3, fixed: boolean, metadata?: Record<string, unknown> }`
+
+**`AssemblyEdgeBetweenLinksDef`**: `name: string`, `a: string`, `b: string`, `length: number | null`, `min?: number`, `max?: number`, `visualOnly: boolean`, `control?: AssemblyKinematicControlOptions`, `metadata?: Record<string, unknown>`
+
+`AssemblyKinematicControlOptions` — defined in [assembly](/docs/assembly).
+
+**`AssemblyAngleBetweenLinksDef`**: `name: string`, `a?: string`, `b: string`, `c: string`, `reference?: AssemblyAngleReferenceDef`, `target?: number`, `min?: number`, `max?: number`, `control?: AssemblyKinematicControlOptions`, `metadata?: Record<string, unknown>`
+
+`AssemblyAngleReferenceDef`: `{ kind: "worldDirection", direction: Vec3 }`
+
+**`AssemblyDerivedLinkDef`**
+- `distance: number` — Signed: positive moves from `fromLink` toward `towardLink`, negative moves away.
+- Also: `name: string`, `fromLink: string`, `towardLink: string`.
+
+`AssemblyFrameDef`: `{ name: string, origin: Vec3, axis: Vec3, up: Vec3, fixed: boolean, metadata?: Record<string, unknown> }`
+
+**`AssemblyFrameJointDef`**: `name: string`, `type: AssemblyFrameJointType`, `parent: string`, `child: string`, `rest: Transform`, `min?: number`, `max?: number`, `defaultValue: number`, `unit?: string`, `control: boolean`, `metadata?: Record<string, unknown>`
+
+`AssemblyFrameEdgeDef`: `{ name: string, a: string, b: string, metadata?: Record<string, unknown> }`
+
+#### `dim()` — Add a dimension annotation between two points, or along an entity.
+
+Overloads:
+
+- `dim(line: Line2D, opts?: DimOpts): void`
+- `dim(edge: EdgeRef, opts?: DimOpts): void`
+- `dim(from: PointArg, to: PointArg, opts?: DimOpts): void`
 
 Dimension annotations are purely visual callouts rendered in the viewport and report export. They do not affect geometry or constrain the model.
 
 Point arguments accept 2D tuples `[x, y]`, 3D tuples `[x, y, z]`, or [`Point2D`](/docs/sketch#point2d) objects (Z is treated as 0 for 2D inputs).
+
+Entity arguments: pass a single [`Line2D`](/docs/sketch#line2d) (from a constrained sketch) or an `EdgeRef` (from `shape.edge('left')`) as the first argument to dimension along that entity directly — no manual endpoint extraction needed.
 
 **Ownership Rules (Report Pages)**
 
@@ -176,33 +176,31 @@ Point arguments accept 2D tuples `[x, y]`, 3D tuples `[x, y, z]`, or [`Point2D`]
 dim([-w / 2, 0, 0], [w / 2, 0, 0], { label: "Width" });
 dim([0, 0, -h / 2], [0, 0, h / 2], { label: "Height", offset: 14 });
 dim([0, 0, 0], [100, 0, 0], { component: "Base", color: "#00AAFF" });
+dim(sk.line(a, b), { label: "Span", offset: -8 });   // Line2D entity
+dim(myBox.edge("top-right"), { label: "Depth" });    // EdgeRef entity
 ```
+
+[`Line2D`](/docs/sketch#line2d) / `EdgeRef` entity (then pass `opts` as the second argument)
 
 `component` (string or string[] — report ownership), `currentComponent` (boolean)
 
-```ts
-dim(from: PointArg, to: PointArg, opts?: DimOpts): void
-```
-
 `DimOpts`: `{ offset?: number, label?: string, color?: string, component?: string | string[], currentComponent?: boolean }`
 
-#### `dimLine()` — Add a dimension annotation along a [`Line2D`](/docs/sketch#line2d).
+**`EdgeRef`**
 
-Convenience wrapper around { points from a constrained-sketch [`Line2D`](/docs/sketch#line2d) entity. All `opts` are forwarded unchanged.
+| Option | Type | Description |
+|--------|------|-------------|
+| `start` | `Vec3` | Start point |
+| `end` | `Vec3` | End point |
+| `query?` | `EdgeQueryRef` | Compiler-owned edge query when available. |
+| `curve?` | `EdgeCurve` | Exact or parametric curve family when the backend/source can identify one. |
+| `faceName?` | `string` | Owning face name when the edge is associated with one face in a larger topology. |
 
-```ts
-const a = point(0, 0);
-const b = point(100, 0);
-dimLine(line(a, b), { label: "Span", offset: -8 });
-```
-
-```ts
-dimLine(l: Line2D, opts?: DimOpts): void
-```
+Also: `name: EdgeName`.
 
 ### Sketch Export
 
-#### `sketchToDxf()` — Export a 2D sketch as a DXF string (R12/AC1009 — maximally compatible).
+#### `sketchToDxf(sketch: Sketch, options?: SketchDxfOptions): string` — Export a 2D sketch as a DXF string (R12/AC1009 — maximally compatible).
 
 For regular sketches, each polygon loop becomes a closed `LWPOLYLINE`. For constrained sketches, exports raw `LINE`, `CIRCLE`, and `ARC` entities from the constraint edge geometry, which preserves internal/shared edges that `toPolygons()` would merge away.
 
@@ -213,15 +211,11 @@ const s = rect(100, 60);
 const dxf = sketchToDxf(s, { layer: 'cut' });
 ```
 
-```ts
-sketchToDxf(sketch: Sketch, options?: SketchDxfOptions): string
-```
-
 **`SketchDxfOptions`**
 - `layer?: string` — DXF layer name. Default: "0"
 - `colorIndex?: number` — DXF color index (1–255, AutoCAD ACI). Default: 7 (white/black)
 
-#### `sketchToSvg()` — Export a 2D sketch as an SVG string.
+#### `sketchToSvg(sketch: Sketch, options?: SketchSvgOptions): string` — Export a 2D sketch as an SVG string.
 
 For regular sketches, exports filled polygon regions. For constrained sketches, exports raw edge geometry (LINE, ARC, CIRCLE) which preserves internal/shared edges that `toPolygons()` would merge away.
 
@@ -230,10 +224,6 @@ The SVG uses the sketch's native coordinate system (Y-up) with a CSS transform t
 ```ts
 const s = rect(100, 60);
 const svg = sketchToSvg(s, { stroke: '#333', strokeWidth: 0.8 });
-```
-
-```ts
-sketchToSvg(sketch: Sketch, options?: SketchSvgOptions): string
 ```
 
 **`SketchSvgOptions`**

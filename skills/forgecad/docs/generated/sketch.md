@@ -9,13 +9,10 @@ skill-order: 100
 
 ## Contents
 
-- [2D Sketch Primitives](#2d-sketch-primitives) — `path`, `stroke`, `rect`, `circle2d`, `roundedRect`, `polygon`, `ngon`, `ellipse`, `slot`, `arcSlot`, `star`
-- [2D Sketch Booleans](#2d-sketch-booleans) — `union2d`, `difference2d`, `intersection2d`
-- [2D Sketch Features](#2d-sketch-features) — `filletCorners`
-- [Tracked Solid Edge Features](#tracked-solid-edge-features) — `filletTrackedEdge`, `chamferTrackedEdge`
-- [2D Text](#2d-text) — `loadFont`, `text2d`, `textWidth`
-- [Constrained Sketches](#constrained-sketches) — `constrainedSketch`, `addRect`, `addPolygon`, `addRegularPolygon`
-- [2D Geometry Helpers](#2d-geometry-helpers) — `point`, `line`, `circle`, `degrees`, `radians`
+- [2D Sketch Primitives](#2d-sketch-primitives)
+- [2D Sketch Booleans](#2d-sketch-booleans)
+- [2D Text](#2d-text)
+- [Constrained Sketches](#constrained-sketches)
 - [Sketch](#sketch) — Transforms, Booleans, Features, Promotion, Placement, Labels, Measurement
 - [ConstrainedSketchBuilder](#constrainedsketchbuilder) — Drawing, Entities, Geometric Constraints, Dimensional Constraints, Coincidence & Equality, Tangent Transitions, Shape Constraints, Positioning, Solving
 - [ConstraintSketch](#constraintsketch)
@@ -29,7 +26,7 @@ skill-order: 100
 
 ### 2D Sketch Primitives
 
-#### `path()` — Create a new [`PathBuilder`](/docs/curves#pathbuilder) for tracing a 2D outline point by point.
+#### `path(): PathBuilder` — Create a new [`PathBuilder`](/docs/curves#pathbuilder) for tracing a 2D outline point by point.
 
 [`PathBuilder`](/docs/curves#pathbuilder) is a fluent API for constructing 2D profiles using a mix of line segments, arcs, bezier curves, and splines. Always start with `.moveTo(x, y)` to set the starting point. Call `.close()` to get a filled `Sketch`, or `.stroke(width)` to thicken an open polyline into a solid profile.
 
@@ -51,27 +48,17 @@ const slot = path()
   .close();
 ```
 
-```ts
-path(): PathBuilder
-```
+#### `stroke(points: Vec2[], width: number, join?: "Round" | "Square"): Sketch` — Thicken a 2D polyline (centerline) into a solid filled profile of uniform width.
 
-#### `stroke()` — Create a stroked polyline sketch from an array of 2D points.
+Standalone equivalent of `path()...stroke(width, join)`. Use for centerline-based geometry — ribs, wire traces, brackets. For rounding corners of a *closed* outline use `.filletCorners(radius)` (all corners) or `.filletCorner([x, y], radius)` (one corner) instead.
 
-```ts
-stroke(points: [ number, number ][], width: number, join?: "Round" | "Square"): Sketch
-```
-
-#### `rect()` — Create a 2D rectangle centered at the origin.
+#### `rect(width: number, height: number): Sketch` — Create a 2D rectangle centered at the origin.
 
 ```ts
 rect(40, 20).extrude(5);
 ```
 
-```ts
-rect(width: number, height: number): Sketch
-```
-
-#### `circle2d()` — Create a 2D circle centered at the origin.
+#### `circle2d(radius: number, segments?: number): Sketch` — Create a 2D circle centered at the origin.
 
 Omit `segments` for a smooth (auto-tessellated) circle. Pass an integer to get a regular polygon approximation — e.g. `6` for a hexagon, `8` for an octagon.
 
@@ -80,11 +67,7 @@ circle2d(25).extrude(10);          // smooth cylinder
 circle2d(25, 6).extrude(10);       // hexagonal prism
 ```
 
-```ts
-circle2d(radius: number, segments?: number): Sketch
-```
-
-#### `roundedRect()` — Create a 2D rectangle with rounded corners, centered at the origin.
+#### `roundedRect(width: number, height: number, radius: number): Sketch` — Create a 2D rectangle with rounded corners, centered at the origin.
 
 The corner radius is automatically clamped to `min(width/2, height/2)` so it can never exceed the shape dimensions.
 
@@ -92,11 +75,7 @@ The corner radius is automatically clamped to `min(width/2, height/2)` so it can
 roundedRect(60, 30, 5).extrude(3);
 ```
 
-```ts
-roundedRect(width: number, height: number, radius: number): Sketch
-```
-
-#### `polygon()` — Create a 2D polygon from an array of `[x, y]` points or `Point2D` objects.
+#### `polygon(points: (Vec2 | Point2D)[]): Sketch` — Create a 2D polygon from an array of `[x, y]` points or `Point2D` objects.
 
 Winding order is normalized automatically — clockwise (CW) input is silently reversed to CCW before being passed to the geometry kernel.
 
@@ -104,11 +83,7 @@ Winding order is normalized automatically — clockwise (CW) input is silently r
 polygon([[0, 0], [50, 0], [25, 40]]).extrude(5); // triangle
 ```
 
-```ts
-polygon(points: ([ number, number ] | Point2D)[]): Sketch
-```
-
-#### `ngon()` — Create a regular polygon inscribed in a circle of the given radius.
+#### `ngon(sides: number, radius: number): Sketch` — Create a regular polygon inscribed in a circle of the given radius.
 
 `radius` is the center-to-vertex (circumradius) distance. Use `sides` of `3` for a triangle, `6` for a hexagon, etc. The first vertex is at the top (−90° from +X).
 
@@ -116,32 +91,20 @@ polygon(points: ([ number, number ] | Point2D)[]): Sketch
 ngon(6, 20).extrude(10); // hexagonal prism, circumradius 20
 ```
 
-```ts
-ngon(sides: number, radius: number): Sketch
-```
-
-#### `ellipse()` — Create a 2D ellipse centered at the origin.
+#### `ellipse(rx: number, ry: number, segments?: number): Sketch` — Create a 2D ellipse centered at the origin.
 
 ```ts
 ellipse(30, 15).extrude(5);
 ellipse(30, 15, 32).extrude(5); // lower-resolution approximation
 ```
 
-```ts
-ellipse(rx: number, ry: number, segments?: number): Sketch
-```
-
-#### `slot()` — Create a slot (oblong / stadium shape) — a rectangle with semicircular ends, centered at the origin.
+#### `slot(length: number, width: number): Sketch` — Create a slot (oblong / stadium shape) — a rectangle with semicircular ends, centered at the origin.
 
 ```ts
 slot(40, 10).extrude(3); // 40mm long, 10mm wide slot
 ```
 
-```ts
-slot(length: number, width: number): Sketch
-```
-
-#### `arcSlot()` — Create an arc-shaped slot (banana / annular sector) centered at the origin.
+#### `arcSlot(pitchRadius: number, sweepDeg: number, thickness: number): Sketch` — Create an arc-shaped slot (banana / annular sector) centered at the origin.
 
 The slot is symmetric about the +X axis. The two ends are closed with semicircular caps. `pitchRadius` is the distance from the origin to the centerline of the slot, and `thickness` is the radial width of the slot.
 
@@ -149,23 +112,9 @@ The slot is symmetric about the +X axis. The two ends are closed with semicircul
 arcSlot(135, 74, 40).extrude(5); // pitch R135, 74° sweep, 40mm wide
 ```
 
-```ts
-arcSlot(pitchRadius: number, sweepDeg: number, thickness: number): Sketch
-```
-
-#### `star()` — Create a star shape with alternating outer and inner radii.
-
-```ts
-star(5, 30, 12).extrude(4); // five-pointed star
-```
-
-```ts
-star(points: number, outerR: number, innerR: number): Sketch
-```
-
 ### 2D Sketch Booleans
 
-#### `union2d()` — Combine 2D sketches into a single profile using an additive boolean union.
+#### `union2d(...inputs: SketchOperandInput[]): Sketch` — Combine 2D sketches into a single profile using an additive boolean union.
 
 Accepts individual sketches or arrays: `union2d(a, b, c)` or `union2d([a, b, c])`. Uses Manifold's batch operation — faster than chaining `.add()` one by one when combining many sketches.
 
@@ -173,11 +122,7 @@ Accepts individual sketches or arrays: `union2d(a, b, c)` or `union2d([a, b, c])
 const cross = union2d(rect(60, 10), rect(10, 60));
 ```
 
-```ts
-union2d(...inputs: SketchOperandInput[]): Sketch
-```
-
-#### `difference2d()` — Subtract one or more 2D sketches from a base sketch.
+#### `difference2d(...inputs: SketchOperandInput[]): Sketch` — Subtract one or more 2D sketches from a base sketch.
 
 The first sketch is the base; all subsequent sketches are subtracted from it. Accepts individual sketches or arrays: `difference2d(base, c1, c2)` or `difference2d([base, c1, c2])`. Uses Manifold's batch operation — faster than chaining `.subtract()` one by one.
 
@@ -185,11 +130,7 @@ The first sketch is the base; all subsequent sketches are subtracted from it. Ac
 const donut = difference2d(circle2d(50), circle2d(30));
 ```
 
-```ts
-difference2d(...inputs: SketchOperandInput[]): Sketch
-```
-
-#### `intersection2d()` — Keep only the area where all input sketches overlap (intersection boolean).
+#### `intersection2d(...inputs: SketchOperandInput[]): Sketch` — Keep only the area where all input sketches overlap (intersection boolean).
 
 Accepts individual sketches or arrays: `intersection2d(a, b)` or `intersection2d([a, b, c])`. Uses Manifold's batch operation — faster than chaining `.intersect()` one by one.
 
@@ -197,92 +138,9 @@ Accepts individual sketches or arrays: `intersection2d(a, b)` or `intersection2d
 const lens = intersection2d(circle2d(30).translate(-10, 0), circle2d(30).translate(10, 0));
 ```
 
-```ts
-intersection2d(...inputs: SketchOperandInput[]): Sketch
-```
-
-### 2D Sketch Features
-
-#### `filletCorners()` — Create a polygon from points with specific corners rounded to arc fillets.
-
-Each corner spec identifies a vertex by its index in the `points` array and the desired fillet `radius`. Both convex and concave corners are supported.
-
-Constraints:
-
-- Collinear corners cannot be filleted (throws an error)
-- Two neighboring fillets whose tangent lengths overlap the same edge will throw
-- Radius must be positive and small enough to fit within the adjacent edge lengths
-
-Use `offset(-r).offset(+r)` instead if you want to round **all** convex corners uniformly. Use `filletCorners` when you need selective or mixed sharp/rounded profiles.
-
-```ts
-const roof = filletCorners(roofPoints, [
-  { index: 3, radius: 19 },
-  { index: 4, radius: 19 },
-  { index: 5, radius: 19 },
-]);
-```
-
-```ts
-filletCorners(points: PointInput[], corners: FilletCornerSpec[]): Sketch
-```
-
-`FilletCornerSpec`: `{ index: number, radius: number, segments?: number }`
-
-### Tracked Solid Edge Features
-
-#### `filletTrackedEdge()` — Round a tracked vertical solid edge with a circular fillet.
-
-Compiler-owned fillet for a narrow tracked-edge subset on solids.
-
-This is **not** a general 2D sketch-corner fillet. It currently works only on tracked vertical edges from [`box()`](/docs/core#box) or `Rectangle2D` extrusions (plus rigid transforms and supported preserved descendants of those). Generic sketch extrudes, including `rect(...).extrude(...)`, are outside the supported subset right now.
-
-**Supported edges:**
-
-- Tracked vertical edges from [`box()`](/docs/core#box) or `Rectangle2D.extrude()`
-- Rigid transforms between tracked source and target
-- Untouched sibling tracked vertical edges after earlier `filletTrackedEdge`/`chamferTrackedEdge`
-
-**Not supported:** edges after shell, hole, cut, trim, difference, intersection, generic sketch extrudes, or tapered extrudes.
-
-Canonical quadrants: `vert-bl → [1,-1]`, `vert-br → [-1,-1]`, `vert-tr → [-1,1]`, `vert-tl → [1,1]`
-
-```ts
-const base = Rectangle2D.fromDimensions(0, 0, 50, 50).extrude(20);
-const filleted = filletTrackedEdge(base, base.edge('vert-br'), 5, [-1, -1]);
-```
-
-```ts
-filletTrackedEdge(shape: Shape, edge: EdgeRef, radius: number, quadrant?: [ number, number ], segments?: number): Shape
-```
-
-**`EdgeRef`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `start` | `[ number, number, number ]` | Start point |
-| `end` | `[ number, number, number ]` | End point |
-| `query?` | `EdgeQueryRef` | Compiler-owned edge query when available. |
-| `curve?` | `EdgeCurve` | Exact or parametric curve family when the backend/source can identify one. |
-| `faceName?` | `string` | Owning face name when the edge is associated with one face in a larger topology. |
-| `name` | | — |
-
-#### `chamferTrackedEdge()` — Bevel a tracked vertical solid edge with a 45° chamfer.
-
-Compiler-owned chamfer for tracked vertical edges. Requires a compile-plan-covered target. This is not a general 2D sketch-corner tool; supported subset and quadrant semantics are the same as `filletTrackedEdge()` - see that function for details.
-
-```ts
-const base = Rectangle2D.fromDimensions(0, 0, 50, 50).extrude(20);
-const chamfered = chamferTrackedEdge(base, base.edge('vert-br'), 3, [-1, -1]);
-```
-
-```ts
-chamferTrackedEdge(shape: Shape, edge: EdgeRef, size: number, quadrant?: [ number, number ]): Shape
-```
-
 ### 2D Text
 
-#### `loadFont()` — Pre-load and cache a font for use with `text2d()`.
+#### `loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype.Font` — Pre-load and cache a font for use with `text2d()`.
 
 Fonts are cached by their source string (or `cacheKey` for `ArrayBuffer` sources), so repeated calls with the same path are free. Pre-loading is useful when you call `text2d()` many times with the same font — it avoids repeated disk reads.
 
@@ -296,11 +154,7 @@ text2d('Title', { size: 12, font }).extrude(1.5);
 text2d('Subtitle', { size: 8, font }).extrude(1);
 ```
 
-```ts
-loadFont(source: string | ArrayBuffer, cacheKey?: string): opentype.Font
-```
-
-#### `text2d()` — Build a filled 2D Sketch from a text string.
+#### `text2d(content: string, options?: TextOptions): Sketch` — Build a filled 2D Sketch from a text string.
 
 The Sketch origin is at the left end of the text baseline by default. Use `align` and `baseline` options to adjust placement. Text is rendered using the bundled Inter font by default, or any TTF/OTF/WOFF font you provide.
 
@@ -333,10 +187,6 @@ const font = loadFont('/path/to/Arial Bold.ttf');
 text2d('Title', { size: 12, font }).extrude(1.5);
 ```
 
-```ts
-text2d(content: string, options?: TextOptions): Sketch
-```
-
 **`TextOptions`**
 
 | Option | Type | Description |
@@ -348,7 +198,7 @@ text2d(content: string, options?: TextOptions): Sketch
 | `font?` | `string \| opentype.Font` | Font to use for text rendering. - `'sans-serif'` or `'inter'` — bundled Inter font (works everywhere, including browser) - **file path** — path to a TTF, OTF, or WOFF font file (CLI/Node only) - **Font object** — a previously loaded opentype.js Font (from `loadFont()`) - **omitted** — uses the bundled Inter font (same as `'sans-serif'`) |
 | `flattenTolerance?` | `number` | Bezier flattening tolerance in model units. Smaller = more polygon segments = smoother curves. |
 
-#### `textWidth()` — Measure the rendered advance width of a string without creating any geometry.
+#### `textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number` — Measure the rendered advance width of a string without creating any geometry.
 
 Uses the same font metrics as `text2d()`. Useful for computing layout dimensions before building the actual sketch — e.g. sizing a plate to fit a label.
 
@@ -357,13 +207,9 @@ const w = textWidth('SERIAL: 001', { size: 6 });
 const plate = box(w + 10, 12, 2);
 ```
 
-```ts
-textWidth(content: string, options?: Pick<TextOptions, "size" | "letterSpacing" | "font">): number
-```
-
 ### Constrained Sketches
 
-#### `constrainedSketch()` — Create a parametric 2D sketch driven by geometric constraints and a nonlinear solver.
+#### `constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder` — Create a parametric 2D sketch driven by geometric constraints and a nonlinear solver.
 
 **Workflow**
 
@@ -394,183 +240,8 @@ result.inspect();               // human-readable summary
 result.withUpdatedConstraint('cst-5', 120); // update a dimension without rebuilding
 ```
 
-```ts
-constrainedSketch(options?: ConstrainedSketchOptions): ConstrainedSketchBuilder
-```
-
 **`ConstrainedSketchOptions`**
 - `strict?: boolean` — When true, adding a constraint that cannot be satisfied throws instead of silently discarding it.
-
-#### `addRect()` — Add an axis-aligned rectangle concept to the builder.
-
-Creates 4 vertices (CCW: bl→br→tr→tl), 4 sides, 4 structural constraints (`horizontal`/`vertical` on each side), CCW winding, a center point, a loop, and a shape. Returns a `ConstrainedRect` handle with 4 DOF (x, y, width, height).
-
-Use `sk.rect()` as the shorthand builder method.
-
-```ts
-const sk = constrainedSketch();
-const r = sk.rect({ x: 0, y: 0, width: 100, height: 50 });
-sk.fix(r.bottomLeft, 0, 0);
-sk.length(r.bottom, 120);  // override initial width
-return sk.solve().extrude(10);
-```
-
-```ts
-addRect(sk: ConstrainedSketchBuilder, options?: RectOptions): ConstrainedRect
-```
-
-**`RectOptions`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `x?` | `number` | Bottom-left x coordinate. Default: 0. |
-| `y?` | `number` | Bottom-left y coordinate. Default: 0. |
-| `width?` | `number` | Width (along x). Default: 10. |
-| `height?` | `number` | Height (along y). Default: 10. |
-| `blockRotation?` | `boolean` | Prevent 180° rotation (ensures bottom edge points rightward). Default: false. |
-
-**`ConstrainedRect`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `bottom` | `LineId` | bottom-left → bottom-right |
-| `right` | `LineId` | bottom-right → top-right |
-| `top` | `LineId` | top-right → top-left |
-| `left` | `LineId` | top-left → bottom-left |
-| `center` | `PointId` | Center point constrained to the geometric center via `midpoint` on the diagonal. Can be used in further constraints: `sk.fix(rect.center, 0, 0)`, `sk.coincident(rect.center, other)`. |
-| `shape` | `ShapeId` | ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`. |
-| `vertices` | `[ PointId, PointId, PointId, PointId ]` | CCW-ordered vertex array: [bottomLeft, bottomRight, topRight, topLeft]. |
-| `sides` | `[ LineId, LineId, LineId, LineId ]` | CCW-ordered side array: [bottom, right, top, left]. |
-| `bottomLeft`, `bottomRight`, `topRight`, `topLeft` | | — |
-
-#### `addPolygon()` — Add a general polygon concept to the builder.
-
-Creates n vertices and n sides (CCW: `sides[i]` from `vertices[i]` → `vertices[(i+1) % n]`). Applies a `ccw` constraint to enforce winding. All dimensional constraints (lengths, angles, position) are left to the caller.
-
-Use `sk.addPolygon()` as the shorthand builder method.
-
-```ts
-const sk = constrainedSketch();
-const tri = sk.addPolygon({ points: [[0,0],[100,0],[50,80]] });
-sk.fix(tri.vertex(0), 0, 0);
-sk.length(tri.side(0), 100);
-return sk.solve().extrude(5);
-```
-
-```ts
-addPolygon(sk: ConstrainedSketchBuilder, options: PolygonOptions): ConstrainedPolygon
-```
-
-**`PolygonOptions`**
-- `points: ReadonlyArray<readonly [ number, number ]>` — Initial vertex coordinates. Minimum 3 points.
-- `addLoop?: boolean` — Whether to register a closed loop for sketch generation. Default: true.
-- `blockRotation?: boolean` — Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false.
-
-**`ConstrainedPolygon`**
-- `vertices: PointId[]` — CCW-ordered PointIds.
-- `sides: LineId[]` — CCW-ordered LineIds. `sides[i]` runs from `vertices[i]` → `vertices[(i+1) % n]`.
-- `shape: ShapeId` — ShapeId for `shapeWidth`, `shapeHeight`, `shapeArea`, `shapeCentroidX/Y`.
-
-#### `addRegularPolygon()` — Add a regular n-gon concept to the builder.
-
-Vertices are placed at `(cx + r·cos(startAngle + i·2π/n), cy + r·sin(...))`. Equal-radius and equal-side constraints enforce regularity (4 DOF: center x/y, radius, rotation). The center point is tracked by the solver and exposed via the returned handle.
-
-Use `sk.regularPolygon()` as the shorthand builder method.
-
-```ts
-const sk = constrainedSketch();
-const hex = sk.regularPolygon({ sides: 6, radius: 25 });
-sk.fix(hex.center, 0, 0);
-sk.length(hex.side(0), 30);  // all sides change (equal constraint)
-return sk.solve().extrude(5);
-```
-
-```ts
-addRegularPolygon(sk: ConstrainedSketchBuilder, options: RegularPolygonOptions): ConstrainedRegularPolygon
-```
-
-**`RegularPolygonOptions`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `sides` | `number` | Number of sides (minimum 3). |
-| `radius?` | `number` | Circumradius — distance from center to vertex. Default: 10. |
-| `cx?` | `number` | Center x coordinate. Default: 0. |
-| `cy?` | `number` | Center y coordinate. Default: 0. |
-| `startAngle?` | `number` | Angle (in degrees) of vertex[0] measured from the +X axis (CCW positive). Default: 0 (rightmost vertex). |
-| `blockRotation?` | `boolean` | Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. |
-
-
-**`ConstrainedRegularPolygon`** extends ConstrainedPolygon
-- `center: PointId` — Center point. Use `sk.fix(poly.center, x, y)` to pin location, or `sk.coincident(poly.center, other)` to align with other geometry.
-
-### 2D Geometry Helpers
-
-#### `point()` — Create an analytic 2D point for measurement and construction geometry.
-
-```ts
-const p = point(10, 20);
-p.distanceTo(point(30, 40));  // Euclidean distance
-p.midpointTo(point(30, 40)); // midpoint
-p.translate(5, 5);           // new shifted point
-p.toTuple();                 // [10, 20]
-```
-
-```ts
-point(x: number, y: number): Point2D
-```
-
-#### `line()` — Create an analytic 2D line segment between two points.
-
-```ts
-const l = line(0, 0, 50, 0);
-l.length; l.midpoint; l.angle; l.direction;
-l.parallel(10);          // parallel line offset 10 (positive = left)
-l.intersect(l2);         // Point2D — treats lines as infinite
-l.intersectSegment(l2);  // Point2D or null — segments only
-
-Line2D.fromPointAndAngle(point(0, 0), 45, 100);
-Line2D.fromPointAndDirection(point(0, 0), [1, 1], 50);
-```
-
-```ts
-line(x1: number, y1: number, x2: number, y2: number): Line2D
-```
-
-#### `circle()` — Create an analytic 2D circle for measurement, construction, and extrusion.
-
-```ts
-const c = circle(0, 0, 25);
-c.diameter; c.circumference; c.area;
-c.pointAtAngle(90);  // Point2D at top (90° CCW from +X)
-
-// Extrude to cylinder with named faces
-const cyl = c.extrude(30);
-cyl.face('top');   // FaceRef (planar)
-cyl.face('side');  // FaceRef (curved)
-
-Circle2D.fromDiameter(point(0, 0), 50);
-```
-
-```ts
-circle(cx: number, cy: number, radius: number): Circle2D
-```
-
-#### `degrees()` — Identity function that returns degrees unchanged.
-
-Use for clarity when the unit of an angle value would otherwise be ambiguous — e.g. `param("Angle", degrees(45))`.
-
-```ts
-degrees(deg: number): number
-```
-
-#### `radians()` — Convert radians to degrees.
-
-ForgeCAD's public API uses degrees throughout. Use this when you have a radian value (e.g. from `Math.atan2`) that you want to express in degrees.
-
-```ts
-radians(rad: number): number
-```
 
 ---
 
@@ -586,7 +257,7 @@ Supported operations:
 
 - **Transforms** — `translate`, `rotate`, `rotateAround`, `scale`, `mirror`
 - **Booleans** — `add` (union), `subtract` (difference), `intersect`
-- **Operations** — `offset`, `simplify`
+- **Operations** — `offset`, `simplify`, `filletCorners`, `filletCorner`, `chamferCorners`, `chamferCorner`
 - **Queries** — `area`, `bounds`, `isEmpty`, `numVert`
 - **3D operations** — `extrude`, `revolve`, `onFace`
 - **Regions** — `regions`, `region`
@@ -602,59 +273,31 @@ Named anchor positions used by `attachTo()`: `'center'` | `'top-left'` | `'top-r
 
 **Transforms**
 
-#### `translate()` — Move the sketch by the given X and Y offset.
+#### `translate(x: number, y?: number): Sketch` — Move the sketch by the given X and Y offset.
 
-```ts
-translate(x: number, y?: number): Sketch
-```
+#### `rotate(degrees: number): Sketch` — Rotate the sketch around its bounding-box center.
 
-#### `rotate()` — Rotate the sketch around its bounding-box center.
-
-```ts
-rotate(degrees: number): Sketch
-```
-
-#### `rotateAround()` — Rotate the sketch around a specific pivot point.
+#### `rotateAround(degrees: number, pivot: Vec2): Sketch` — Rotate the sketch around a specific pivot point.
 
 ```ts
 rect(20, 20).rotateAround(45, [0, 0]);
 ```
 
-```ts
-rotateAround(degrees: number, pivot: [ number, number ]): Sketch
-```
-
-#### `scale()` — Scale the sketch relative to its bounding-box center.
+#### `scale(v: number | Vec2): Sketch` — Scale the sketch relative to its bounding-box center.
 
 Pass a single number for uniform scaling, or `[sx, sy]` for per-axis scaling.
 
-```ts
-scale(v: number | [ number, number ]): Sketch
-```
+#### `scaleAround(pivot: Vec2, v: number | Vec2): Sketch` — Scale the sketch relative to an arbitrary pivot point.
 
-#### `scaleAround()` — Scale the sketch relative to an arbitrary pivot point.
-
-```ts
-scaleAround(pivot: [ number, number ], v: number | [ number, number ]): Sketch
-```
-
-#### `mirror()` — Mirror the sketch across a line through its bounding-box center.
+#### `mirror(normal: Vec2): Sketch` — Mirror the sketch across a line through its bounding-box center.
 
 `normal` is the normal vector of the mirror line (not the line direction). For example, `[1, 0]` mirrors across a vertical line (Y axis direction), and `[0, 1]` mirrors across a horizontal line.
 
-```ts
-mirror(normal: [ number, number ]): Sketch
-```
-
-#### `mirrorThrough()` — Mirror the sketch across a line defined by a point and a normal direction.
-
-```ts
-mirrorThrough(point: [ number, number ], normal: [ number, number ]): Sketch
-```
+#### `mirrorThrough(point: Vec2, normal: Vec2): Sketch` — Mirror the sketch across a line defined by a point and a normal direction.
 
 **Booleans**
 
-#### `add()` — Add (union) one or more sketches to this sketch.
+#### `add(...others: SketchOperandInput[]): Sketch` — Add (union) one or more sketches to this sketch.
 
 Accepts individual sketches or arrays: `sketch.add(a, b)` or `sketch.add([a, b])`. For combining many sketches at once, prefer the free function `union2d()` which uses Manifold's batch operation and is faster than chaining.
 
@@ -662,11 +305,7 @@ Accepts individual sketches or arrays: `sketch.add(a, b)` or `sketch.add([a, b])
 circle2d(20).add(rect(10, 30)).extrude(5);
 ```
 
-```ts
-add(...others: SketchOperandInput[]): Sketch
-```
-
-#### `subtract()` — Subtract one or more sketches from this sketch.
+#### `subtract(...others: SketchOperandInput[]): Sketch` — Subtract one or more sketches from this sketch.
 
 Accepts individual sketches or arrays: `sketch.subtract(a, b)` or `sketch.subtract([a, b])`. For subtracting many cutters at once, prefer the free function `difference2d()`.
 
@@ -674,38 +313,64 @@ Accepts individual sketches or arrays: `sketch.subtract(a, b)` or `sketch.subtra
 rect(40, 40).subtract(circle2d(10)).extrude(5);
 ```
 
-```ts
-subtract(...others: SketchOperandInput[]): Sketch
-```
-
-#### `intersect()` — Intersect this sketch with one or more others (keep overlapping area only).
+#### `intersect(...others: SketchOperandInput[]): Sketch` — Intersect this sketch with one or more others (keep overlapping area only).
 
 Accepts individual sketches or arrays: `sketch.intersect(a, b)` or `sketch.intersect([a, b])`. For intersecting many sketches, prefer the free function `intersection2d()`.
 
-```ts
-intersect(...others: SketchOperandInput[]): Sketch
-```
-
 **Features**
 
-#### `offset()` — Inflate (positive delta) or deflate (negative delta) the sketch contour.
+#### `offset(delta: number, join?: "Square" | "Round" | "Miter"): Sketch` — Inflate (positive delta) or deflate (negative delta) the sketch contour.
 
-Use `offset(-r).offset(+r)` to round every convex corner of a closed sketch.
+For rounding corners, prefer `filletCorners(radius)` (all corners) or `filletCorner([x, y], radius)` (one corner) — they round only true corners and keep concave geometry exact.
 
 - `'Round'` — smooth arc at each corner (default)
 - `'Square'` — flat mitered extension
 - `'Miter'` — sharp pointed extension
 
 ```ts
-rect(40, 20).offset(3);            // expand by 3
-rect(40, 20).offset(-2).offset(2); // round all convex corners
+rect(40, 20).offset(3); // expand by 3
 ```
+
+#### `filletCorners(radius: number): Sketch` — Round every significant corner of this sketch with the same fillet radius.
+
+Works on any sketch — primitives, boolean results, attached or composed profiles. A vertex counts as a corner when its turn angle is at least 30°, so vertices that belong to tessellated circles or earlier fillets are left untouched. Both convex and concave corners are rounded. Holes are preserved, and their corners are rounded too.
+
+Throws if the sketch has no significant corners, or if the radius does not fit a corner (the error names the corner and the maximum radius).
 
 ```ts
-offset(delta: number, join?: "Square" | "Round" | "Miter"): Sketch
+rect(60, 30).filletCorners(5).extrude(4);          // rounded plate
+polygon(bracketPts).filletCorners(3);              // every corner of an outline
 ```
 
-#### `regions()` — Decompose this sketch into its distinct filled regions, sorted largest-first by area.
+#### `filletCorner(at: Vec2, radius: number): Sketch` — Round the single corner of this sketch nearest to a seed point.
+
+Selects the significant corner (turn angle ≥ 30°) closest to `at` — the seed does not need to be exact, just nearer to the intended corner than to any other (like `region([x, y])` seed selection). Throws if two corners are equidistant from the seed, naming both so you can move the seed.
+
+Chain calls to round several corners with different radii.
+
+```ts
+polygon(roofPts)
+  .filletCorner([45, 86], 14)  // peak
+  .filletCorner([24, 74], 8);  // left shoulder
+```
+
+#### `chamferCorners(size: number): Sketch` — Bevel every significant corner of this sketch with a straight chamfer.
+
+Replaces each significant corner (turn angle ≥ 30°) with a straight cut set back `size` along both adjacent edges. Tessellated arcs are left untouched; holes are preserved. Throws if the sketch has no significant corners or the size does not fit a corner.
+
+```ts
+rect(60, 30).chamferCorners(4).extrude(4); // beveled plate outline
+```
+
+#### `chamferCorner(at: Vec2, size: number): Sketch` — Bevel the single corner of this sketch nearest to a seed point.
+
+Selects the significant corner (turn angle ≥ 30°) closest to `at` and replaces it with a straight cut set back `size` along both adjacent edges. Throws if two corners are equidistant from the seed. Chain calls to bevel several corners with different sizes.
+
+```ts
+rect(60, 30).chamferCorner([30, 15], 6); // bevel only the top-right corner
+```
+
+#### `regions(): Sketch[]` — Decompose this sketch into its distinct filled regions, sorted largest-first by area.
 
 A single sketch can contain several disconnected filled areas (e.g., two separate rectangles, or a ring shape with a hole). This method enumerates all top-level connected regions as independent `Sketch` objects, each with its own outer boundary and associated holes.
 
@@ -715,11 +380,7 @@ const [left, right] = pair.regions(); // largest first
 left.extrude(5);
 ```
 
-```ts
-regions(): Sketch[]
-```
-
-#### `region()` — Select the single filled region that contains the given 2D seed point.
+#### `region(seed: Vec2): Sketch` — Select the single filled region that contains the given 2D seed point.
 
 The seed must lie strictly inside the filled area — not on a boundary edge and not inside a hole. Throws a descriptive error if the seed is outside all regions. If unsure where regions are, use `.regions()` first — each result has `.bounds()`.
 
@@ -728,27 +389,15 @@ const donut = circle2d(50).subtract(circle2d(30));
 donut.region([40, 0]).extrude(10); // seed at radius 40, inside the ring
 ```
 
-```ts
-region(seed: [ number, number ]): Sketch
-```
-
 **Promotion**
 
-#### `extrude()` — Extrude this 2D sketch along Z to create a 3D solid. Supports twist and scale tapering.
+#### `extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | Vec2; }): Shape` — Extrude this 2D sketch along Z to create a 3D solid. Supports twist and scale tapering.
 
-```ts
-extrude(height: number, opts?: { twist?: number; divisions?: number; scaleTop?: number | [ number, number ]; }): Shape
-```
-
-#### `revolve()` — Revolve this 2D sketch around the Y axis to create a 3D solid of revolution.
-
-```ts
-revolve(degrees?: number, segments?: number): Shape
-```
+#### `revolve(degrees?: number, segments?: number): Shape` — Revolve this 2D sketch around the world Z axis. Sketch X is radius; sketch Y becomes world Z height. Keep the profile at X > 0 unless it intentionally touches the axis.
 
 **Placement**
 
-#### `attachTo()` — Position this sketch relative to another using named anchor points.
+#### `attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: Vec2): Sketch` — Position this sketch relative to another using named anchor points.
 
 Computes the translation needed to align `selfAnchor` on this sketch with `targetAnchor` on the target sketch, then applies an optional pixel-exact offset.
 
@@ -759,101 +408,47 @@ const arm = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left');
 const shifted = rect(4, 70).attachTo(plate, 'bottom-left', 'top-left', [5, 0]);
 ```
 
-```ts
-attachTo(target: Sketch, targetAnchor: Anchor, selfAnchor?: Anchor, offset?: [ number, number ]): Sketch
-```
-
-#### `onFace()` — Place this sketch on a face or planar target in 3D space.
+#### `onFace(parentOrFace: Shape | { toShape(): Shape; } | { _bbox(): { min: number[]; max: number[]; }; } | FaceRef, faceOrOpts?: "front" | "back" | "left" | "right" | "top" | "bottom" | string | FaceRef | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor; }, opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor; }): Sketch` — Place this sketch on a face or planar target in 3D space.
 
 Use this when a 2D profile should be oriented onto a 3D face before extrusion or other downstream operations.
 
-```ts
-onFace(parentOrFace: Shape | { toShape(): Shape; } | { _bbox(): { min: number[]; max: number[]; }; } | FaceRef, faceOrOpts?: "front" | "back" | "left" | "right" | "top" | "bottom" | string | FaceRef | { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor; }, opts?: { u?: number; v?: number; protrude?: number; selfAnchor?: Anchor; }): Sketch
-```
+`FaceRef` — defined in [core](/docs/core).
 
 **Labels**
 
-#### `labelEdge()` — Label the single boundary edge (for circles, single-loop profiles). Returns a new sketch.
+#### `labelEdge(name: string): Sketch` — Label the single boundary edge (for circles, single-loop profiles). Returns a new sketch.
 
-```ts
-labelEdge(name: string): Sketch
-```
-
-#### `labelEdges()` — Label edges in winding order, or by named map for rect.
+#### `labelEdges(...args: (string | null)[] | [ Record<string, string> ]): Sketch` — Label edges in winding order, or by named map for rect.
 
 Positional: `labelEdges('bottom', 'right', 'top', 'left')` — one per edge, `null` to skip. Named (rect only): `labelEdges({ bottom: 'floor', top: 'ceiling' })`. Returns a new sketch.
 
-```ts
-labelEdges(...args: (string | null)[] | [ Record<string, string> ]): Sketch
-```
+#### `edgeLabels(): string[]` — List current edge label names.
 
-#### `edgeLabels()` — List current edge label names.
+#### `prefixLabels(prefix: string): Sketch` — Prefix all edge labels. Returns a new sketch with prefixed labels.
 
-```ts
-edgeLabels(): string[]
-```
+#### `renameLabel(from: string, to: string): Sketch` — Rename a single edge label. Returns a new sketch.
 
-#### `prefixLabels()` — Prefix all edge labels. Returns a new sketch with prefixed labels.
+#### `dropLabels(...names: string[]): Sketch` — Remove specific labels. Returns a new sketch.
 
-```ts
-prefixLabels(prefix: string): Sketch
-```
-
-#### `renameLabel()` — Rename a single edge label. Returns a new sketch.
-
-```ts
-renameLabel(from: string, to: string): Sketch
-```
-
-#### `dropLabels()` — Remove specific labels. Returns a new sketch.
-
-```ts
-dropLabels(...names: string[]): Sketch
-```
-
-#### `dropAllLabels()` — Remove all labels. Returns a new sketch.
-
-```ts
-dropAllLabels(): Sketch
-```
+#### `dropAllLabels(): Sketch` — Remove all labels. Returns a new sketch.
 
 **Measurement**
 
-#### `area()` — Return the total filled area of the sketch.
+#### `area(): number` — Return the total filled area of the sketch.
 
-```ts
-area(): number
-```
+#### `bounds(): ProfileBounds` — Return the axis-aligned bounding box of the sketch.
 
-#### `bounds()` — Return the axis-aligned bounding box of the sketch.
+#### `isEmpty(): boolean` — Return `true` if the sketch contains no filled area.
 
-```ts
-bounds(): ProfileBounds
-```
+#### `numVert(): number` — Return the number of vertices in the polygon representation of the sketch contours.
 
-#### `isEmpty()` — Return `true` if the sketch contains no filled area.
-
-```ts
-isEmpty(): boolean
-```
-
-#### `numVert()` — Return the number of vertices in the polygon representation of the sketch contours.
-
-```ts
-numVert(): number
-```
-
-#### `toPolygons()` — Return the sketch as a list of polygons matching its contour topology.
+#### `toPolygons(): number[][][]` — Return the sketch as a list of polygons matching its contour topology.
 
 Useful when you need raw polygon data for inspection or custom export.
 
-```ts
-toPolygons(): number[][][]
-```
-
 **Other**
 
-#### `color()` — Set the display color of this sketch.
+#### `color(value: string | undefined): Sketch` — Set the display color of this sketch.
 
 Color is preserved through all transforms and boolean operations. Pass `undefined` to clear the color.
 
@@ -861,129 +456,53 @@ Color is preserved through all transforms and boolean operations. Pass `undefine
 circle2d(20).color('#ff0000').extrude(5);
 ```
 
-```ts
-color(value: string | undefined): Sketch
-```
-
-#### `clone()` — Create an explicit copy of this sketch for branching variants.
+#### `clone(): Sketch` — Create an explicit copy of this sketch for branching variants.
 
 Because all Sketch operations are immutable, `clone()` is rarely needed. Use it when you want to assign the same sketch to multiple names and continue modifying each independently without confusion.
-
-```ts
-clone(): Sketch
-```
 
 ### `ConstrainedSketchBuilder`
 
 **Drawing**
 
-#### `moveTo()` — Move the cursor to `(x, y)` and start a new profile loop.
+#### `moveTo(x: number, y: number): this` — Move the cursor to `(x, y)` and start a new profile loop.
 
-```ts
-moveTo(x: number, y: number): this
-```
+#### `lineTo(x: number, y: number): this` — Draw a line from the current cursor to `(x, y)`.
 
-#### `lineTo()` — Draw a line from the current cursor to `(x, y)`.
+#### `lineH(dx: number): this` — Draw a horizontal line of length `dx` from the current cursor.
 
-```ts
-lineTo(x: number, y: number): this
-```
+#### `lineV(dy: number): this` — Draw a vertical line of length `dy` from the current cursor.
 
-#### `lineH()` — Draw a horizontal line of length `dx` from the current cursor.
+#### `lineAngled(length: number, degrees: number): this` — Draw a line of the given `length` at `degrees` from +X.
 
-```ts
-lineH(dx: number): this
-```
+#### `arcTo(x: number, y: number, radius: number, clockwise?: boolean): this` — Draw a circular arc from the current cursor to `(x, y)` with the given radius.
 
-#### `lineV()` — Draw a vertical line of length `dy` from the current cursor.
+#### `arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise?: boolean, name?: string, fixedRadius?: boolean): ArcId` — Create an arc from an explicit center point and endpoint IDs.
 
-```ts
-lineV(dy: number): this
-```
+#### `bezier(p0: any, p1: any, p2: any, p3: any, name?: string): BezierId` — Create a cubic Bezier curve from four control points.
 
-#### `lineAngled()` — Draw a line of the given `length` at `degrees` from +X.
+#### `bezierTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): this` — Draw a cubic Bezier from the current cursor to `(x3, y3)`.
 
-```ts
-lineAngled(length: number, degrees: number): this
-```
+#### `blendTo(x: number, y: number, weight?: number): this` — Draw a smooth Bezier tangent to the previous arc.
 
-#### `arcTo()` — Draw a circular arc from the current cursor to `(x, y)` with the given radius.
+#### `label(name: string): this` — Label the current path segment.
 
-```ts
-arcTo(x: number, y: number, radius: number, clockwise?: boolean): this
-```
+#### `close(): this` — Close the current path and register the loop.
 
-#### `arcByCenter()` — Create an arc from an explicit center point and endpoint IDs.
+#### `addLoopCircle(center: PointId, radius: number, segments?: number): this` — Add a circle loop to the path.
 
-```ts
-arcByCenter(centerId: PointId, startId: PointId, endId: PointId, clockwise?: boolean, name?: string, fixedRadius?: boolean): ArcId
-```
+#### `addLoop(points: any[]): this` — Add a closed polygon loop from point IDs.
 
-#### `bezier()` — Create a cubic Bezier curve from four control points.
-
-```ts
-bezier(p0: any, p1: any, p2: any, p3: any, name?: string): BezierId
-```
-
-#### `bezierTo()` — Draw a cubic Bezier from the current cursor to `(x3, y3)`.
-
-```ts
-bezierTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): this
-```
-
-#### `blendTo()` — Draw a smooth Bezier tangent to the previous arc.
-
-```ts
-blendTo(x: number, y: number, weight?: number): this
-```
-
-#### `label()` — Label the current path segment.
-
-```ts
-label(name: string): this
-```
-
-#### `close()` — Close the current path and register the loop.
-
-```ts
-close(): this
-```
-
-#### `addLoopCircle()` — Add a circle loop to the path.
-
-```ts
-addLoopCircle(center: PointId, radius: number, segments?: number): this
-```
-
-#### `addLoop()` — Add a closed polygon loop from point IDs.
-
-```ts
-addLoop(points: any[]): this
-```
-
-#### `addProfileLoop()` — Add a profile loop from prebuilt line/arc/bezier segments.
-
-```ts
-addProfileLoop(segments: Array<{ kind: "line"; line: any; } | { kind: "arc"; arc: any; } | { kind: "bezier"; bezier: any; }>): this
-```
+#### `addProfileLoop(segments: Array<{ kind: "line"; line: any; } | { kind: "arc"; arc: any; } | { kind: "bezier"; bezier: any; }>): this` — Add a profile loop from prebuilt line/arc/bezier segments.
 
 **Entities**
 
-#### `point()` — Add a free point to the sketch at `(x, y)`.
+#### `point(x?: number, y?: number, fixed?: boolean): PointId` — Add a free point to the sketch at `(x, y)`.
 
 If `x` or `y` are omitted, the point is placed at the bounding-box center of existing geometry so it starts near other entities rather than at the origin. Throws if either coordinate is `NaN` or `Infinity`.
 
-```ts
-point(x?: number, y?: number, fixed?: boolean): PointId
-```
+#### `pointAt(index: number): PointId` — Return the `PointId` of the point created at the given insertion index.
 
-#### `pointAt()` — Return the `PointId` of the point created at the given insertion index.
-
-```ts
-pointAt(index: number): PointId
-```
-
-#### `line()` — Connect two existing points with a line segment.
+#### `line(a: PointId, b: PointId, construction?: boolean, name?: string): LineId` — Connect two existing points with a line segment.
 
 Pass `construction = true` for a helper line that participates in constraints but is excluded from the solved sketch output (not part of any profile loop).
 
@@ -992,39 +511,19 @@ const axis = sk.line(sk.point(0, -50), sk.point(0, 50), true);
 sk.symmetric(p1, p2, axis);
 ```
 
-```ts
-line(a: PointId, b: PointId, construction?: boolean, name?: string): LineId
-```
+#### `lineAt(index: number): LineId` — Return the `LineId` of the line created at the given insertion index.
 
-#### `lineAt()` — Return the `LineId` of the line created at the given insertion index.
-
-```ts
-lineAt(index: number): LineId
-```
-
-#### `circle()` — Add a circle to the sketch with the given center point and initial radius.
+#### `circle(center: PointId, radius: number, construction?: boolean, segments?: number, name?: string): CircleId` — Add a circle to the sketch with the given center point and initial radius.
 
 The radius is a starting value — if you add a `radius()` or `diameter()` constraint, the solver will adjust it. Non-construction circles automatically register a loop.
 
-```ts
-circle(center: PointId, radius: number, construction?: boolean, segments?: number, name?: string): CircleId
-```
+#### `circleAt(index: number): CircleId` — Return the `CircleId` of the circle created at the given insertion index.
 
-#### `circleAt()` — Return the `CircleId` of the circle created at the given insertion index.
-
-```ts
-circleAt(index: number): CircleId
-```
-
-#### `shape()` — Register a named shape (closed polygon) from an ordered list of line IDs.
+#### `shape(lines: LineId[]): ShapeId` — Register a named shape (closed polygon) from an ordered list of line IDs.
 
 The `ShapeId` can be passed to `shapeWidth()`, `shapeHeight()`, `shapeArea()`, `shapeCentroidX()`, `shapeCentroidY()`, and `shapeEqualCentroid()` constraints. Shape registration is done automatically by concept factories like `rect()` and `addPolygon()`.
 
-```ts
-shape(lines: LineId[]): ShapeId
-```
-
-#### [`group()`](/docs/core#group) — Create a rigid-body group with a local coordinate frame.
+#### `group(opts?: { x?: number; y?: number; theta?: number; id?: string; }): SketchGroupBuilder` — Create a rigid-body group with a local coordinate frame.
 
 Points and lines added to the group move together as a unit — the solver sees 3 DOF (x, y, θ) instead of 2N per point. After configuring the group, call `.done()` to register it and receive a `SketchGroupHandle`.
 
@@ -1041,355 +540,161 @@ const handle = g.done();
 sk.coincident(p0, someExternalPoint);
 ```
 
-```ts
-group(opts?: { x?: number; y?: number; theta?: number; id?: string; }): SketchGroupBuilder
-```
+#### `rect(options?: RectOptions): ConstrainedRect` — Add an axis-aligned rectangle concept. Returns a `ConstrainedRect` handle with named vertices, sides, and center.
 
-#### `rect()` — Add an axis-aligned rectangle concept. Returns a `ConstrainedRect` handle with named vertices, sides, and center.
+**`RectOptions`**
 
-```ts
-rect(options?: RectOptions): ConstrainedRect
-```
+| Option | Type | Description |
+|--------|------|-------------|
+| `x?` | `number` | Bottom-left x coordinate. Default: 0. |
+| `y?` | `number` | Bottom-left y coordinate. Default: 0. |
+| `width?` | `number` | Width (along x). Default: 10. |
+| `height?` | `number` | Height (along y). Default: 10. |
+| `blockRotation?` | `boolean` | Prevent 180° rotation (ensures bottom edge points rightward). Default: false. |
 
-#### `addPolygon()` — Add a general polygon concept (CCW winding enforced). Returns a `ConstrainedPolygon` handle.
+#### `addPolygon(options: PolygonOptions): ConstrainedPolygon` — Add a general polygon concept (CCW winding enforced). Returns a `ConstrainedPolygon` handle.
 
-```ts
-addPolygon(options: PolygonOptions): ConstrainedPolygon
-```
+**`PolygonOptions`**
+- `points: ReadonlyArray<readonly Vec2>` — Initial vertex coordinates. Minimum 3 points.
+- `addLoop?: boolean` — Whether to register a closed loop for sketch generation. Default: true.
+- `blockRotation?: boolean` — Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false.
 
-#### `regularPolygon()` — Add a regular n-gon concept (equal sides, CCW winding). Returns a `ConstrainedRegularPolygon` handle with a center point.
+#### `regularPolygon(options: RegularPolygonOptions): ConstrainedRegularPolygon` — Add a regular n-gon concept (equal sides, CCW winding). Returns a `ConstrainedRegularPolygon` handle with a center point.
 
-```ts
-regularPolygon(options: RegularPolygonOptions): ConstrainedRegularPolygon
-```
+**`RegularPolygonOptions`**
 
-#### `groupRect()` — Add a rigid rectangle as a group concept. Returns a `ConstrainedGroupRect` handle with named vertices and sides. The rectangle is fixed in shape — only position (and optionally rotation) varies.
+| Option | Type | Description |
+|--------|------|-------------|
+| `sides` | `number` | Number of sides (minimum 3). |
+| `radius?` | `number` | Circumradius — distance from center to vertex. Default: 10. |
+| `cx?` | `number` | Center x coordinate. Default: 0. |
+| `cy?` | `number` | Center y coordinate. Default: 0. |
+| `startAngle?` | `number` | Angle (in degrees) of vertex[0] measured from the +X axis (CCW positive). Default: 0 (rightmost vertex). |
+| `blockRotation?` | `boolean` | Prevent 180° rotation (ensures first edge maintains its initial direction). Default: false. |
 
-```ts
-groupRect(options: GroupRectOptions): ConstrainedGroupRect
-```
+#### `groupRect(options: GroupRectOptions): ConstrainedGroupRect` — Add a rigid rectangle as a group concept. Returns a `ConstrainedGroupRect` handle with named vertices and sides. The rectangle is fixed in shape — only position (and optionally rotation) varies.
+
+**`GroupRectOptions`**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `x?` | `number` | Bottom-left x coordinate (world). Default: 0. |
+| `y?` | `number` | Bottom-left y coordinate (world). Default: 0. |
+| `width` | `number` | Width (along x in local coords). Required. |
+| `height` | `number` | Height (along y in local coords). Required. |
+| `allowRotation?` | `boolean` | Allow the solver to rotate this rectangle. Default: false. |
 
 **Geometric Constraints**
 
-#### `horizontal()` — Constrain a line to be horizontal (parallel to the X axis).
+#### `horizontal(line: any): this` — Constrain a line to be horizontal (parallel to the X axis).
 
-```ts
-horizontal(line: any): this
-```
+#### `vertical(line: any): this` — Constrain a line to be vertical (parallel to the Y axis).
 
-#### `vertical()` — Constrain a line to be vertical (parallel to the Y axis).
+#### `parallel(a: any, b: any): this` — Constrain two lines to be parallel.
 
-```ts
-vertical(line: any): this
-```
+#### `sameDirection(a: any, b: any): this` — Constrain two lines to point in the same direction.
 
-#### `parallel()` — Constrain two lines to be parallel.
+#### `oppositeDirection(a: any, b: any): this` — Constrain two lines to point in opposite directions.
 
-```ts
-parallel(a: any, b: any): this
-```
+#### `perpendicular(a: any, b: any): this` — Constrain two lines to be perpendicular.
 
-#### `sameDirection()` — Constrain two lines to point in the same direction.
+#### `tangent(a: any, b: any): this` — Constrain a line/circle or circle/circle tangency relationship.
 
-```ts
-sameDirection(a: any, b: any): this
-```
+#### `collinear(point: any, line: any): this` — Constrain a point to lie on the infinite extension of a line.
 
-#### `oppositeDirection()` — Constrain two lines to point in opposite directions.
+#### `symmetric(a: any, b: any, axis: any): this` — Constrain two points to be symmetric about an axis line.
 
-```ts
-oppositeDirection(a: any, b: any): this
-```
-
-#### `perpendicular()` — Constrain two lines to be perpendicular.
-
-```ts
-perpendicular(a: any, b: any): this
-```
-
-#### `tangent()` — Constrain a line/circle or circle/circle tangency relationship.
-
-```ts
-tangent(a: any, b: any): this
-```
-
-#### `collinear()` — Constrain a point to lie on the infinite extension of a line.
-
-```ts
-collinear(point: any, line: any): this
-```
-
-#### `symmetric()` — Constrain two points to be symmetric about an axis line.
-
-```ts
-symmetric(a: any, b: any, axis: any): this
-```
-
-#### `blockRotation()` — Prevent 180° rotation of a polygon by anchoring its first edge.
-
-```ts
-blockRotation(points: any[], axis?: "x" | "y"): this
-```
+#### `blockRotation(points: any[], axis?: "x" | "y"): this` — Prevent 180° rotation of a polygon by anchoring its first edge.
 
 **Dimensional Constraints**
 
-#### `distance()` — Constrain the Euclidean distance between two points.
+#### `distance(a: any, b: any, value: number): this` — Constrain the Euclidean distance between two points.
 
-```ts
-distance(a: any, b: any, value: number): this
-```
+#### `length(line: any, value: number): this` — Constrain the length of a line segment.
 
-#### `length()` — Constrain the length of a line segment.
+#### `angle(a: any, b: any, value: number): this` — Constrain the signed angle from line `a` to line `b`.
 
-```ts
-length(line: any, value: number): this
-```
+#### `radius(circle: any, value: number): this` — Constrain the radius of a circle.
 
-#### `angle()` — Constrain the signed angle from line `a` to line `b`.
+#### `diameter(circle: any, value: number): this` — Constrain the diameter of a circle.
 
-```ts
-angle(a: any, b: any, value: number): this
-```
+#### `hDistance(a: any, b: any, value: number): this` — Constrain the horizontal distance between two points.
 
-#### `radius()` — Constrain the radius of a circle.
+#### `vDistance(a: any, b: any, value: number): this` — Constrain the vertical distance between two points.
 
-```ts
-radius(circle: any, value: number): this
-```
+#### `pointLineDistance(point: any, line: any, value: number): this` — Constrain the signed perpendicular distance from a point to a line.
 
-#### `diameter()` — Constrain the diameter of a circle.
+#### `lineDistance(a: any, b: any, value: number): this` — Constrain the perpendicular offset distance between two lines.
 
-```ts
-diameter(circle: any, value: number): this
-```
+#### `absoluteAngle(line: any, value: number): this` — Constrain the absolute angle of a line measured from +X.
 
-#### `hDistance()` — Constrain the horizontal distance between two points.
+#### `arcLength(arc: any, value: number): this` — Constrain the arc length of an arc.
 
-```ts
-hDistance(a: any, b: any, value: number): this
-```
+#### `equalRadius(a: any, b: any): this` — Constrain two circles to have equal radii.
 
-#### `vDistance()` — Constrain the vertical distance between two points.
-
-```ts
-vDistance(a: any, b: any, value: number): this
-```
-
-#### `pointLineDistance()` — Constrain the signed perpendicular distance from a point to a line.
-
-```ts
-pointLineDistance(point: any, line: any, value: number): this
-```
-
-#### `lineDistance()` — Constrain the perpendicular offset distance between two lines.
-
-```ts
-lineDistance(a: any, b: any, value: number): this
-```
-
-#### `absoluteAngle()` — Constrain the absolute angle of a line measured from +X.
-
-```ts
-absoluteAngle(line: any, value: number): this
-```
-
-#### `arcLength()` — Constrain the arc length of an arc.
-
-```ts
-arcLength(arc: any, value: number): this
-```
-
-#### `equalRadius()` — Constrain two circles to have equal radii.
-
-```ts
-equalRadius(a: any, b: any): this
-```
-
-#### `angleBetween()` — Constrain the unsigned angle between two lines.
-
-```ts
-angleBetween(a: any, b: any, value: number): this
-```
+#### `angleBetween(a: any, b: any, value: number): this` — Constrain the unsigned angle between two lines.
 
 **Coincidence & Equality**
 
-#### `equal()` — Constrain two lines to have equal length.
+#### `equal(a: any, b: any): this` — Constrain two lines to have equal length.
 
-```ts
-equal(a: any, b: any): this
-```
+#### `coincident(a: any, b: any): this` — Constrain two points to coincide.
 
-#### `coincident()` — Constrain two points to coincide.
+#### `concentric(a: any, b: any): this` — Constrain two circles to share a center.
 
-```ts
-coincident(a: any, b: any): this
-```
+#### `fix(point: any, x?: number, y?: number): this` — Pin a point at a specific world location.
 
-#### `concentric()` — Constrain two circles to share a center.
+#### `midpoint(point: any, line: any): this` — Constrain a point to lie at the midpoint of a line.
 
-```ts
-concentric(a: any, b: any): this
-```
+#### `pointOnCircle(point: any, circle: any): this` — Constrain a point to lie on the perimeter of a circle.
 
-#### `fix()` — Pin a point at a specific world location.
+#### `pointOnLine(point: any, line: any): this` — Constrain a point to lie on the bounded segment of a line.
 
-```ts
-fix(point: any, x?: number, y?: number): this
-```
-
-#### `midpoint()` — Constrain a point to lie at the midpoint of a line.
-
-```ts
-midpoint(point: any, line: any): this
-```
-
-#### `pointOnCircle()` — Constrain a point to lie on the perimeter of a circle.
-
-```ts
-pointOnCircle(point: any, circle: any): this
-```
-
-#### `pointOnLine()` — Constrain a point to lie on the bounded segment of a line.
-
-```ts
-pointOnLine(point: any, line: any): this
-```
-
-#### `ccw()` — Constrain all given points to be in counter-clockwise order.
-
-```ts
-ccw(...points: any[]): this
-```
+#### `ccw(...points: any[]): this` — Constrain all given points to be in counter-clockwise order.
 
 **Tangent Transitions**
 
-#### `lineTangentArc()` — Constrain a line to be tangent to an arc at its start or end point.
+#### `lineTangentArc(line: any, arc: any, atStart: boolean): this` — Constrain a line to be tangent to an arc at its start or end point.
 
-```ts
-lineTangentArc(line: any, arc: any, atStart: boolean): this
-```
+#### `arcTangentArc(arcA: any, arcB: any, aAtStart?: boolean, bAtStart?: boolean): this` — Constrain two arcs to be tangent at their shared junction point.
 
-#### `arcTangentArc()` — Constrain two arcs to be tangent at their shared junction point.
+#### `bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: boolean): this` — Constrain a Bezier to be tangent to an arc at one endpoint.
 
-```ts
-arcTangentArc(arcA: any, arcB: any, aAtStart?: boolean, bAtStart?: boolean): this
-```
-
-#### `bezierTangentArc()` — Constrain a Bezier to be tangent to an arc at one endpoint.
-
-```ts
-bezierTangentArc(bezier: any, arc: any, atBezierStart: boolean, atArcStart: boolean): this
-```
-
-#### `smoothBlend()` — Create a Bezier blend between two arcs.
-
-```ts
-smoothBlend(arc1: any, arc2: any, options?: { weight?: number; arc1End?: "start" | "end"; arc2End?: "start" | "end"; }): BezierId
-```
+#### `smoothBlend(arc1: any, arc2: any, options?: { weight?: number; arc1End?: "start" | "end"; arc2End?: "start" | "end"; }): BezierId` — Create a Bezier blend between two arcs.
 
 **Shape Constraints**
 
-#### `shapeWidth()` — Constrain a shape's width.
+#### `shapeWidth(shape: any, value: number): this` — Constrain a shape's width.
 
-```ts
-shapeWidth(shape: any, value: number): this
-```
+#### `shapeHeight(shape: any, value: number): this` — Constrain a shape's height.
 
-#### `shapeHeight()` — Constrain a shape's height.
+#### `shapeCentroidX(shape: any, value: number): this` — Constrain a shape's centroid X position.
 
-```ts
-shapeHeight(shape: any, value: number): this
-```
+#### `shapeCentroidY(shape: any, value: number): this` — Constrain a shape's centroid Y position.
 
-#### `shapeCentroidX()` — Constrain a shape's centroid X position.
+#### `shapeArea(shape: any, value: number): this` — Constrain a shape's area.
 
-```ts
-shapeCentroidX(shape: any, value: number): this
-```
-
-#### `shapeCentroidY()` — Constrain a shape's centroid Y position.
-
-```ts
-shapeCentroidY(shape: any, value: number): this
-```
-
-#### `shapeArea()` — Constrain a shape's area.
-
-```ts
-shapeArea(shape: any, value: number): this
-```
-
-#### `shapeEqualCentroid()` — Constrain two shapes to have the same centroid.
-
-```ts
-shapeEqualCentroid(a: any, b: any): this
-```
+#### `shapeEqualCentroid(a: any, b: any): this` — Constrain two shapes to have the same centroid.
 
 **Positioning**
 
-#### `offsetX()` — Constrain the horizontal (X-axis) offset between two lines. Uses the start-point of each line to measure horizontal distance. `value` is the signed distance: b.startPt.x − a.startPt.x = value.
+#### `offsetX(a: any, b: any, value: number): this` — Constrain the horizontal (X-axis) offset between two lines. Uses the start-point of each line to measure horizontal distance. `value` is the signed distance: b.startPt.x − a.startPt.x = value.
 
-```ts
-offsetX(a: any, b: any, value: number): this
-```
+#### `offsetY(a: any, b: any, value: number): this` — Constrain the vertical (Y-axis) offset between two lines. Uses the start-point of each line to measure vertical distance. `value` is the signed distance: b.startPt.y − a.startPt.y = value.
 
-#### `offsetY()` — Constrain the vertical (Y-axis) offset between two lines. Uses the start-point of each line to measure vertical distance. `value` is the signed distance: b.startPt.y − a.startPt.y = value.
+#### `referencePoint(x: number, y: number): PointId` — Add a fixed reference point at `(x, y)`.
 
-```ts
-offsetY(a: any, b: any, value: number): this
-```
+#### `referenceLine(x1: number, y1: number, x2: number, y2: number): LineId` — Add a fixed reference line from `(x1, y1)` to `(x2, y2)`.
 
-#### `importPoint()` — Import a `Point2D` object into the sketch.
+#### `referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | null` — Import a single named entity from a solved sketch as fixed reference geometry.
 
-```ts
-importPoint(pt: { x: number; y: number; }, fixed?: boolean): PointId
-```
-
-#### `importLine()` — Import a `Line2D` object into the sketch.
-
-```ts
-importLine(l: { start: { x: number; y: number; }; end: { x: number; y: number; }; }, fixed?: boolean): LineId
-```
-
-#### `importRectangle()` — Import a `Rectangle2D` as four points and four lines.
-
-```ts
-importRectangle(r: { vertices: [ { x: number; y: number; }, { x: number; y: number; }, { x: number; y: number; }, { x: number; y: number; } ]; }, fixed?: boolean): { ... }
-```
-
-#### `referencePoint()` — Add a fixed reference point at `(x, y)`.
-
-```ts
-referencePoint(x: number, y: number): PointId
-```
-
-#### `referenceLine()` — Add a fixed reference line from `(x1, y1)` to `(x2, y2)`.
-
-```ts
-referenceLine(x1: number, y1: number, x2: number, y2: number): LineId
-```
-
-#### `referenceFrom()` — Import a single named entity from a solved sketch as fixed reference geometry.
-
-```ts
-referenceFrom(source: ConstraintSketch, entityId: string): PointId | LineId | null
-```
-
-#### `referenceAllFrom()` — Import all non-construction entities from a solved sketch as fixed references.
-
-```ts
-referenceAllFrom(source: ConstraintSketch): { points: Map<string, PointId>; lines: Map<string, LineId>; }
-```
+#### `referenceAllFrom(source: ConstraintSketch): { points: Map<string, PointId>; lines: Map<string, LineId>; }` — Import all non-construction entities from a solved sketch as fixed references.
 
 **Solving**
 
-#### `constrain()` — Add a raw constraint object to the builder.
+#### `constrain(constraint: Omit<SketchConstraint, "id">): this` — Add a raw constraint object to the builder.
 
-```ts
-constrain(constraint: Omit<SketchConstraint, "id">): this
-```
-
-#### `solve()` — Run the constraint solver and return a solved sketch.
+#### `solve(options?: SolveOptions): ConstraintSketch | Sketch` — Run the constraint solver and return a solved sketch.
 
 The returned `ConstraintSketch` extends `Sketch` and can be used directly in all 3D operations (`extrude`, `revolve`, etc.). It also exposes `constraintMeta` with the solver status:
 
@@ -1408,19 +713,28 @@ result.withUpdatedConstraint('cst-5', 120); // update a dimension without rebuil
 - **Over-constrained** — conflicting constraints are auto-rejected. Check `result.constraintMeta.constraints` and `result.inspect()`.
 - **maxError > 1e-6** — solver did not converge; check for contradictory constraints.
 
-```ts
-solve(options?: SolveOptions): ConstraintSketch | Sketch
-```
+**`SolveOptions`**
 
-#### `solveConstraintsOnly()` — Run the solver without building a full `ConstraintSketch`.
+| Option | Type | Description |
+|--------|------|-------------|
+| `iterations?` | `number` | Maximum number of LM outer iterations per restart. |
+| `tolerance?` | `number` | Infinity-norm residual tolerance for declaring convergence. |
+| `restarts?` | `number` | Number of deterministic restart seeds used by the global solver. |
+| `warmStartIterations?` | `number` | Optional projector iterations used only for initialisation, not as the main solver. |
+| `maxScaledStep?` | `number` | Maximum LM step length in scaled variable space. Larger = bolder, smaller = safer. |
+| `skipRedundancyCheck?` | `boolean` | Skip redundancy detection (safe when topology is unchanged and previous DOF >= 0). |
+| `presolveConstraintId?` | `string` | Run the targeted presolve hook for this constraint before the main solve. |
+| `fallbackRestarts?` | `number` | When set and the first solve exceeds tolerance*5, retry with this many restarts. |
+| `progressive?` | `boolean` | Add constraints progressively with short LM solves, all in one WASM call. |
+| `timeBudgetMs?` | `number` | Wall-clock time budget in ms for the entire solve. 0 = no limit. |
+| `debugConstructiveTranscript?` | `boolean` | Capture a readable constructive transcript in `constraintMeta.debug`. |
+| `debugSvgSnapshots?` | `boolean` | Capture SVG snapshots for constructive steps in `constraintMeta.debug`. |
+
+#### `solveConstraintsOnly(options?: SolveOptions): { maxError: number; rejectedCount: number; definition: ConstraintDefinition; }` — Run the solver without building a full `ConstraintSketch`.
 
 Lighter than `solve()` — skips profile and DOF analysis. Useful for lightweight constraint validation or progress monitoring mid-construction.
 
-```ts
-solveConstraintsOnly(options?: SolveOptions): { maxError: number; rejectedCount: number; definition: ConstraintDefinition; }
-```
-
-#### `route()` — Start a directional route from coordinates.
+#### `route(x: number, y: number): RouteBuilder` — Start a directional route from coordinates.
 
 Returns a [`RouteBuilder`](/docs/viewport#routebuilder) - describe the path with up/down/left/right/arcLeft/arcRight. Each method returns the entity ID (`LineId` or `ArcId`) for use in `sk.*` constraints.
 
@@ -1431,10 +745,6 @@ r.arcLeft(8.9);
 const neck = r.down();
 r.done();
 sk.offsetX(stem, neck, 10.8);
-```
-
-```ts
-route(x: number, y: number): RouteBuilder
 ```
 
 ### `ConstraintSketch`
@@ -1448,71 +758,31 @@ route(x: number, y: number): RouteBuilder
 
 **Methods:**
 
-#### `detectArrangement()` — Enumerate all bounded regions formed by the line arrangement of this sketch. Construction lines are excluded. Regions are returned largest-first by area.
+#### `detectArrangement(): Sketch[]` — Enumerate all bounded regions formed by the line arrangement of this sketch. Construction lines are excluded. Regions are returned largest-first by area.
 
-```ts
-detectArrangement(): Sketch[]
-```
+#### `detectArrangementRegion(_seed: Vec2): Sketch` — Select the single arrangement region that contains the given seed point. Throws if no region contains the seed.
 
-#### `detectArrangementRegion()` — Select the single arrangement region that contains the given seed point. Throws if no region contains the seed.
-
-```ts
-detectArrangementRegion(_seed: [ number, number ]): Sketch
-```
-
-#### `toPolyline()` — Return the solved constrained path as a sampled 2D polyline.
+#### `toPolyline(samples?: number): Vec2[]` — Return the solved constrained path as a sampled 2D polyline.
 
 Use this when a construction rail was authored with `constrainedSketch()` and should feed another operation such as `Loft.pathOnXz(...)`. The sketch must contain exactly one profile path.
 
-```ts
-toPolyline(samples?: number): [ number, number ][]
-```
-
-#### `withUpdatedConstraint()` — Re-solve the sketch after changing the value of one existing constraint.
+#### `withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch` — Re-solve the sketch after changing the value of one existing constraint.
 
 Use this for interactive dimension edits without rebuilding the whole sketch graph. It attempts a warm-started solve first, then falls back to a full solve if needed.
 
-```ts
-withUpdatedConstraint(constraintId: string, value: number): ConstraintSketch
-```
-
-#### `inspect()` — Return a human-readable diagnostic string of the solved state.
-
-```ts
-inspect(): string
-```
+#### `inspect(): string` — Return a human-readable diagnostic string of the solved state.
 
 ### `SketchGroupBuilder`
 
-#### `point()` — Add a point in local coordinates. Returns its globally-addressable PointId.
+#### `point(lx: number, ly: number): PointId` — Add a point in local coordinates. Returns its globally-addressable PointId.
 
-```ts
-point(lx: number, ly: number): PointId
-```
+#### `line(a: PointId, b: PointId, name?: string): LineId` — Connect two group points with a line. Both must be PointIds from this group.
 
-#### `line()` — Connect two group points with a line. Both must be PointIds from this group.
+#### `fixRotation(): this` — Freeze rotation (theta). Group can still translate - 2 DOF remain.
 
-```ts
-line(a: PointId, b: PointId, name?: string): LineId
-```
+#### `fix(): this` — Freeze all 3 DOF - group is completely fixed.
 
-#### `fixRotation()` — Freeze rotation (theta). Group can still translate - 2 DOF remain.
-
-```ts
-fixRotation(): this
-```
-
-#### `fix()` — Freeze all 3 DOF - group is completely fixed.
-
-```ts
-fix(): this
-```
-
-#### `done()` — Finalize and register the group with the builder.
-
-```ts
-done(): SketchGroupHandle
-```
+#### `done(): SketchGroupHandle` — Finalize and register the group with the builder.
 
 ### `Point2D`
 
@@ -1529,29 +799,13 @@ Used as construction geometry in sketches, constraints, and analytic measurement
 
 **Methods:**
 
-#### `distanceTo()` — Measure straight-line distance to another point.
+#### `distanceTo(other: Point2D): number` — Measure straight-line distance to another point.
 
-```ts
-distanceTo(other: Point2D): number
-```
+#### `midpointTo(other: Point2D): Point2D` — Compute the midpoint between this point and another point.
 
-#### `midpointTo()` — Compute the midpoint between this point and another point.
+#### `translate(dx: number, dy: number): Point2D` — Return a point shifted by the given delta.
 
-```ts
-midpointTo(other: Point2D): Point2D
-```
-
-#### `translate()` — Return a point shifted by the given delta.
-
-```ts
-translate(dx: number, dy: number): Point2D
-```
-
-#### `toTuple()` — Convert this point to a plain `[x, y]` tuple.
-
-```ts
-toTuple(): [ number, number ]
-```
+#### `toTuple(): Vec2` — Convert this point to a plain `[x, y]` tuple.
 
 ### `Line2D`
 
@@ -1568,67 +822,27 @@ Provides both segment-only (`intersectSegment`) and infinite-line (`intersect`) 
 
 **Methods:**
 
-#### `length()` — Length of the line segment.
+#### `get length(): number` — Length of the line segment.
 
-```ts
-get length(): number
-```
+#### `get midpoint(): Point2D` — Midpoint of the line segment.
 
-#### `midpoint()` — Midpoint of the line segment.
+#### `get angle(): number` — Direction angle in degrees, measured CCW from +X.
 
-```ts
-get midpoint(): Point2D
-```
+#### `get direction(): Vec2` — Unit direction vector from start to end.
 
-#### `angle()` — Direction angle in degrees, measured CCW from +X.
-
-```ts
-get angle(): number
-```
-
-#### `direction()` — Unit direction vector from start to end.
-
-```ts
-get direction(): [ number, number ]
-```
-
-#### `parallel()` — Create a parallel line offset by the given distance.
+#### `parallel(distance: number): Line2D` — Create a parallel line offset by the given distance.
 
 Positive distance shifts to the left of the line direction.
 
-```ts
-parallel(distance: number): Line2D
-```
+#### `intersect(other: Line2D): Point2D | null` — Intersect this line with another infinite line.
 
-#### `intersect()` — Intersect this line with another infinite line.
+#### `intersectSegment(other: Line2D): Point2D | null` — Intersect this line with another as bounded segments.
 
-```ts
-intersect(other: Line2D): Point2D | null
-```
+#### `static fromCoordinates(x1: number, y1: number, x2: number, y2: number): Line2D` — Create a line from raw coordinates.
 
-#### `intersectSegment()` — Intersect this line with another as bounded segments.
+#### `static fromPointAndAngle(origin: Point2D, angleDeg: number, length: number): Line2D` — Create a line from a start point, angle, and length.
 
-```ts
-intersectSegment(other: Line2D): Point2D | null
-```
-
-#### `fromCoordinates()` — Create a line from raw coordinates.
-
-```ts
-static fromCoordinates(x1: number, y1: number, x2: number, y2: number): Line2D
-```
-
-#### `fromPointAndAngle()` — Create a line from a start point, angle, and length.
-
-```ts
-static fromPointAndAngle(origin: Point2D, angleDeg: number, length: number): Line2D
-```
-
-#### `fromPointAndDirection()` — Create a line from a start point, direction vector, and length.
-
-```ts
-static fromPointAndDirection(origin: Point2D, dir: [ number, number ], length: number): Line2D
-```
+#### `static fromPointAndDirection(origin: Point2D, dir: Vec2, length: number): Line2D` — Create a line from a start point, direction vector, and length.
 
 ### `Circle2D`
 
@@ -1645,59 +859,23 @@ Extruding a `Circle2D` produces a cylinder with named `top`, `bottom`, and `side
 
 **Methods:**
 
-#### `diameter()` — Diameter of the circle.
+#### `get diameter(): number` — Diameter of the circle.
 
-```ts
-get diameter(): number
-```
+#### `get circumference(): number` — Circumference of the circle.
 
-#### `circumference()` — Circumference of the circle.
+#### `get area(): number` — Area of the circle.
 
-```ts
-get circumference(): number
-```
+#### `pointAtAngle(angleDeg: number): Point2D` — Return a point on the circle at the given angle.
 
-#### `area()` — Area of the circle.
+#### `translate(dx: number, dy: number): Circle2D` — Return a translated circle.
 
-```ts
-get area(): number
-```
+#### `toSketch(segments?: number): Sketch` — Convert this circle to a sketch profile.
 
-#### `pointAtAngle()` — Return a point on the circle at the given angle.
+#### `extrude(height: number, segments?: number): Shape` — Extrude the circle into a solid cylinder.
 
-```ts
-pointAtAngle(angleDeg: number): Point2D
-```
+#### `static fromCenterAndRadius(center: Point2D, radius: number): Circle2D` — Create a circle from its center and radius.
 
-#### `translate()` — Return a translated circle.
-
-```ts
-translate(dx: number, dy: number): Circle2D
-```
-
-#### `toSketch()` — Convert this circle to a sketch profile.
-
-```ts
-toSketch(segments?: number): Sketch
-```
-
-#### `extrude()` — Extrude the circle into a solid cylinder.
-
-```ts
-extrude(height: number, segments?: number): Shape
-```
-
-#### `fromCenterAndRadius()` — Create a circle from its center and radius.
-
-```ts
-static fromCenterAndRadius(center: Point2D, radius: number): Circle2D
-```
-
-#### `fromDiameter()` — Create a circle from its center and diameter.
-
-```ts
-static fromDiameter(center: Point2D, diameter: number): Circle2D
-```
+#### `static fromDiameter(center: Point2D, diameter: number): Circle2D` — Create a circle from its center and diameter.
 
 ### `Rectangle2D`
 
@@ -1719,93 +897,37 @@ const [d1, d2] = r.diagonals();   // [bl-tr, br-tl]
 r.toSketch();      // Sketch (for 2D operations)
 r.extrude(20);     // Shape with named faces
 
-Rectangle2D.fromCenterAndDimensions(point(50, 30), 100, 60);
-Rectangle2D.from2Corners(point(0, 0), point(100, 60));
+Rectangle2D.fromCenterAndDimensions(new Point2D(50, 30), 100, 60);
+Rectangle2D.from2Corners(new Point2D(0, 0), new Point2D(100, 60));
 Rectangle2D.from3Points(p1, p2, p3);  // free-angle rectangle
 ```
 
-#### `width()` — Width of the rectangle.
+#### `get width(): number` — Width of the rectangle.
 
-```ts
-get width(): number
-```
+#### `get height(): number` — Height of the rectangle.
 
-#### `height()` — Height of the rectangle.
+#### `get center(): Point2D` — Geometric center of the rectangle.
 
-```ts
-get height(): number
-```
+#### `side(name: RectSide): Line2D` — Return a named side of the rectangle.
 
-#### `center()` — Geometric center of the rectangle.
+#### `sideAt(index: number): Line2D` — Return a side by index.
 
-```ts
-get center(): Point2D
-```
+#### `vertex(name: RectVertex): Point2D` — Return a named vertex of the rectangle.
 
-#### `side()` — Return a named side of the rectangle.
+#### `diagonals(): [ Line2D, Line2D ]` — Return the two diagonals of the rectangle.
 
-```ts
-side(name: RectSide): Line2D
-```
+#### `toSketch(): Sketch` — Convert the rectangle to a sketch profile.
 
-#### `sideAt()` — Return a side by index.
+#### `translate(dx: number, dy: number): Rectangle2D` — Return a translated rectangle.
 
-```ts
-sideAt(index: number): Line2D
-```
+#### `static fromDimensions(x: number, y: number, width: number, height: number): Rectangle2D` — Create an axis-aligned rectangle from origin corner plus width and height.
 
-#### `vertex()` — Return a named vertex of the rectangle.
+#### `static fromCenterAndDimensions(center: Point2D, width: number, height: number): Rectangle2D` — Create a rectangle centered on a point.
 
-```ts
-vertex(name: RectVertex): Point2D
-```
+#### `static from2Corners(p1: Point2D, p2: Point2D): Rectangle2D` — Create an axis-aligned rectangle from two opposite corners.
 
-#### `diagonals()` — Return the two diagonals of the rectangle.
-
-```ts
-diagonals(): [ Line2D, Line2D ]
-```
-
-#### `toSketch()` — Convert the rectangle to a sketch profile.
-
-```ts
-toSketch(): Sketch
-```
-
-#### `translate()` — Return a translated rectangle.
-
-```ts
-translate(dx: number, dy: number): Rectangle2D
-```
-
-#### `fromDimensions()` — Create an axis-aligned rectangle from origin corner plus width and height.
-
-```ts
-static fromDimensions(x: number, y: number, width: number, height: number): Rectangle2D
-```
-
-#### `fromCenterAndDimensions()` — Create a rectangle centered on a point.
-
-```ts
-static fromCenterAndDimensions(center: Point2D, width: number, height: number): Rectangle2D
-```
-
-#### `from2Corners()` — Create an axis-aligned rectangle from two opposite corners.
-
-```ts
-static from2Corners(p1: Point2D, p2: Point2D): Rectangle2D
-```
-
-#### `from3Points()` — Create a free-angle rectangle from three points.
+#### `static from3Points(p1: Point2D, p2: Point2D, p3: Point2D): Rectangle2D` — Create a free-angle rectangle from three points.
 
 `p1` and `p2` define one edge, and `p3` chooses the perpendicular side.
 
-```ts
-static from3Points(p1: Point2D, p2: Point2D, p3: Point2D): Rectangle2D
-```
-
-#### `extrude()` — Extrude the rectangle into a solid prism with named topology.
-
-```ts
-extrude(height: number, up?: boolean): Shape
-```
+#### `extrude(height: number, up?: boolean): Shape` — Extrude the rectangle into a solid prism with named topology.

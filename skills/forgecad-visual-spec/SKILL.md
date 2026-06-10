@@ -6,135 +6,54 @@ forgecad-public: true
 
 # ForgeCAD Visual Spec
 
-Use this skill after the artifact is already concrete enough to visualize.
+## Scope
 
-Good triggers:
-
-- a specific `.forge.js` model or project folder
-- a build brief or HLD that already defines the object
-- a request like "write image prompts for this model"
-- a request to show the final product without hiding how it is built
-
-Do not use this skill for a vague artifact brief. If the object is still underspecified, use `forgecad-prepare-prompt` first.
+Only for artifacts already concrete enough to visualize (a specific `.forge.js` model, build brief, or HLD); route vague briefs to `forgecad-prepare-prompt` first. Read minimum context — entry `.forge.js`, one key helper if it delegates geometry, brief/HLD — and capture what must survive the image model: artifact type and scale, major subassemblies, actuation style, visible mechanisms, material and color cues.
 
 ## Core Rule
 
-These prompts are not concept art prompts. They are visual-spec prompts.
+Visual-spec prompts, not concept art: show the final artifact clearly, preserve build and subsystem truth, and keep visible the seams, modules, hardware, and mechanical hierarchy that matter.
 
-The image should:
+Negatives (the only negatives list — reuse it, never restate variants):
 
-- show the final artifact clearly
-- preserve build truth and subsystem truth
-- keep visible the seams, modules, hardware, and mechanical hierarchy that matter
+- no fake sleek consumer shell, no hidden mechanics
+- no over-smoothed geometry, no sci-fi styling
+- no CAD-drawing, blueprint, or dimension-arrow pretense
+- no cutaway, sectioned, or exploded teaching view unless the user explicitly asks
+- no text, labels, or humans
 
-The image should not:
+## Prompt Skeleton
 
-- smooth away the mechanism into a fake consumer shell
-- invent flashy sci-fi styling that hides how it works
-- pretend to be a CAD drawing, dimensioned blueprint, or engineering diagram
-- turn the artifact into a cutaway, sectioned shell, or exploded teaching view unless the user explicitly asks for that representation
+Block order: identity → mechanism truth → materials/color truth → pose/state → shot/camera/lighting → negatives. Fill in, don't copy:
 
-## Default Strategy
+```text
+A [artifact identity and scale], designed as a real buildable CAD-driven object, not a fantasy concept. [Major subassemblies and mechanism truth]. [Materials, colors, finish, visible hardware]. Show it in [pose / state]. [Shot, camera, background, lighting]. It should look physically buildable and mechanically honest, with visible part boundaries and serviceable architecture. No [negative 1], no [negative 2], no [negative 3].
+```
 
-Default to one `honest hero render`.
+Default shot: `front-left three-quarter hero view, eye-level product camera`. Alternate: `rear-right three-quarter view showing motor placement and belt routing`.
 
-That is the best first image for most ForgeCAD artifacts because it balances:
+## Modes
 
-- final-product readability
-- mechanical honesty
-- visual appeal
+Default to ONE honest hero render; add support prompts only when the user asks. Prefer separate single-purpose images over collages or multi-view boards.
 
-Only add more prompts if the user wants them. The most useful support prompts are:
+| Mode | Job | Signature phrases |
+|------|-----|-------------------|
+| Honest hero render (default) | Final object clearly, still reads as buildable | `clean premium studio product render`, `physically buildable and mechanically honest` |
+| Builder-first mechanical | Teach the build; bias to interfaces, seams, mounted actuators | `clear visibility of interfaces, seams, and subsystem boundaries`, `serious prototype, not a polished consumer shell` |
+| Mild exploded | Assembly logic; major modules only, no per-screw chaos. Image-only — the CAD model stays the complete assembled product | `major modules separated by small clean gaps`, `no tiny floating fragments` |
+| Workshop prototype realism | Feel like a real first prototype | `visible print lines and honest surface texture`, `uncluttered engineering bench background` |
+| End-effector close-up | Wrist/gripper mechanism detail | `close-up on the wrist and end effector showing the mechanism clearly` |
 
-- `builder-first mechanical render`
-- `mild exploded assembly render`
-- `workshop prototype realism`
-- `gripper / end-effector close-up`
-
-Prefer separate images over one collage. Multi-view boards are acceptable, but single-purpose images are usually more reliable.
-
-## Workflow
-
-1. Gather artifact truth.
-   Read only the minimum context needed:
-   - top-level `.forge.js` entry
-   - key helper/module file if the entry delegates the geometry
-   - build brief / HLD if they exist
-
-2. Extract the truths that must survive the image model.
-   Capture:
-   - artifact type and scale
-   - major subassemblies
-   - actuation style
-   - visible mechanisms
-   - material cues
-   - color cues if already established
-   - what must stay visible for build understanding
-
-3. Choose the representation mode.
-   Default: `honest hero render`
-   Switch only if the user explicitly wants a support view or image pack.
-
-4. Write the prompt in blocks.
-   Use the template in `references/prompt-template.md`.
-   Keep the wording concrete and artifact-specific.
-
-5. Add negative constraints inline.
-   Tell the model what to avoid, especially:
-   - hidden mechanics
-   - fake sleek shelling
-   - over-smoothed geometry
-   - unreadable clutter
-   - text, labels, or dimension arrows unless explicitly requested
-
-6. Return the prompt pack.
-   If the user asked for "a prompt", return one prompt.
-   If the user asked to compare approaches, return 2-4 prompts with clearly different jobs.
-
-## Prompt Writing Rules
+## Writing Rules
 
 - Use real artifact language: base, turntable, shoulder, rails, bearings, gripper, belt, pulley, shaft.
 - Prefer visible subsystem truth over poetic adjectives.
 - Keep exact dimensions out unless they matter visually and are already known.
-- If a detail is uncertain, stay honest at the subsystem level instead of inventing internals.
-- Ask for "physically buildable", "mechanically honest", and "visible part boundaries" when that is central.
-- For robots and mechanisms, mention motors, belts, pulleys, shafts, guide rods, fasteners, or service covers only if they are genuinely part of the artifact.
-- Avoid long style dumps. A short strong prompt beats a bloated one.
-
-## Mode Guide
-
-### Honest Hero Render
-
-Use by default.
-
-Best when the user wants one image that shows the final object clearly while still reading as something that could actually be built.
-
-### Builder-First Mechanical Render
-
-Use when the user wants the image to teach the build more directly.
-
-Bias harder toward interfaces, seams, mounted actuators, and subsystem boundaries.
-
-### Mild Exploded Assembly Render
-
-Use when the user wants assembly logic or modular breakdown.
-
-Keep the explosion restrained. Separate only major modules, not every screw.
-This is a visual-spec support image, not a default ForgeCAD modeling instruction; the CAD artifact should still be the complete assembled product.
-
-### Workshop Prototype Realism
-
-Use when the user wants the artifact to feel like a real first prototype rather than a clean studio render.
-
-Bias toward print texture, honest materials, and believable workshop context.
+- If a detail is uncertain, stay honest at the subsystem level — never invent internals.
+- Ask for "physically buildable", "mechanically honest", "visible part boundaries" when central.
+- Mention motors, belts, pulleys, shafts, guide rods, fasteners, or service covers only if genuinely part of the artifact.
+- A short strong prompt beats a style dump.
 
 ## Output Contract
 
-When using this skill, the answer should usually contain:
-
-1. one sentence interpreting the artifact
-2. one primary prompt, usually the `honest hero render`
-3. optional support prompts only if useful
-4. a short note on which prompt to try first
-
-Do not bury the prompts under theory.
+Return: one sentence interpreting the artifact, the primary prompt first (usually the honest hero render), optional support prompts, and a short which-to-try-first note. Never bury the prompts under theory.

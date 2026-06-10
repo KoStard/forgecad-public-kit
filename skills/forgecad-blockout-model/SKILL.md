@@ -6,25 +6,7 @@ forgecad-public: true
 
 # Block Out a Model
 
-Create lightweight ForgeCAD concept models. These are spatial planning artifacts: fast, legible, and intentionally approximate, but still grounded in the physical object rather than an annotated lesson diagram.
-
-## Trigger Boundary
-
-Use this skill when the user wants to answer questions like:
-
-- Roughly where do the parts go?
-- Does this mechanism idea make intuitive spatial sense?
-- What is the silhouette, footprint, or motion envelope?
-- Can we show the concept before spending time on detail?
-
-Do **not** use this skill for:
-
-- print-ready or fabrication-ready geometry
-- exact fit, tight tolerances, or detailed dimensioning
-- dense parametric modeling
-- hardware details, fillets, chamfers, or finish work unless they are essential to the concept
-
-Routing:
+A blockout is a spatial planning artifact: 3-7 simple masses that answer where parts go, whether a mechanism makes spatial sense, and what the silhouette, footprint, or motion envelope looks like. Not for print-ready geometry, exact fit, tolerances, or detail work.
 
 | Need | Skill |
 |------|-------|
@@ -32,110 +14,29 @@ Routing:
 | Written concept or architecture before CAD | `forgecad-high-level-spec` |
 | Accurate, detailed, parametric ForgeCAD model | `forgecad-make-a-model` |
 
-## File Placement
+## Method
 
-All new `.forge.js` files go under the date-based directory structure:
+- Load the `forgecad` skill first; read its Core API and CLI docs. Load nothing else unless the concept demands it.
+- Translate the idea into 3-7 conceptual parts BEFORE writing geometry: masses and zones (base, arm, payload, sweep volume, keep-out, hand access).
+- One primitive stands in for many eventual details. A bounding box beats a fake detailed part. Never add detail as a substitute for clarity — simplify or reposition instead.
+- Use round-number dimensions; "believably shaped" beats numerically correct. Name uncertainty honestly: `armLengthGuess`, `baseWidthApprox`, `clearanceEnvelope`.
+- At most a handful of `param()` values, for comparing proportions. Do not parameterize every dimension.
+- Color by meaning; keep each conceptual part visually distinct via color or opacity. Return named shape objects so the viewer can inspect the concept part-by-part.
+- Ghost geometry: transparent volumes only for REAL physical envelopes — sweep arcs, keep-out volumes, approximate payloads, reach/access zones. Never decorative teaching overlays. Exaggerate tiny clearances when needed for readability.
+- Even a blockout represents the object in its normal assembled state: no labels, legends, cutaways, or permanently exploded layouts (full rule in the `forgecad` skill).
+- Leave out: fasteners and screw holes, wall thicknesses, fillets and blend radii, polished materials, hidden internal structure that does not affect the concept.
 
-```text
-YYYY/MM/DD/file.forge.js          - single-file blockout
-YYYY/MM/DD/folder/file.forge.js   - multi-file concept project
-```
+## Verify
 
-Use today's date for the directory. Use the user's current ForgeCAD project when one is available; otherwise use a clearly named local model folder.
-
-### Naming
-
-- Use kebab-case
-- Prefer names like `desk-lamp-blockout.forge.js` or `hinged-display-concept.forge.js`
-- Add `-blockout` or `-concept` unless the user already supplied a clearer name
-
-## Workflow
-
-1. **Load the `forgecad` skill first** and read the Core API and CLI docs. Only load more documentation if the concept truly needs it.
-2. **Translate the idea into 3-7 conceptual parts** before writing geometry. Think in terms of masses and zones: base, arm, payload, sweep volume, keep-out space, hand access, wheel envelope.
-3. **Choose approximate dimensions** using round numbers and obvious proportions. Favor "believably shaped" over "numerically correct".
-4. **Write the simplest geometry that communicates the idea**. Default to `box()`, `cylinder()`, `sphere()`, and very simple extrusions.
-5. **Place parts with readable transforms**. Keep coordinates easy to inspect and edit. Prefer centered primitives when that reduces mental load.
-6. **Color by meaning** so a viewer can decode the concept immediately.
-7. **Render and inspect** from a few angles. If the idea is still unclear, simplify or reposition; do not add detail as a substitute for clarity.
-8. **Stop early** once the mechanism, layout, or concept is understandable.
-
-## Modeling Rules
-
-- Use one primitive to stand in for many eventual details whenever possible.
-- A bounding box is usually better than a fake detailed part.
-- Use at most a handful of top-level `param()` values when comparing rough proportions. Do not parameterize every dimension.
-- Name uncertainty honestly: `armLengthGuess`, `baseWidthApprox`, `screenVolume`, `clearanceEnvelope`.
-- Do not add text labels, callout arrows, legends, coordinate labels, or explanatory plaques to the model. Use named return objects and a short written note outside the geometry.
-- Do not cut away a shell, remove covers, or permanently explode parts just to show hidden intent. Even a blockout should represent the object in its normal assembled state unless the user explicitly asks for a presentation view.
-- Use transparent ghost geometry for:
-  - sweep arcs
-  - keep-out volumes
-  - approximate payloads
-  - user reach or access space
-- Ghost geometry must represent a real physical envelope, clearance, motion path, or human-access zone, not decorative teaching overlays.
-- Exaggerate tiny clearances if needed to keep the concept readable.
-- Keep each conceptual part visually distinct through color or opacity.
-- Prefer arrays of named shapes in the return value so the viewer can inspect the concept part-by-part.
-
-## What to Leave Out
-
-Do not spend time on:
-
-- screw holes
-- exact wall thicknesses
-- blend radii
-- polished materials
-- hidden internal structure that does not affect the concept
-- mathematical precision that the concept does not justify
-
-If you notice yourself reaching for detailed constraints, pause and ask whether the blockout should instead hand off to `forgecad-make-a-model`.
-
-## Render-Verify Loop
-
-Even rough models must be rendered. The whole point is spatial intuition.
-
-### Minimum check
-
-```bash
-forgecad run model.forge.js
-node dist-cli/forgecad.js render model.forge.js /tmp/blockout.png --camera 45:25 --camera 0:0 --camera 90:0 --size 600
-```
-
-Inspect the render and ask:
+Rendering is mandatory even for rough models. Run the script, then render from 2-3 angles with the installed `forgecad` CLI (syntax: the `forgecad` skill's CLI docs). Judge by the reader test:
 
 - Can someone unfamiliar with the idea tell what each mass represents?
-- Are the overall proportions believable enough to discuss?
+- Are proportions believable enough to discuss?
 - Is motion or interference visible where it matters?
-- Are unknowns shown honestly, rather than hidden behind fake detail?
+- Are unknowns shown honestly, not hidden behind fake detail?
 
-If the answer is no, simplify the model or add clearer ghost volumes.
+If any answer is no, simplify or add clearer ghost volumes.
 
-## Useful Pattern
+## Handoff
 
-```js
-// Concept only:
-// - dimensions are approximate
-// - red transparent geometry shows motion / keep-out
-
-const base = box(160, 90, 30).placeReference('center', [0, 0, 0]).color('#4c6ef5');
-const arm = box(22, 22, 180).placeReference('center', [0, 0, 105]).color('#f08c00');
-const payload = box(120, 18, 70).placeReference('center', [0, 0, 210]).color('#2b8a3e');
-
-const sweep = cylinder(12, 110, 110, 48).placeReference('center', [0, 0, 0])
-  .rotateY(90)
-  .translate(0, 0, 120)
-  .color('#e03131')
-  .material({ opacity: 0.18 });
-
-return [
-  { name: 'Base', shape: base },
-  { name: 'Arm', shape: arm },
-  { name: 'Payload Volume', shape: payload },
-  { name: 'Sweep Envelope', shape: sweep },
-];
-```
-
-## Handoff Rule
-
-When the blockout has answered the high-level questions, stop. If the next question is about real fit, tunable dimensions, part details, or manufacturing logic, switch to `forgecad-make-a-model` rather than refining the blockout indefinitely.
+File placement and naming follow `forgecad-make-a-model` conventions; suffix the filename `-blockout` or `-concept` unless the user supplied a clearer name. Once the high-level questions are answered, stop. If the next question is real fit, tunable dimensions, part details, or manufacturing logic, switch to `forgecad-make-a-model` instead of refining the blockout indefinitely.

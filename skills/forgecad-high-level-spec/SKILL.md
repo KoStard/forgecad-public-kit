@@ -6,199 +6,89 @@ forgecad-public: true
 
 # High-Level Design (HLD)
 
-Write a right-sized design document that works backwards from requirements. Define the problem, explore the solution space, record decisions. Include as much detail as needed for quality and shared understanding; stop before exhaustive construction details.
+The HLD aligns the user and the agent on *what* to build before anyone thinks about *how*. Every design concern, risk, and tradeoff lives in the document — not in conversation, not in the agent's head. Brevity is a readability tool, not a success metric: there is no page limit; include whatever evidence, diagrams, and dimensions a good decision needs. Decision-driving dimensions belong here; exhaustive construction dimensions belong in the LLD.
 
-## Philosophy
+Manufacturing process is a design decision, not a default — never assume 3D printing/FDM. If the user didn't specify a process, treat process choice as an HLD alternative (full posture taxonomy: `/forgecad-prepare-prompt`).
 
-An HLD is a thinking tool, not a construction document. It should be:
-
-- **Quality-first and right-sized.** Use whatever detail, evidence, diagrams, dimensions, and examples are needed for a good decision.
-- **Honest about what's unknown.** Open questions are features, not bugs.
-- **Opinionated about alternatives.** Don't just list options — recommend one and say why.
-- **Stable under iteration.** Easy to update after a round of feedback without rewriting everything.
-
-Brevity is a readability tool, not a success metric. Do not omit visible evidence, image-derived features, assumptions, interfaces, risks, or decision-driving dimensions just to keep the document short.
-
-The HLD exists so that the user and the agent can align on *what* to build before anyone thinks about *how* to build it. All design concerns, risks, and tradeoffs live here — not in conversation, not in the agent's head.
-
-Manufacturing process is part of the design problem, not a default.
-If the user has not specified a process, compare plausible approaches and recommend the one that fits the artifact, load path, scale, material needs, safety expectations, and intended use.
-Do not default to 3D printing, FDM, or "printable" unless the user asked for it or the chosen concept genuinely calls for printed parts.
-
-## When to Write an HLD
-
-- Before starting a new model, mechanism, or assembly
-- When an existing design has fundamental problems (wrong approach, not just wrong numbers)
-- When the user says "spec this out", "think this through", "what should we build"
-- Before writing an LLD
-
-## Output Location
-
-HLDs go next to the model files. Name: `<name>-hld.md` or for a project: `hld.md` in the project folder.
+Write an HLD before any LLD, and whenever an existing design is wrong in approach, not just in numbers. Output: `<name>-hld.md` beside the model files, or `hld.md` for a whole project.
 
 ## Document Structure
+
+The section order is the workflow — write it top to bottom, following the embedded instructions.
 
 ```markdown
 # [Name] — High-Level Design
 
 ## Problem
-
-What does this need to do? What role does it play? What are the hard
-requirements (must grip objects, must fit in a 60mm housing, must use
-sheet metal, must be CNC-machinable, must be printable, must use purchased
-bearings)?
-
-State the problem without implying a solution.
+What must this do? Hard requirements (must grip objects, fit a 60mm
+housing, use purchased bearings). State the problem without implying
+a solution. Unspecified process choice is an open design dimension.
 
 ## Approach
-
-How does it work at a conceptual level? Describe the mechanism, structure,
-or behavior. Use ASCII diagrams where they make spatial relationships clearer.
-
-Keep this at the architecture level, but include enough spatial and behavioral
-detail that someone unfamiliar with the project understands the concept.
+How it works at a conceptual level. ASCII diagram of the key elements
+and their spatial relationships — diagram labels stay in this markdown;
+never carry them into CAD geometry unless the real artifact needs
+markings.
 
 ## Key Interfaces
-
-How does this connect to the rest of the system? What are the mating
-surfaces, shared dimensions, or coordination points? List them explicitly.
+Every point where this touches another part or the outside world:
+mating surfaces, shared dimensions, coordination points. These are the
+contracts that constrain the design.
 
 ## Dictionary
-
-Define every domain-specific term used in this document. Don't assume
-engineering terminology is widely known — write for a developer who
-doesn't have a mechanical engineering background.
-
 | Term | What it is |
 |------|-----------|
-| ... | Plain-language description with dimensions if relevant |
+Define every domain term in plain words, with dimensions where relevant.
+Write for a developer without a mechanical-engineering background.
 
 ## Alternatives
-
 | Option | Description | Tradeoff |
 |--------|-------------|----------|
-| A (recommended) | ... | ... |
-| B | ... | ... |
-| C | ... | ... |
-
-For each alternative, include enough detail to understand why it fits or loses.
-One sentence is fine only when one sentence is enough. Mark the recommended option.
+2-3 genuinely different strategies, not minor variations. Enough detail
+per row to see why it fits or loses. Mark one recommended and say why.
+If there is honestly only one approach, say so and skip the table.
 
 ## Usage Guide
-
-Work backwards from the user experience. Write the step-by-step needed to show
-how someone would use/assemble/operate this thing. This exposes gaps in the
-design before any code is written.
-
-For a physical product: assembly steps, tools needed, what connects to what.
-For a mechanism: how it moves, what the user does, what happens.
-For a software component: how it's called, what it returns, error cases.
-
-Flag issues inline with ⚠️.
+The strongest validation: work backwards from how someone uses,
+assembles, or operates the thing, step by step (physical product:
+assembly steps, tools, what connects to what; mechanism: how it moves
+and what the user does). If a step doesn't make sense ("how does the
+servo get inside?"), the design has a gap — flag it inline with ⚠️ and
+promote it to Concerns.
 
 ## Concerns
-
-Numbered list. Each concern is a risk, open question, or thing that
-could go wrong. Be specific — "tolerances might be tight" is useless;
-"the 12mm arm cantilevers under gripping load, may flex >0.5mm" is useful.
-
-Include issues discovered while writing the Usage Guide.
-
-1. ...
-2. ...
+1. Numbered, falsifiably specific — a reviewer must be able to say
+   "real problem" or "fine, because…". "Tolerances might be tight" is
+   useless; "the 12mm arm cantilevers under gripping load, may flex
+   >0.5mm" is useful.
 
 ## Decisions
-
-Filled in after review. Each decision references which concern or
-alternative it resolves.
-
 | # | Decision | Rationale |
 |---|----------|-----------|
-| 1 | ... | ... |
+Filled ONLY after user review — never pre-decide. Each row resolves a
+concern or alternative.
 ```
 
-## Workflow
+## Review via git
 
-### 1. Define the problem
+HLDs and LLDs iterate through git, not conversation:
 
-State what the part/assembly needs to accomplish. Include hard constraints (size envelope, specified manufacturing/process constraints, interfaces with other parts). Do not describe a solution yet.
-If no process is specified, treat manufacturing/process choice as an HLD alternative rather than as a hidden assumption.
+- **Commit every version.** No drafts floating in chat. After writing, commit and tell the user it's ready for review.
+- **Feedback arrives as file edits** (inline comments, strikethroughs) **or chat — check both.** Read `git diff`: the diff is the review artifact.
+- **Update, commit, repeat** until the Decisions table is filled and the user says "go."
 
-### 2. Sketch the approach
+## Rules
 
-Describe the recommended approach at a conceptual level. Draw an ASCII diagram showing the key elements and their spatial relationships. Label the markdown diagram, but do not carry those labels into CAD geometry unless the real artifact needs markings.
+- If you're speccing every part, formula, tolerance, and fabrication step, you're writing an LLD — back up.
+- If you can't draw it, you don't understand it yet.
+- Tables are welcome where they clarify (interfaces, requirements, visible evidence); full parameter catalogs go to the LLD.
 
-### 3. Identify interfaces
-
-List every point where this design touches another part or the outside world. These are the contracts that constrain the design.
-
-### 4. Explore alternatives
-
-Show 2-3 meaningfully different approaches. Not minor variations — genuinely different strategies. For each, state the key tradeoff in one line. Recommend one.
-
-### 5. Write the usage guide
-
-Work backwards: describe how someone uses/assembles/operates this thing step by step. This is the most powerful validation — it forces you to think through the physical reality before writing code. If a step doesn't make sense ("how does the servo get inside?"), the design has a gap.
-
-Flag issues inline with ⚠️. These feed directly into the Concerns list.
-
-### 6. Surface concerns
-
-Collect everything from the usage guide ⚠️ flags plus any risks, open questions, or things that could go wrong. Be concrete and specific. These are the agenda for the review conversation.
-
-### 7. Commit and present for review
-
-Commit the HLD to git. Tell the user it's ready for review. Do NOT fill in the Decisions table yet.
-
-### 8. Iterate via git
-
-The user reviews the file (may edit it directly with comments/strikethroughs, or give verbal feedback). After review:
-
-1. Read the git diff or the updated file to see the user's feedback
-2. Update the HLD to address feedback
-3. Commit the update
-4. Present for another round if needed
-
-Repeat until the Decisions table is filled and the user says "go."
-
-## Git Workflow
-
-HLDs and LLDs iterate through git, not conversation. This keeps the document as the single source of truth and gives both sides a clear diff to review.
-
-```
-Agent writes HLD → git commit → User reviews (edits file or gives feedback)
-→ Agent reads diff → updates HLD → git commit → repeat until approved
-```
-
-- **Every version gets committed.** No unsaved drafts floating in conversation.
-- **User feedback goes in the file** (inline comments, strikethroughs) or in chat — agent checks both.
-- **The diff is the review artifact.** Agent reads `git diff` to see what changed.
-
-## Writing Rules
-
-- **Quality first.** There is no fixed page, time, or section-length limit. Write the HLD to the depth the design deserves.
-- **Clear, not artificially terse.** If a reviewer has to re-read a paragraph to understand it, rewrite it; do not delete needed content just to make it shorter.
-- **ASCII diagrams where useful.** A cross-section sketch can communicate layout better than paragraphs, but use whichever representation makes the design clearest.
-- **Decision-driving dimensions are welcome.** Include dimensions, size envelopes, counts, interface dimensions, and proportional constraints when they clarify architecture, risks, image matching, or feasibility. Put exhaustive construction dimensions and formulas in the LLD.
-- **Tables are allowed when they improve clarity.** Use compact tables for alternatives, interfaces, requirements, feature inventories, or visible evidence. Keep full parameter catalogs in the LLD.
-- **Concerns are not rhetorical.** Every concern must be specific enough that someone can say "yes that's a real problem" or "no, here's why it's fine."
-- **Alternatives are not padding.** If there's genuinely only one way to do it, say so and skip the table.
-
-## Relationship to Other Skills
+## Pipeline
 
 | Stage | Skill | Output |
 |-------|-------|--------|
-| 1. Explore the problem space | `/forgecad-high-level-spec` (this skill) | `*-hld.md` |
+| 1. Explore the problem space | this skill | `*-hld.md` |
 | 2. Detailed design | `/forgecad-lld` | `*-lld.md` |
-| 3. Implementation | `/forgecad-make-a-model` + `/forgecad` | `.forge.js` files |
+| 3. Implementation | `/forgecad-make-a-model` + `/forgecad` | `.forge.js` |
 
-The HLD must have its Decisions table filled before writing an LLD. The LLD must exist before implementation (unless the model is simple enough to skip straight from HLD to code).
-
-## Anti-Patterns
-
-- **HLD that's actually an LLD.** If you're exhaustively specifying every part, formula, tolerance, and fabrication step before the architecture is chosen, you've gone too far. Back up.
-- **HLD with no alternatives.** You haven't explored the solution space. Even if the answer is obvious, name what you rejected and why.
-- **Concerns that are vague worries.** "This might be hard to manufacture" — hard how? Tool access? Bending radius? Wall thickness? Tolerance stack? Support material? Be specific or don't list it.
-- **Decisions made before review.** The whole point is to align with the user before committing. Present the HLD, discuss, then decide.
-- **Skipping the diagram.** If you can't draw it, you don't understand it yet.
-- **Iterating in conversation instead of in the file.** The document is the artifact. Update it, commit it, review the diff.
+The Decisions table must be filled before writing the LLD. Simple models may skip straight from HLD to code.

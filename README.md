@@ -83,6 +83,8 @@ Open more than one local project at once:
 forgecad studio examples path/to/another-project
 ```
 
+Keep one long-running `forgecad studio <project-path> [project-path ...]` process open with every active project folder listed in its arguments; the user opens the single printed localhost port once, and AI agents should only create or edit files under those folders so the browser updates live without starting more servers.
+
 ## First Script
 
 Inside a cloned or initialized ForgeCAD project, drop this into `starter.forge.js`:

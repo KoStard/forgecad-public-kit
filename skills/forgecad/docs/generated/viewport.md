@@ -9,7 +9,7 @@ Cut planes, exploded views, joint animations, and scene configuration.
 
 ## Contents
 
-- [Viewport & Runtime](#viewport-runtime) — `Viewport.label`, `scene`, `viewConfig`, `explodeView`, `jointsView`, `compareWith`, `cutPlane`, `mock`, `showLabels`, `highlight`
+- [Viewport & Runtime](#viewport-runtime)
 - [RouteBuilder](#routebuilder)
 - [route](#route)
 
@@ -17,7 +17,7 @@ Cut planes, exploded views, joint animations, and scene configuration.
 
 ### Viewport & Runtime
 
-#### `Viewport.label()` — Add a render-only viewport label at a world-space point.
+#### `Viewport.label(text: string, at: Vec3, options?: RenderLabelOptions): void` — Add a render-only viewport label at a world-space point.
 
 `Viewport.label()` is for temporary review, debug, tutorial, or explicitly requested presentation overlays. It does not create sketches, meshes, B-rep topology, exported text, or face labels, so it stays off the OCCT path. Default production models should be understandable from physical geometry, materials, part boundaries, and named objects, not viewport annotations.
 
@@ -36,10 +36,6 @@ Viewport.label('Bearing bore', [0, 0, 18], {
 return box(40, 30, 12);
 ```
 
-```ts
-Viewport.label(text: string, at: [ number, number, number ], options?: RenderLabelOptions): void
-```
-
 **`RenderLabelOptions`**
 
 | Option | Type | Description |
@@ -47,23 +43,54 @@ Viewport.label(text: string, at: [ number, number, number ], options?: RenderLab
 | `color?` | `string` | Text color as any CSS color string. |
 | `background?` | `string` | Background color as any CSS color string. Use `'transparent'` for no pill background. |
 | `size?` | `number` | Font size in CSS pixels. Defaults to 12. |
-| `offset?` | `[ number, number, number ]` | Additional world-space offset from `at`. |
+| `offset?` | `Vec3` | Additional world-space offset from `at`. |
 | `anchor?` | `RenderLabelAnchor` | Which point of the label box is anchored to `at`. Defaults to `'center'`. |
 | `alwaysOnTop?` | `boolean` | When false, the label is hidden when occluded by scene geometry. Defaults to true. |
 
-#### `scene()` — Configure the scene environment for the current script execution.
+#### `Viewport.highlight(target: unknown, options?: HighlightOptions): void` — Highlight any geometry for visual debugging in the viewport.
 
-Controls camera position, named render views, optional model journeys, lighting rig, background color or gradient, atmospheric fog, environment maps, post-processing effects, and capture parameters for the `forgecad capture` command. Multiple calls merge — later values override earlier ones on a per-key basis, so you can split configuration across multiple `scene()` calls.
+`Viewport.highlight()` draws render-only debug overlays — distinctive colored markers that appear in the viewport but never become geometry, never export, and never appear in `objects`.
 
-When `lights` is specified, **all** default lights are removed. You must include your own ambient light or the scene will be fully dark.
+Supported inputs:
 
-Setting `camera.position` overrides auto-framing — the viewport will no longer auto-fit the geometry on script reload.
+- `[x, y, z]` — 3D point
+- `[[x1,y1,z1], [x2,y2,z2]]` — edge (line segment)
+- `{ normal: [x,y,z], offset: number }` — plane by normal + distance from origin
+- `{ normal: [x,y,z], point: [x,y,z] }` — plane by normal + point on plane
+- [`Shape`](/docs/core#shape) — highlight an entire 3D shape
+- `FaceRef` (from `shape.face('top')`) — highlight as plane at face center
+- `EdgeRef` (from `shape.edge('left')`) — highlight as edge segment
+- `string` — 2D sketch entity ID (e.g. `'L0'`, `'P0'`)
 
-Named render views let scripts check in repeatable cameras next to the model code. The canonical shape is `{ camera: { position, target } }`, and a direct camera shorthand `{ position, target }` is also accepted. Use the canonical shape when you may add view metadata later. Use it from the CLI with `--view hero` on `forgecad render 3d`, `forgecad render hq`, or `forgecad capture`.
+Pass `{ labels: true }` with a [`Shape`](/docs/core#shape) to annotate every user-authored labeled face with its name (the face-label debugging view).
 
-Model journeys let scripts check in a compact guided path through named objects. Each journey has ordered `steps`; each step can name a `focus` target by object name/tree path, provide a caption, and optionally provide an explicit camera. In the viewer, journeys are opt-in: they appear as a small Explore control and do not move the camera until the user starts them. Use `forgecad run model.forge.js --journeys` or `--journeys-json` to inspect resolved targets.
+```js
+const b = box(30, 20, 15);
+Viewport.highlight([0, 0, 0], { color: 'cyan', label: 'origin' });
+Viewport.highlight(b.face('top'), { color: 'red' });
+Viewport.highlight(b, { labels: true }); // annotate all user-labeled faces
+return b;
+```
 
-Post-processing effects (`bloom`, `vignette`, `grain`) work in the browser viewport only. The CLI applies camera, lights, background, fog, and `toneMappingExposure` but skips shader effects.
+**`HighlightOptions`**
+- `size?: number` — Size hint for points (radius in mm) or planes (disc radius in mm).
+- `labels?: boolean` — Shape inputs only: when true, annotate every user-authored labeled face with its label name (one plane highlight per labeled face). The whole-shape tint is added only when other visual options (`color`, `label`, `pulse`) are also passed.
+- Also: `color?: string`, `label?: string`, `pulse?: boolean`.
+
+#### `scene(options: SceneOptions): void` — Configure the scene environment for the current script execution.
+
+Controls camera, named render views, guided journeys, lighting, background, fog, environment maps, post-processing, capture defaults, and the joint-control helper overlay (`jointOverlay` — axis arrows and arc indicators, renderer-only). Multiple `scene()` calls merge per-key — later values win — so configuration can be split across calls.
+
+Two behavioral cliffs:
+
+- Specifying `lights` removes **all** default lights. Include your own ambient light or the scene is fully dark.
+- Setting `camera.position` disables auto-framing — the viewport no longer auto-fits the geometry on script reload.
+
+Named views are repeatable cameras checked in with the model code. Canonical shape is `{ camera: { position, target } }`; a direct `{ position, target }` shorthand is also accepted. Render one with `--view <name>` (see CLI docs).
+
+Journeys are ordered `steps`, each focusing a returned object by name/tree path with an optional caption and camera. In the viewer they are opt-in (an Explore control; the camera does not move until started). Inspect resolved targets with `forgecad run --journeys`.
+
+Post-processing (`bloom`, `vignette`, `grain`) is browser-only; the CLI applies camera, lights, background, fog, and `toneMappingExposure` but skips shader effects.
 
 All numeric values accept `param()` expressions.
 
@@ -72,40 +99,19 @@ scene({
   background: { top: '#000814', bottom: '#001d3d' },
   camera: { position: [160, -120, 100], target: [0, 0, 50], fov: 52 },
   views: {
-    hero: {
-      camera: { position: [180, -140, 90], target: [0, 0, 25], up: [0, 0, 1], fov: 38 },
-    },
-    side: { position: [240, 0, 70], target: [0, 0, 25], fov: 34 },
+    hero: { camera: { position: [180, -140, 90], target: [0, 0, 25], fov: 38 } },
   },
   journeys: {
-    grandTour: {
-      title: 'Grand Tour',
-      startsAt: 'overview',
-      steps: [
-        { id: 'overview', focus: 'Solar System', caption: 'Start with the whole model.' },
-        { id: 'earth', focus: 'Earth', caption: 'Fit and inspect Earth.' },
-      ],
-    },
+    tour: { steps: [{ id: 'earth', focus: 'Earth', caption: 'Fit and inspect Earth.' }] },
   },
   lights: [
     { type: 'ambient', color: '#001233', intensity: 0.08 },
-    { type: 'point', position: [120, -80, 130], color: '#00f5d4', intensity: 4, distance: 400, decay: 1 },
-    { type: 'point', position: [-100, 60, 20], color: '#f72585', intensity: 3, distance: 350 },
     { type: 'directional', position: [50, -30, 200], color: '#ffd60a', intensity: 1.2 },
-    { type: 'hemisphere', skyColor: '#003566', groundColor: '#000814', intensity: 0.2 },
   ],
   fog: { color: '#000814', near: 100, far: 450 },
-  postProcessing: {
-    bloom: { intensity: param('bloom', 1.5, 0, 4), threshold: 0.5, radius: 0.7 },
-    vignette: { darkness: 0.8, offset: 0.25 },
-    grain: { intensity: 0.08 },
-    toneMappingExposure: param('exposure', 1.5, 0.5, 4),
-  },
+  postProcessing: { bloom: { intensity: param('bloom', 1.5, 0, 4) } },
+  jointOverlay: { axisColor: '#13dfff', arcColor: '#ff7a1a' },
 });
-```
-
-```ts
-scene(options: SceneOptions): void
 ```
 
 **`SceneOptions`**
@@ -113,11 +119,12 @@ scene(options: SceneOptions): void
 | Option | Type | Description |
 |--------|------|-------------|
 | `capture?` | `SceneCaptureConfig` | Default capture parameters for `forgecad capture` — CLI flags override these. |
-| `background?`, `camera?`, `views?`, `journeys?`, `lights?`, `environment?`, `fog?`, `postProcessing?`, `ground?` | | — |
+
+Also: `background?: string | SceneBackgroundGradient`, `camera?: SceneCameraConfig`, `views?: Record<string, SceneViewInputConfig>`, `journeys?: Record<string, SceneJourneyConfig>`, `lights?: SceneLightConfig[]`, `environment?: SceneEnvironmentConfig`, `fog?: SceneFogConfig`, `postProcessing?: ScenePostProcessingConfig`, `ground?: SceneGroundConfig`.
 
 `SceneBackgroundGradient`: `{ top: string, bottom: string }`
 
-**`SceneCameraConfig`**: `position?: [ number, number, number ]`, `target?: [ number, number, number ]`, `up?: [ number, number, number ]`, `fov?: number`, `type?: "perspective" | "orthographic"`
+`SceneCameraConfig`: `{ position?: Vec3, target?: Vec3, up?: Vec3, fov?: number, type?: "perspective" | "orthographic" }`
 
 **`SceneJourneyConfig`**
 
@@ -145,7 +152,7 @@ scene(options: SceneOptions): void
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `target?` | `[ number, number, number ]` | Target for directional/spot lights |
+| `target?` | `Vec3` | Target for directional/spot lights |
 | `groundColor?` | `string` | Ground color for hemisphere lights |
 | `skyColor?` | `string` | Sky color alias for hemisphere lights (same as color) |
 | `angle?` | `number` | Spot light cone angle in radians |
@@ -153,7 +160,8 @@ scene(options: SceneOptions): void
 | `decay?` | `number` | Point/spot light decay |
 | `distance?` | `number` | Point/spot light distance (0 = infinite) |
 | `castShadow?` | `boolean` | Whether this light casts shadows |
-| `type`, `color?`, `intensity?`, `position?` | | — |
+
+Also: `type: SceneLightType`, `color?: string`, `intensity?: number`, `position?: Vec3`.
 
 **`SceneEnvironmentConfig`**
 - `preset?: "studio" | "sunset" | "dawn" | "warehouse" | "forest" | "apartment" | "lobby" | "city" | "park" | "night" | "none"` — Built-in preset name or 'none' to disable
@@ -164,7 +172,7 @@ scene(options: SceneOptions): void
 - `near?: number` — Linear fog near distance
 - `far?: number` — Linear fog far distance
 - `density?: number` — Exponential fog density (if set, uses FogExp2 instead of linear Fog)
-- Also: `color?: string`
+- Also: `color?: string`.
 
 `ScenePostProcessingConfig`: `{ bloom?: SceneBloomConfig, vignette?: SceneVignetteConfig, grain?: SceneGrainConfig, toneMappingExposure?: number }`
 
@@ -194,28 +202,7 @@ scene(options: SceneOptions): void
 | `size?` | `number` | Output frame size in pixels (default: 960) |
 | `background?` | `string` | Canvas background color for capture (default: '#252526') |
 
-#### `viewConfig()` — Configure viewport helper visuals for the current script execution.
-
-Controls renderer-only overlays that appear in the viewport but are not part of the geometry. Currently supports the joint overlay that renders axis arrows and arc indicators when `jointsView` is active. Multiple calls merge — later values override earlier ones per key.
-
-This does **not** trigger a geometry recompute; it only affects the visual helpers drawn on top of the 3D scene.
-
-```js
-viewConfig({
-  jointOverlay: {
-    axisColor: '#13dfff',
-    arcColor: '#ff7a1a',
-    axisLineRadiusScale: 0.03,
-    arcLineRadiusScale: 0.022,
-  },
-});
-```
-
-```ts
-viewConfig(options?: ViewConfigOptions): void
-```
-
-#### `explodeView()` — Configure how the viewport explode slider offsets returned objects.
+#### `explodeView(options?: ExplodeViewOptions): void` — Configure how the viewport explode slider offsets returned objects.
 
 Offsets are resolved from the returned object tree, not a flat list. In `radial` mode each node follows its parent branch direction, then fans locally from the immediate parent center — nested assemblies peel apart level by level. In fixed-axis or fixed-vector modes, the branch follows that axis/vector but nested descendants fan out perpendicular by default.
 
@@ -230,10 +217,6 @@ explodeView({
   mode: 'radial',
   byPath: { 'Drive/Shaft': { direction: [1, 0, 0], stage: 1.6 } },
 });
-```
-
-```ts
-explodeView(options?: ExplodeViewOptions): void
 ```
 
 **`ExplodeViewOptions`**
@@ -253,104 +236,15 @@ explodeView(options?: ExplodeViewOptions): void
 - `direction?: ExplodeDirection` — Direction mode for this node
 - `axisLock?: ExplodeAxis` — Optional axis lock after direction is resolved
 
-#### `jointsView()` — Register viewport-only mechanism controls that animate returned objects without re-running the script.
+#### `compareWith(path: string, options?: CompareWithOptions): void` — Declare a reference model for comparison inspection.
 
-Defines joints (revolute or prismatic), optional gear/rack couplings, and named animations. The viewport resolves transforms through the joint chain at display time — the script geometry is computed only once at rest pose.
-
-**Critical:** Solve the assembly at **rest pose** (all animated joints = 0). The viewport applies `jointsView` transforms on top of the returned scene. If geometry is already solved at non-zero angles, animation will double-rotate everything.
-
-```js
-// BAD — double rotation
-const solved = mech.solve({ shoulder: 45, elbow: 30 });
-jointsView({ joints: [{ name: 'shoulder', ... }] });
-return solved;
-
-// GOOD — rest pose, jointsView controls all posing
-const solved = mech.solve({ shoulder: 0, elbow: 0 });
-jointsView({
-  joints: [
-    { name: 'shoulder', child: 'Upper Arm', default: 45, ... },
-    { name: 'elbow', child: 'Forearm', parent: 'Upper Arm', default: 30, ... },
-  ],
-});
-return solved;
-```
-
-**Pivot coordinates** are world-space positions of each joint origin at rest pose. For `addRevolute('shoulder', 'Base', 'Link', { frame: Transform.identity().translate(0, 0, 20) })` where "Base" is at world origin, the pivot is `[0, 0, 20]`.
-
-**Fixed attachments** that must follow a parent during animation need a zero-angle revolute joint in the chain:
-
-```js
-{ name: 'EE_Follow', child: 'End Effector', parent: 'Last Link',
-  type: 'revolute', axis: [0, 0, 1], pivot: [linkLength, 0, 0],
-  min: 0, max: 0, default: 0 }
-```
-
-Animation values are interpolated linearly between keyframes. ForgeCAD does **not** auto-wrap revolute values across `-180/180`. Keep keyframe values continuous — a `-180 -> 171` jump spins the part the long way around. Use `-180 -> -189` instead. Author high-speed multi-turn joints as accumulating angles (`0, 360, 720, ...`) with `continuous: true`.
-
-**Tick-based keyframes:** Omit `at` from all keyframes to auto-distribute by tick weight:
-
-```js
-keyframes: [
-  { ticks: 3, values: { Shoulder: 20 } },  // slow segment (3x weight)
-  { ticks: 1, values: { Shoulder: -10 } }, // fast segment (1x weight)
-  { values: { Shoulder: 20 } },            // last keyframe; ticks ignored
-]
-// positions: 0, 0.75, 1.0
-```
-
-Mixing explicit `at` and omitted `at` in the same animation is not allowed.
-
-```js
-jointsView({
-  joints: [{
-    name: 'Shoulder', child: 'Upper Arm', parent: 'Base',
-    type: 'revolute', axis: [0, -1, 0], pivot: [0, 0, 46],
-    min: -30, max: 110, default: 15,
-  }],
-  animations: [{
-    name: 'Walk Cycle', duration: 1.6, loop: true,
-    keyframes: [
-      { values: { Shoulder: 20 } },
-      { values: { Shoulder: -10 } },
-      { values: { Shoulder: 20 } },
-    ],
-  }],
-});
-```
-
-```ts
-jointsView(options?: JointsViewOptions): void
-```
-
-**`JointsViewOptions`**: `enabled?: boolean`, `joints?: JointViewInput[]`, `couplings?: JointViewCouplingInput[]`, `animations?: JointViewAnimationInput[]`, `defaultAnimation?: string`
-
-**`JointViewInput`**: `name: string`, `child: string`, `parent?: string`, `type?: JointViewType`, `axis?: JointViewAxis`, `pivot?: [ number, number, number ]`, `min?: number`, `max?: number`, `default?: number`, `unit?: string`, `hidden?: boolean`
-
-`JointViewCouplingInput`: `{ joint: string, terms: JointViewCouplingTermInput[], offset?: number }`
-
-`JointViewCouplingTermInput`: `{ joint: string, ratio?: number }`
-
-`JointViewAnimationInput`: `{ name: string, duration?: number, loop?: boolean, continuous?: boolean, keyframes: JointViewAnimationKeyframeInput[] }`
-
-**`JointViewAnimationKeyframeInput`**
-- `at?: number` — Timeline position [0, 1]. If omitted from ALL keyframes, positions are auto-computed from tick weights.
-- `ticks?: number` — Relative weight of the segment from this keyframe to the next (default 1). Only used in tick-based mode (when `at` is omitted). Last keyframe's ticks value is ignored.
-- Also: `values: Record<string, number>`
-
-#### `compareWith()` — Declare a reference model for comparison inspection.
-
-`compareWith()` lets a model carry its own comparison target for inspection workflows. `forgecad inspect comparison model.forge.js` uses this reference to render the same Difference Only comparison overlay as the live viewport. Amber marks candidate mismatch evidence, cyan marks reference mismatch evidence, and faint model context keeps the overlay readable. When the CLI can resolve the referenced file, the manifest also includes the same geometric score produced by `forgecad compare 3d`.
+`compareWith()` lets a model carry its own comparison target for inspection workflows. `forgecad inspect compare overlay model.forge.js` uses this reference to render the same Difference Only comparison overlay as the live viewport. Amber marks candidate mismatch evidence, cyan marks reference mismatch evidence, and faint model context keeps the overlay readable. When the CLI can resolve the referenced file, the manifest also includes the same geometric score produced by `forgecad compare 3d`.
 
 The path is resolved relative to the file that calls `compareWith()`. It may point to another `.forge.js` file or an imported CAD asset such as `.stl`, `.obj`, `.3mf`, `.step`, or `.stp`.
 
 ```js
 compareWith('./reference.3mf', { align: 'center', toleranceMm: 0.25, samples: 3000 });
 return rebuiltBearing;
-```
-
-```ts
-compareWith(path: string, options?: CompareWithOptions): void
 ```
 
 **`CompareWithOptions`**
@@ -364,6 +258,11 @@ compareWith(path: string, options?: CompareWithOptions): void
 
 #### `cutPlane()` — Define a named section plane for inspecting internal geometry.
 
+Overloads:
+
+- `cutPlane(name: string, normal: Vec3, offset?: number, options?: CutPlaneOptions): void`
+- `cutPlane(name: string, normal: Vec3, options?: CutPlaneOptions): void`
+
 Registers a cut plane that appears as a toggle in the viewport View Panel. When enabled, geometry on the positive side of the plane (the side the normal points toward) is clipped away, revealing the internal cross-section. The newly exposed section faces render with a hatched overlay; pre-existing coplanar boundary faces are left unhatched.
 
 Planes are registered once per script run. The viewport toggle state (on/off) persists across parameter changes without re-running the script. The `exclude` option only works correctly when the excluded object names are stable across parameter changes.
@@ -375,22 +274,17 @@ const cutZ = param('Cut Height', 10, { min: -50, max: 50, unit: 'mm' });
 cutPlane('Inspection', [0, 0, 1], cutZ, { exclude: ['Probe', 'Fasteners'] });
 ```
 
-Overloads:
-
-- `cutPlane(name: string, normal: [ number, number, number ], offset?: number, options?: CutPlaneOptions): void`
-- `cutPlane(name: string, normal: [ number, number, number ], options?: CutPlaneOptions): void`
-
 **`CutPlaneOptions`**
 - `offset?: number` — Optional offset along the plane normal (primarily for object-form overload).
 - `exclude?: CutPlaneExcludeInput` — Object names to keep uncut for this plane.
 
-#### `mock()` — Register a mock (context) object for visualization and collision checking.
+#### `mock<T extends Shape>(shape: T, name?: string): T` — Register a mock (context) object for visualization and inspection.
 
-Mock objects appear in the viewport and spatial analysis when you run a file directly, but are excluded when the file is imported via [`require()`](/docs/core#require). This lets you model the surrounding context — walls, bolts, mating parts — without polluting the module's exports.
+Mock objects appear in the viewport and inspection analysis when you run a file directly, but are excluded when the file is imported via [`require()`](/docs/core#require). This lets you model the surrounding context — walls, bolts, mating parts — without polluting the module's exports.
 
 The shape is returned unchanged, so you can reference it for alignment, dimensioning, and `verify` checks.
 
-Mock objects participate in `forgecad run --spatial bounded|exact` collision detection and spatial analysis. Their names appear with a `(mock)` suffix in reports.
+Mock objects participate in focused inspection commands such as `forgecad inspect fit interference` and `forgecad inspect physical gaps`. Their names appear with a `(mock)` suffix in reports.
 
 In the viewport, mock objects render at reduced opacity so they are visually distinct from real geometry.
 
@@ -407,174 +301,47 @@ return bracket;
 // When run directly: bracket + wall + bolt all visible
 ```
 
-```ts
-mock<T extends Shape>(shape: T, name?: string): T
-```
-
-#### `showLabels()` — Highlight all user-labeled faces on a shape for visual debugging.
-
-Shows each user-authored label name in the viewport for visual debugging. Returns the shape unchanged for chaining: `return showLabels(myShape)`.
-
-```ts
-showLabels(shape: Shape): Shape
-```
-
-#### `highlight()` — Highlight any geometry for visual debugging in the viewport.
-
-Supported inputs:
-
-- `string` — sketch entity ID (e.g. `'L0'`, `'P0'`, `'C0'`)
-- `[x, y, z]` — 3D point
-- `[[x1,y1,z1], [x2,y2,z2]]` — edge (line segment)
-- `{ normal: [x,y,z], offset: number }` — plane by normal + distance from origin
-- `{ normal: [x,y,z], point: [x,y,z] }` — plane by normal + point on plane
-- [`Shape`](/docs/core#shape) — highlight entire 3D shape
-- `FaceRef` (from `shape.face('top')`) — highlight as plane at face center
-- `EdgeRef` (from `shape.edge('left')`) — highlight as edge segment
-
-Overloads:
-
-- `highlight(entityId: string, opts?: HighlightOptions): void`
-- `highlight(point: [ number, number, number ], opts?: HighlightOptions): void`
-- `highlight(edge: [ [ number, number, number ], [ number, number, number ] ], opts?: HighlightOptions): void`
-- `highlight(plane: { normal: [ number, number, number ]; offset: number; }, opts?: HighlightOptions): void`
-- `highlight(plane: { normal: [ number, number, number ]; point: [ number, number, number ]; }, opts?: HighlightOptions): void`
-- `highlight(shape: Shape, opts?: HighlightOptions): void`
-- `highlight(face: FaceRef, opts?: HighlightOptions): void`
-- `highlight(edge: EdgeRef, opts?: HighlightOptions): void`
-
-**`HighlightOptions`**
-- `size?: number` — Size hint for points (radius in mm) or planes (disc radius in mm).
-- Also: `color?: string, label?: string, pulse?: boolean`
-
-**`FaceRef`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `normal` | `[ number, number, number ]` | Normal direction of the face |
-| `center` | `[ number, number, number ]` | Center point of the face |
-| `query?` | `FaceQueryRef` | Compiler-owned face query when available. |
-| `planar?` | `boolean` | True when the face can host a 2D sketch placement frame |
-| `uAxis?` | `[ number, number, number ]` | Face-local horizontal axis for planar faces |
-| `vAxis?` | `[ number, number, number ]` | Face-local vertical axis for planar faces |
-| `surface?` | `FaceSurface` | Analytic surface family when the backend can identify one. |
-| `descendant?` | `FaceDescendantMetadata` | Shared descendant-resolution metadata when this face is a semantic region/set. |
-| `name` | | — |
-
-**`FaceDescendantMetadata`**: `kind: "single" | "face-set"`, `semantic: FaceDescendantSemantic`, `memberCount: number`, `memberNames: string[]`, `coplanar: boolean`
-
-**`EdgeRef`**
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `start` | `[ number, number, number ]` | Start point |
-| `end` | `[ number, number, number ]` | End point |
-| `query?` | `EdgeQueryRef` | Compiler-owned edge query when available. |
-| `curve?` | `EdgeCurve` | Exact or parametric curve family when the backend/source can identify one. |
-| `faceName?` | `string` | Owning face name when the edge is associated with one face in a larger topology. |
-| `name` | | — |
-
 ---
 
 ## Classes
 
 ### `RouteBuilder`
 
-#### `up()` — Vertical line going +Y. Length is optional (solver determines it from constraints).
+#### `up(length?: number): LineId` — Vertical line going +Y. Length is optional (solver determines it from constraints).
 
-```ts
-up(length?: number): LineId
-```
+#### `down(length?: number): LineId` — Vertical line going -Y. Length is optional.
 
-#### `down()` — Vertical line going -Y. Length is optional.
+#### `right(length?: number): LineId` — Horizontal line going +X. Length is optional.
 
-```ts
-down(length?: number): LineId
-```
+#### `left(length?: number): LineId` — Horizontal line going -X. Length is optional.
 
-#### `right()` — Horizontal line going +X. Length is optional.
+#### `lineAt(angleDeg: number, length?: number): LineId` — Line at an arbitrary angle (degrees from +X). Length is optional.
 
-```ts
-right(length?: number): LineId
-```
+#### `line(length?: number): LineId` — Line with solver-determined direction. Length is optional. Direction comes from tangency to previous arc or from constraints.
 
-#### `left()` — Horizontal line going -X. Length is optional.
+#### `toward(x: number, y: number): LineId` — Line toward a specific point. Length defaults to the distance to that point.
 
-```ts
-left(length?: number): LineId
-```
-
-#### `lineAt()` — Line at an arbitrary angle (degrees from +X). Length is optional.
-
-```ts
-lineAt(angleDeg: number, length?: number): LineId
-```
-
-#### [`line()`](/docs/sketch#line) — Line with solver-determined direction. Length is optional. Direction comes from tangency to previous arc or from constraints.
-
-```ts
-line(length?: number): LineId
-```
-
-#### `toward()` — Line toward a specific point. Length defaults to the distance to that point.
-
-```ts
-toward(x: number, y: number): LineId
-```
-
-#### `arcLeft()` — Tangent arc turning left relative to travel direction.
+#### `arcLeft(radius?: number, sweepDegOrOpts?: number | { minSweep: number; }): ArcId` — Tangent arc turning left relative to travel direction.
 
 or `{ minSweep: degrees }` to seed the geometry without constraining. `minSweep` guides the solver to the correct branch for arcs that sweep more than the default 90° seed.
 
-```ts
-arcLeft(radius?: number, sweepDegOrOpts?: number | { minSweep: number; }): ArcId
-```
-
-#### `arcRight()` — Tangent arc turning right relative to travel direction.
+#### `arcRight(radius?: number, sweepDegOrOpts?: number | { minSweep: number; }): ArcId` — Tangent arc turning right relative to travel direction.
 
 or `{ minSweep: degrees }` to seed without constraining.
 
-```ts
-arcRight(radius?: number, sweepDegOrOpts?: number | { minSweep: number; }): ArcId
-```
+#### `close(): void` — Close the route with a straight line back to the start point.
 
-#### `close()` — Close the route with a straight line back to the start point.
-
-```ts
-close(): void
-```
-
-#### `done()` — Close the route back to its start point and register as a profile loop.
+#### `done(): void` — Close the route back to its start point and register as a profile loop.
 
 No extra line segment is added. A coincident constraint connects the last point to the start, and tangency is added for G1 smoothness when arcs are at the junction. The session's incremental solver processes these constraints, keeping seed positions accurate for the final solve.
 
-```ts
-done(): void
-```
+#### `get start(): PointId` — PointId of the route's start point.
 
-#### `start()` — PointId of the route's start point.
+#### `get end(): PointId` — PointId of the current cursor (route's end).
 
-```ts
-get start(): PointId
-```
+#### `startOf(segId: LineId | ArcId): PointId` — Get the start point of a segment.
 
-#### `end()` — PointId of the current cursor (route's end).
-
-```ts
-get end(): PointId
-```
-
-#### `startOf()` — Get the start point of a segment.
-
-```ts
-startOf(segId: LineId | ArcId): PointId
-```
-
-#### `endOf()` — Get the end point of a segment.
-
-```ts
-endOf(segId: LineId | ArcId): PointId
-```
+#### `endOf(segId: LineId | ArcId): PointId` — Get the end point of a segment.
 
 ---
 

@@ -5,74 +5,37 @@ skill-order: 5
 
 # Joint Design Recipes
 
-How to build mechanical joints — clevis-tongue hinges, ball-and-socket, dovetails — that actually rotate without binding and stop where they should.
+Geometry recipes for joints that actually rotate without binding — clevis-tongue hinges, hinge chains, hard stops.
+
+Anything that must rotate or slide gets connector frames: `origin` = pivot, `axis` = hinge line, `up` = rest twist. Always set `up` on hinges, wheels, and levers. Connector/link/mate semantics and mirrored-axis sign rules: see the assembly API reference.
 
 ## The Cavity Rule
 
-Every mechanical joint has a **cavity** in one part and a **tenon** in the other. The cavity must be a real empty volume — not a gap implied by the absence of two separate solids.
+Every joint is a **cavity** in one part plus a **tenon** in the other, and the cavity must be a real empty volume — not a gap implied by separate solids. A body that runs solid through the joint zone (e.g. a stadium cap under the clevis slot) blocks rotation even though the rest pose looks fine. End the body FLAT before the joint; extend the tines forward to the pivot; the inter-tine volume must be genuinely empty.
 
-If two adjacent parts in an assembly show a collision volume larger than the expected clearance volume in `forgecad run`, one part is missing its cavity. Both parts have solid material at the same joint position. This will look fine at rest pose but will block rotation and produce confusing joint behavior.
+Diagnostic: adjacent-part collision volume > expected clearance in `forgecad run` = missing cavity (both parts have solid material at the joint position). After fixing, the collision volume should drop to ~0 (or a few mm³ of clearance overlap).
 
-```ts
-// BAD — body has a stadium cap at both ends; the "slot" between two clevis tines
-// is just empty space next to a solid body cap. The next phalanx's tongue knuckle
-// has nowhere to go (it intersects the previous body's cap).
-const body  = stadiumBar(L);            // cap at X=0 AND X=L
-const tine1 = box(...).translate(L,  Y_OFF, 0);
-const tine2 = box(...).translate(L, -Y_OFF, 0);
-let phalanx = union(body, tine1, tine2);
+## Structural Sizing
 
-// GOOD — body ends FLAT before the joint. Tines extend forward to the pivot.
-// The X = L-KNUCK_R..L+KNUCK_R volume between the tines is genuinely empty.
-const body = box(L - KNUCK_R, TONG_T, H).translate((L - KNUCK_R) / 2, 0, -H / 2);
-const tongueKnuckle = knuckleDisc(0, 0, TONG_T);  // proximal cap only
-let phalanx = union(tongueKnuckle, body, tine1, tine2, ...tineCaps);
-```
+**Yoke (connecting cantilevers).** Clevis tines at Y = ±Y_OFF are physically disconnected from a body of thickness TONG_T when Y_OFF > TONG_T/2 + clearance — the tines float and would snap under load. Always bridge with a yoke slab spanning the full clevis width, `(Y_OFF + TINE_T/2) * 2`, with a few mm of structural overlap along the joint axis, so material runs continuously from body to each tine.
 
-After applying the cavity rule, `forgecad run` collision volume between adjacent parts in a clevis-tongue chain should drop to **zero** (or a few mm³ of clearance overlap). If it doesn't, there's still solid material where there should be a cavity.
-
-## Connecting Cantilevers
-
-A clevis tine arm at Y=±Y_OFF is geometrically separate from a body at Y=±TONG_T/2. With Y_OFF > TONG_T/2 + clearance, there is a **physical gap** between them. The tines float — they would snap off as soon as load is applied.
-
-Always add a **yoke**: a short slab spanning the full clevis width, sitting between the body's flat distal end and the tines' attachment point. The yoke fills the Y gap so material is continuous from the body through to each tine.
-
-```ts
-const yokeLen   = 3;                                  // a few mm of structural overlap
-const yokeStart = L - KNUCK_R - yokeLen;
-const totalY    = (Y_OFF + TINE_T / 2) * 2;           // full clevis width
-const yoke = box(yokeLen, totalY, H)
-  .translate(yokeStart + yokeLen / 2, 0, -H / 2);
-phalanx = union(phalanx, yoke);
-```
+**Knuckle radius.** For body height H, require `KNUCK_R >= H/2`. Smaller, and the body corners protrude past the knuckle's cylindrical envelope and sweep into the adjacent part during rotation. `KNUCK_R = H/2` makes the body cross-section a stadium that exactly fits the envelope.
 
 ## Hard Stops vs Slider Limits
 
-`addRevolute({ min: 0, max: 90 })` sets **slider limits** — the viewport won't let the user drag past them, but the geometry permits any rotation. There is no physical stop.
+Declared joint min/max are not geometry — they only constrain the viewport slider; the geometry still permits any rotation. A physical stop requires an interfering protrusion:
 
-For a **geometric** hard stop (parts can't backbend past extension, or can't curl past full closure), add a small protrusion on one part that interferes with the other at the limit angle:
+- **Extension stop at 0°**: a small lip on the dorsal side of the child's proximal end, sized to just touch the parent's distal dorsal corner at 0°; backbending is then blocked by contact.
+- **Flexion stop at θmax**: a palmar lip, or body-on-body contact when bodies meet.
 
-- **Extension stop at 0°** (typical for fingers, knees, elbows): add a small "lip" on the dorsal side of the proximal end of the child phalanx, sized so it just touches the parent's distal dorsal corner at 0°. Negative rotation (backbending) is then blocked by part-on-part contact.
-- **Flexion stop at θmax**: add a similar lip on the palmar side, or rely on the body-to-body collision when bodies meet.
-
-Verify with `forgecad run` at the limit poses — the contact pair should show ~0 mm³ collision (just touching), and rotation past the limit should report a non-zero collision volume.
-
-## Knuckle Sizing
-
-For a clevis-tongue joint with body height H, the tongue knuckle radius and clevis tine knuckle radius must satisfy:
-
-```
-KNUCK_R >= H / 2
-```
-
-If the knuckle radius is smaller than the body's half-height, the body's corners protrude beyond the knuckle envelope. When the joint rotates, those corners sweep through space outside the cylindrical envelope and collide with the adjacent part.
-
-Setting `KNUCK_R = H / 2` exactly makes the body cross-section a stadium that perfectly fits the knuckle envelope.
+Verify: ~0 mm³ collision exactly at the limit pose (just touching), non-zero past it.
 
 ## Verification Workflow
 
-1. Build the joint at rest pose. Run `forgecad run`. Check collision volumes.
-2. If adjacent parts in the joint show > clearance-volume of overlap → missing cavity (apply the cavity rule).
-3. Render with `--focus PartName` to inspect each part in isolation. The clevis end should clearly show a gap between the tines (the cavity).
-4. Render at curl angles (set joint debug params) at 30°, 60°, 90°. No new collisions should appear from rotation.
-5. Render at -10° (backbend test). Either no rotation possible (geometric stop in place) or rotation occurs and you need to add a stop.
+Check the loop, not just the rest pose:
+
+1. Build at rest; `forgecad run`; check collision volumes.
+2. Overlap > clearance volume between joint neighbors → apply the cavity rule.
+3. Render each part with `--focus PartName`; the clevis end must show a visible gap between tines.
+4. Re-check at swept angles (30°/60°/90°) — rotation reveals collisions the rest pose hides.
+5. Backbend test at -10°: blocked = hard stop exists; rotates = add a stop.
