@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeCAD Reconstruct From Images"
+  short_description: "Build real CAD objects from images"
+  default_prompt: "Use $forgecad-reconstruct-from-images to infer the real object from these reference images and build a ForgeCAD model that holds up from all views."

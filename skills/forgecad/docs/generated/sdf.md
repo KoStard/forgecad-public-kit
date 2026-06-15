@@ -53,7 +53,7 @@ An immutable SDF expression. Supports SDF-specific operations (smooth booleans, 
 
 #### `clone(): SdfShape` — Clone this SDF expression and its visual metadata.
 
-#### `toShape(options?: SdfToShapeOptions): Shape` — Mesh this SDF into a ForgeCAD Shape through ForgeCAD's Surface Nets pipeline. Once converted, the result is a regular Shape — booleans, transforms, export all work.
+#### `toShape(options?: SdfToShapeOptions): Shape` — Mesh this SDF into a ForgeCAD Shape. Typed SDF trees materialize through Rust Manifold Dual Contouring; dynamic trees (custom/noise/voronoi/displace/blend callbacks) mesh through the Surface Nets pipeline. Once converted, the result is a regular Shape — booleans, transforms, export all work.
 
 #### `color(value: string | undefined): SdfShape` — Set the display color for this implicit leaf.
 
@@ -230,7 +230,7 @@ return {
 - `basketWeave(options?: BasketWeaveOptions): SurfacePattern` — Basket weave surface pattern — threads with over-under crossings in UV space. Returns a SurfacePattern for use with `.surfaceDisplace()`.
 - `pattern2d(): Pattern2DBuilder` — Create typed, composable 2D surface patterns for `.surfaceDisplace()`.
 - `SurfacePattern: typeof SurfacePattern` — A 2D surface pattern — a heightmap function for use with `.surfaceDisplace()`.
-- `fromFunction(fn: SdfFunctionSource, options: SdfFunctionOptions): SdfShape` — Create a custom SDF from one expression; shader-safe expressions raymarch directly.
+- `fromFunction(fn: SdfFunctionSource, options: SdfFunctionOptions): SdfShape` — Create a custom SDF from one expression; shader-safe expressions keep shader metadata for tooling.
 - `combine(value: unknown, options?: CombineOptions): SdfShape` — Collapse a plain object/array tree of SDF leaves into one continuous implicit field. Per-leaf color/material identity is intentionally discarded — the result is one scalar field. Use plain object returns for multi-material SDF preview, and `sdf.combine(...)` only when you want one implicit body. Explicit shape lists are covered by `a.union(b, c)`; pass `{ op: 'intersection' }` to intersect instead.
 
   ```js

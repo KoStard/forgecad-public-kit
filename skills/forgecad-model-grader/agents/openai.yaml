@@ -1,4 +1,0 @@
-interface:
-  display_name: "ForgeCAD Model Grader"
-  short_description: "Grade CAD models against a brief"
-  default_prompt: "Use $forgecad-model-grader to evaluate this ForgeCAD model against the requirement and give a 0-10 score with evidence."

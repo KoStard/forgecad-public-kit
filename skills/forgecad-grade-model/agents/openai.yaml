@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeCAD Grade Model"
+  short_description: "Grade CAD models against a brief"
+  default_prompt: "Use $forgecad-grade-model to evaluate this ForgeCAD model against the requirement and give a 0-10 score with evidence."

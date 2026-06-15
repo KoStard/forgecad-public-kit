@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeCAD Reconstruct CAD File"
+  short_description: "Rebuild CAD files as ForgeCAD models"
+  default_prompt: "Use $forgecad-reconstruct-cad-file to inspect this 3D file, rebuild it as parametric ForgeCAD, and score the result against the source."

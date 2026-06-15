@@ -5,7 +5,7 @@ skill-order: 100
 
 # Assembly API
 
-Assembly-owned links, constraints, connectors, solved poses, and robot export.
+Assembly-owned links, constraints, connectors, solved poses, and source-level simulation metadata.
 
 ## Contents
 
@@ -17,6 +17,59 @@ Assembly-owned links, constraints, connectors, solved poses, and robot export.
 ## Functions
 
 ### Assembly & Joints
+
+#### `Sim.material(name: string, options?: SimMaterialOptions): SimMaterialDef` — Create a named physical material with density and contact coefficients for simulation export and checks.
+
+`SimMaterialOptions`: `{ densityKgM3?: number, staticFriction?: number, dynamicFriction?: number, restitution?: number }`
+
+`SimMaterialDef`: `{ kind: "material", name: string }`
+
+#### `Sim.body(options: SimBodyOptions): SimBodyDef` — Describe one assembly part as a physical body with mass/density, material, collider intent, and optional contact surfaces.
+
+**`SimBodyOptions`**: `massKg?: number`, `densityKgM3?: number`, `material?: SimMaterialDef`, `collider?: SimColliderDef`, `contacts?: Record<string, SimContactDef>`
+
+`SimColliderDef`: `{ kind: "collider", mode: SimColliderMode, reason?: string }`
+
+`SimContactDef`: `{ kind: "wheelSurface" | "gripperSurface", connectorName: string }`
+
+`SimBodyDef`: `{ kind: "body" }`
+
+#### `Sim.collider` — Collision-geometry intent constructors for physical parts.
+
+- `Sim.collider.convexHull(): SimColliderDef` — Use a generated collision mesh for the part. This is the default fast rigid-body collider for irregular parts.
+- `Sim.collider.boundingBox(): SimColliderDef` — Use the part bounding box as the collision geometry. This is fastest and works well for chassis and simple blocks.
+- `Sim.collider.visualMesh(): SimColliderDef` — Use the visual mesh as collision geometry. This is exact but usually slower in physics engines.
+- `Sim.collider.none(reason: string): SimColliderDef` — Disable collision for a part with an explicit reason, such as a sensor-only or decorative object.
+
+#### `Sim.drive` — Joint-drive intent constructors for passive or powered assembly joints.
+
+- `Sim.drive.passive(options?: SimPassiveDriveOptions): SimDriveDef` — Mark a joint as passive while preserving damping and friction metadata for simulation export.
+- `Sim.drive.velocity(options: SimVelocityDriveOptions): SimDriveDef` — Mark a revolute joint as velocity-driven with torque and speed limits. Speed is authored in rpm and exported as deg/s or rad/s as needed.
+
+`SimPassiveDriveOptions`: `{ damping?: number, friction?: number }`
+
+`SimVelocityDriveOptions`: `{ maxTorqueNm: number, maxSpeedRpm: number }`
+
+#### `Sim.contact` — Contact-surface metadata over existing part connectors.
+
+- `Sim.contact.wheelSurface(connectorName: string): SimContactDef` — Mark a connector as the wheel tread contact surface for offline checks and downstream simulation metadata.
+- `Sim.contact.gripperSurface(connectorName: string): SimContactDef` — Mark a connector as a gripper pad/contact surface for offline checks and downstream grasp-readiness metadata.
+
+#### `Sim.profile` — Named validation/export profile constructors.
+
+- `Sim.profile.robotBodyRunnable(): SimProfileDef` — SimReady-style profile for a robot body that should be runnable in a physics simulator.
+- `Sim.profile.robotBodyIsaac(): SimProfileDef` — SimReady-style profile for robot bodies targeting Isaac Sim readiness.
+- `Sim.profile.roboticsAssetPhysx(): SimProfileDef` — SimReady-style profile for robotics assets with PhysX-ready rigid bodies and colliders.
+
+`SimProfileDef`: `{ kind: "profile", name: SimProfileName }`
+
+#### `Sim.controller` — Standard controller metadata constructors for simulator package generation.
+
+- `Sim.controller.diffDrive(options: SimDiffDriveControllerOptions): SimDiffDriveControllerDef` — Describe a differential-drive controller from left/right wheel joints and wheel dimensions.
+
+**`SimDiffDriveControllerOptions`**: `leftJoints: string[]`, `rightJoints: string[]`, `wheelSeparationMm: number`, `wheelRadiusMm: number`, `topic?: string`, `odomTopic?: string`, `tfTopic?: string`, `frameId?: string`, `odomFrameId?: string`, `maxLinearVelocity?: number`, `maxAngularVelocity?: number`, `linearAcceleration?: number`, `angularAcceleration?: number`
+
+`SimDiffDriveControllerDef`: `{ kind: "diffDrive" }`
 
 #### `assembly(name?: string): Assembly` — Create an assembly container with named parts, connectors, and kinematic links.
 
@@ -151,7 +204,7 @@ const housing = group(
 assembly.addPart("Base Assembly", housing);
 ```
 
-**`PartOptions`**: `transform?: TransformInput`, `metadata?: PartMetadata`, `mate?: AssemblyPartMateInput | AssemblyPartMateInput[]`, `bindToFrame?: string`
+**`PartOptions`**: `transform?: TransformInput`, `metadata?: PartMetadata`, `sim?: SimBodyDef`, `mate?: AssemblyPartMateInput | AssemblyPartMateInput[]`, `bindToFrame?: string`
 
 **`PartMetadata`**
 
@@ -212,7 +265,9 @@ Frame semantics: `origin` is the pivot/contact point, `axis` the hinge or slide 
 
 **Face-to-face:** each connector's axis points outward from its part; mating makes the axes anti-parallel, like a plug meeting a socket (same convention as `matchTo()`).
 
-**Mirrored revolute axes:** revolute values follow the right-hand rule, so a mirrored hinge axis (`[1, 0, 0]` vs `[-1, 0, 0]`) rotates oppositely for the same `+theta`: negate the mirrored side's value and mirror limits as `[min, max] -> [-max, -min]`. Prismatic joints have no handedness flip. Use an explicit per-side sign mapping (or side-neutral link controls) for bilateral mechanisms.
+**Revolute sign:** a positive joint value follows the right-hand rule about the **child** connector's placed axis. Because face-to-face mating makes the axes anti-parallel, that is the *left*-hand rule about the parent connector's outward axis — if `+30` swings the opposite way you expected, you predicted from the parent's axis. `forgecad debug assembly` prints each joint's resolved world axis.
+
+**Mirrored revolute axes:** because of the right-hand rule, a mirrored hinge axis (`[1, 0, 0]` vs `[-1, 0, 0]`) rotates oppositely for the same `+theta`: negate the mirrored side's value and mirror limits as `[min, max] -> [-max, -min]`. Prismatic joints have no handedness flip. Use an explicit per-side sign mapping (or side-neutral link controls) for bilateral mechanisms.
 
 Joint type defaults to the connector's `kind`. For `start`/`end` connectors, `align` / `parentAlign` / `childAlign` (`'start' | 'middle' | 'end'`) choose which point meets.
 
@@ -239,7 +294,7 @@ assembly("Door").addPart("Frame", frame).addPart("Door", door)
 | `align?` | `PortAlign` | Shorthand: set both parentAlign and childAlign at once. |
 | `follows?` | `JointFollowOptions` | Slave this joint to another joint: `value = ratio × source + offset` (e.g. a mirrored jaw with `ratio: -1`). |
 
-Also: `as?: string`, `type?: JointType`, `default?: number`, `unit?: string`, `effort?: number`, `velocity?: number`, `damping?: number`, `friction?: number`.
+Also: `as?: string`, `type?: JointType`, `default?: number`, `unit?: string`, `effort?: number`, `velocity?: number`, `damping?: number`, `friction?: number`, `drive?: SimDriveDef`.
 
 **`JointFollowOptions`**
 - `joint: string` — Name of the source joint that drives this one.
@@ -298,6 +353,12 @@ return mech.solve({ theta: 45 });
 ```
 
 **Other**
+
+#### `withSimulation(options: SimAssemblySimulationOptions): Assembly` — Attach the root simulation contract for this assembly.
+
+Use this after adding physical parts and joints. Robot-body profiles require `rootPart`; asset profiles can describe one-part or multi-part physical assets. URDF/SDF/MJCF/USD exporters and `forgecad check simready` read this contract directly from the returned assembly.
+
+`SimAssemblySimulationOptions`: `{ profile: SimProfileDef, rootPart?: string, controllers?: SimControllerDef[] }`
 
 #### `edgeBetweenFrames(a: string, b: string, options?: AssemblyFrameEdgeOptions): Assembly` — Add a visual skeleton edge between two rig frame origins.
 
@@ -434,7 +495,7 @@ The sub-assembly must have exactly one root part before it can be merged (collap
 | `connectorRefs?` | `JointConnectorRefs` | Connector refs that define this joint contract. Usually set by `connect()` / `match()`. |
 | `follows?` | `JointFollowOptions` | Slave this joint to another joint: `value = ratio × source + offset`. Use for mechanisms with one physical DOF expressed through several joints — a mirrored gripper jaw (`ratio: -1`), a gear pair, a drive crank turning with its servo. A followed joint stops being an independent control: the Motion view drives it from its source, `solve()` derives its value (a direct state override is ignored with a warning), and limits still clamp the derived value. |
 
-Also: `frame?: TransformInput`, `origin?: Vec3`, `axis?: Vec3`, `min?: number`, `max?: number`, `default?: number`, `unit?: string`, `effort?: number`, `velocity?: number`, `damping?: number`, `friction?: number`.
+Also: `frame?: TransformInput`, `origin?: Vec3`, `axis?: Vec3`, `min?: number`, `max?: number`, `default?: number`, `unit?: string`, `effort?: number`, `velocity?: number`, `damping?: number`, `friction?: number`, `drive?: SimDriveDef`.
 
 `JointConnectorRefs`: `{ parent: string, child: string, parentAlign?: PortAlign, childAlign?: PortAlign }`
 
@@ -506,4 +567,4 @@ console.log("Collisions", solved.collisionReport());
 
 #### `minClearance(partA: string, partB: string, searchLength?: number): number` — Compute the minimum gap (clearance) between two parts in this solved pose.
 
-Returns `0` if the parts are touching or overlapping. Requires the Manifold backend. `searchLength` bounds the search radius in mm — increase it for widely separated parts.
+Returns `0` if the parts are touching or overlapping. Manifold-backed parts use the exact Manifold gap query. SDF-backed parts use a mesh-derived sampled gap. `searchLength` bounds the Manifold search radius in mm — increase it for widely separated Manifold parts.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ForgeCAD Image Prompt"
+  short_description: "Builder-honest image prompt packs"
+  default_prompt: "Use $forgecad-image-prompt to turn this ForgeCAD artifact into image prompts that show the final product without hiding how it is built."

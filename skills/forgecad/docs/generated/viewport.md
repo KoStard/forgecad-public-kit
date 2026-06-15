@@ -79,7 +79,7 @@ return b;
 
 #### `scene(options: SceneOptions): void` — Configure the scene environment for the current script execution.
 
-Controls camera, named render views, guided journeys, lighting, background, fog, environment maps, post-processing, capture defaults, and the joint-control helper overlay (`jointOverlay` — axis arrows and arc indicators, renderer-only). Multiple `scene()` calls merge per-key — later values win — so configuration can be split across calls.
+Controls camera, named render views, guided journeys, lighting, background, fog, environment maps, capture defaults, and the joint-control helper overlay (`jointOverlay` — axis arrows and arc indicators, renderer-only). Multiple `scene()` calls merge per-key — later values win — so configuration can be split across calls.
 
 Two behavioral cliffs:
 
@@ -90,7 +90,7 @@ Named views are repeatable cameras checked in with the model code. Canonical sha
 
 Journeys are ordered `steps`, each focusing a returned object by name/tree path with an optional caption and camera. In the viewer they are opt-in (an Explore control; the camera does not move until started). Inspect resolved targets with `forgecad run --journeys`.
 
-Post-processing (`bloom`, `vignette`, `grain`) is browser-only; the CLI applies camera, lights, background, fog, and `toneMappingExposure` but skips shader effects.
+Post-processing is disabled for now while the browser EffectComposer flicker path is being rebuilt. Existing scripts that pass `postProcessing` continue running, but the option is not part of the active scene API.
 
 All numeric values accept `param()` expressions.
 
@@ -109,7 +109,6 @@ scene({
     { type: 'directional', position: [50, -30, 200], color: '#ffd60a', intensity: 1.2 },
   ],
   fog: { color: '#000814', near: 100, far: 450 },
-  postProcessing: { bloom: { intensity: param('bloom', 1.5, 0, 4) } },
   jointOverlay: { axisColor: '#13dfff', arcColor: '#ff7a1a' },
 });
 ```
@@ -120,7 +119,7 @@ scene({
 |--------|------|-------------|
 | `capture?` | `SceneCaptureConfig` | Default capture parameters for `forgecad capture` — CLI flags override these. |
 
-Also: `background?: string | SceneBackgroundGradient`, `camera?: SceneCameraConfig`, `views?: Record<string, SceneViewInputConfig>`, `journeys?: Record<string, SceneJourneyConfig>`, `lights?: SceneLightConfig[]`, `environment?: SceneEnvironmentConfig`, `fog?: SceneFogConfig`, `postProcessing?: ScenePostProcessingConfig`, `ground?: SceneGroundConfig`.
+Also: `background?: string | SceneBackgroundGradient`, `camera?: SceneCameraConfig`, `views?: Record<string, SceneViewInputConfig>`, `journeys?: Record<string, SceneJourneyConfig>`, `lights?: SceneLightConfig[]`, `environment?: SceneEnvironmentConfig`, `fog?: SceneFogConfig`, `ground?: SceneGroundConfig`.
 
 `SceneBackgroundGradient`: `{ top: string, bottom: string }`
 
@@ -173,14 +172,6 @@ Also: `type: SceneLightType`, `color?: string`, `intensity?: number`, `position?
 - `far?: number` — Linear fog far distance
 - `density?: number` — Exponential fog density (if set, uses FogExp2 instead of linear Fog)
 - Also: `color?: string`.
-
-`ScenePostProcessingConfig`: `{ bloom?: SceneBloomConfig, vignette?: SceneVignetteConfig, grain?: SceneGrainConfig, toneMappingExposure?: number }`
-
-`SceneBloomConfig`: `{ intensity?: number, threshold?: number, radius?: number }`
-
-`SceneVignetteConfig`: `{ darkness?: number, offset?: number }`
-
-`SceneGrainConfig`: `{ intensity?: number }`
 
 **`SceneGroundConfig`**
 

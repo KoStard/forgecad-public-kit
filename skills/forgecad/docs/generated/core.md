@@ -24,12 +24,17 @@ skill-order: 100
 - [SurfacePattern](#surfacepattern)
 - [Pattern2D](#pattern2d)
 - [Pattern2DBuilder](#pattern2dbuilder)
+- [Sheet](#sheet)
+- [CurveNetBuilder](#curvenetbuilder)
+- [MatchEdgeBuilder](#matchedgebuilder)
+- [BridgeBuilder](#bridgebuilder)
 - [ShapeRef](#shaperef)
 - [ANCHOR3D_NAMES](#anchor3d-names)
 - [verify](#verify)
 - [Points](#points)
 - [connector](#connector)
 - [Import](#import)
+- [Wrap](#wrap)
 
 ## Functions
 
@@ -111,6 +116,8 @@ The `edges` parameter is flexible:
 
 Throws if no edges match the selection, or if `radius` is not a positive finite number.
 
+Selectorless (all-edges) calls draw from a per-run broad edge-feature budget. Exceeding it throws — except in live preview, which skips the finish with a warning for responsiveness. Explicit edge selectors are never budgeted; `FORGECAD_BROAD_EDGE_FEATURE_BUDGET` / `FORGECAD_ALLOW_BROAD_EDGE_FEATURES=1` raise or lift the budget.
+
 ```ts
 // Fillet all edges
 fillet(myShape, 2)
@@ -133,6 +140,8 @@ fillet(base, 5, base.edge('vert-br'))
 
 Produces a 45° bevel at the specified `size` (distance from edge). Edge selections compile into backend operations; unsupported selections fail as explicit kernel gaps instead of using TypeScript geometry fallbacks.
 
+Selectorless (all-edges) calls draw from a per-run broad edge-feature budget. Exceeding it throws — except in live preview, which skips the finish with a warning for responsiveness. Explicit edge selectors are never budgeted; `FORGECAD_BROAD_EDGE_FEATURE_BUDGET` / `FORGECAD_ALLOW_BROAD_EDGE_FEATURES=1` raise or lift the budget.
+
 The `edges` parameter accepts the same options as `fillet()`: inline `EdgeQuery`, pre-selected `EdgeSegment`/`EdgeSegment[]`, a tracked `EdgeRef` from `shape.edge('vert-br')` (exact compiler-owned path), or `undefined` (all sharp edges).
 
 ```ts
@@ -151,7 +160,7 @@ chamfer(base, 3, base.edge('vert-br'))
 
 Adds a taper angle to the vertical faces of a solid so that it can be extracted from a mold. The neutral plane is the Z position where the draft angle is zero — faces above and below are tapered symmetrically. Typical values for injection molding are 1–5°.
 
-Truck supports vertical-prism solids with Z-axis pull directions. OCCT uses its native draft operation when available. Manifold throws.
+SDF, Manifold, and Truck lower supported vertical-prism solids with Z-axis pull directions to a tapered loft. OCCT uses its native draft operation when available.
 
 ```ts
 // Add 3° draft to a box for injection molding
@@ -704,7 +713,7 @@ Supports transforms (translate, rotate, scale, mirror, transform, rotateAround, 
 
 Returns a new Shape with the specified material properties merged on top of any previously set properties. All properties are optional — omitted keys retain their current value. Material properties survive transforms and boolean operations.
 
-Use `.color()` to set the base diffuse color; `.material()` controls how that color behaves under light (metalness, roughness, clearcoat) and can add emissive glow independent of lighting. Emissive glow pairs naturally with the `postProcessing.bloom` effect in [`scene()`](/docs/viewport#scene).
+Use `.color()` to set the base diffuse color; `.material()` controls how that color behaves under light (metalness, roughness, clearcoat) and can add emissive glow independent of lighting.
 
 ```js
 box(50, 50, 50).material({ metalness: 0.9, roughness: 0.1 }); // polished metal
@@ -733,6 +742,7 @@ box(100, 100, 10).color('#gold').material({ metalness: 0.95, roughness: 0.05 }).
 | `specularIntensity?` | `number` | Specular highlight intensity (0–1). |
 | `specularColor?` | `string` | Specular highlight tint. |
 | `reflectivity?` | `number` | Reflection strength for supported renderers (0–1). |
+| `texture?` | `{ image: string; projection: UvProjectionSpec; ...` | Projected bitmap texture set by `Shape.wrapTexture`. `image` is a self-contained `data:` URI; `projection` maps each vertex's final world position to (u,v) in the shader, so the texture survives transforms and boolean cuts. `imageWidth`/`imageHeight` are the intrinsic pixel dimensions. |
 
 **Face Topology**
 
@@ -1081,6 +1091,22 @@ Overloads:
 
 **Other**
 
+#### `wrapTexture(image: ImageHandle, projection: UvProjectionSpec): Shape` — Wrap an imported bitmap image around this shape using a projection.
+
+The `image` comes from `Import.image('path.png')`; the `projection` is one of the `Wrap.*` helpers — `Wrap.flat({ onto: 'top' })` lays it flat on a face, `Wrap.aroundCylinder({ axis: 'z' })` wraps it like a can label, `Wrap.onSphere()` maps it like a globe, and `Wrap.box()` cube-maps it onto the six sides.
+
+By default the image **auto-fits** the shape — one copy across the relevant extent, so no `width`/`height`/`size` is needed (pass them only to override). The (u,v) is derived from each vertex's final world position, so the image stays glued to the surface through transforms and boolean cuts with no UV layout to maintain — apply `wrapTexture` *after* positioning the shape. Returns a new Shape; the original is unchanged.
+
+```js
+const logo = Import.image('./logo.png');
+box(80, 80, 10).wrapTexture(logo, Wrap.flat({ onto: 'top' }));            // auto-fits the face
+
+const label = Import.image('./label.jpg');
+cylinder(60, 20).wrapTexture(label, Wrap.aroundCylinder({ axis: 'z' }));  // wraps the side
+```
+
+`ImageHandle`: `{ __forgeImage: true, dataUri: string, width: number, height: number, mimeType: string, byteLength: number }`
+
 #### `clone(): Shape` — Return a new Shape wrapper for explicit duplication in scripts.
 
 #### `geometryInfo(): GeometryInfo` — Inspect which backend/representation produced this solid.
@@ -1329,6 +1355,71 @@ const bracket = group(
 | `depth?` | `number` | Thread groove depth in millimeters. Default: 0.8. |
 | `underScale?` | `number` | Relative height of the under-crossing thread. Default: 0.15. |
 
+### `Sheet`
+
+A parametric open surface value (control grid + knots + analytic differential geometry).
+
+**Properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `surface` | `BSplineSurface` | — |
+
+**Methods:**
+
+#### `get frontEdge(): SheetEdge` — Edge naming follows parameter direction (documented): front=v0, rear=v1, left=u0, right=u1.
+
+#### `thicken(wall: number, options?: { resolution?: number; }): Shape` — Offset the sheet along its analytic normals into a watertight solid shell of the given wall thickness. Throws if the wall would self-intersect on a concave region (no silent degenerate solid).
+
+#### `matchEdge(edge: SheetEdge): MatchEdgeBuilder` — Per-edge continuity match against a neighbor (returns a NEW Sheet).
+
+**`SheetEdge`**
+- `fixed: "u" | "v"` — Which parameter is held fixed along this edge.
+- `value: 0 | 1` — The fixed value (0 or 1).
+- Also: `sheet: Sheet`.
+
+- `get rearEdge(): SheetEdge`
+- `get leftEdge(): SheetEdge`
+- `get rightEdge(): SheetEdge`
+- `pointAt(u: number, v: number): Vec3`
+- `normalAt(u: number, v: number): Vec3`
+- `curvatureAt(u: number, v: number): SurfaceCurvature`
+
+### `CurveNetBuilder`
+
+#### `toSheet(): Sheet` — Build (once) and return the Sheet.
+
+- `lengthwise(...curves: CurveInput[]): this`
+- `crosswise(...curves: CurveInput[]): this`
+- `alongRails(railA: CurveInput, railB: CurveInput): this`
+- `sections(...curves: CurveInput[]): this`
+- `cage(grid: Vec3[][]): this`
+- `degree(u: number, v: number): this`
+- `get frontEdge(): SheetEdge`
+- `get rearEdge(): SheetEdge`
+- `get leftEdge(): SheetEdge`
+- `get rightEdge(): SheetEdge`
+- `get surface(): BSplineSurface`
+- `pointAt(u: number, v: number): Vec3`
+- `normalAt(u: number, v: number): Vec3`
+- `curvatureAt(u: number, v: number): SurfaceCurvature`
+- `thicken(wall: number, options?: { resolution?: number; }): Shape`
+- `matchEdge(edge: SheetEdge): MatchEdgeBuilder`
+
+### `MatchEdgeBuilder`
+
+- `toG0(neighbor: SheetEdge): Sheet`
+- `toG1(neighbor: SheetEdge): Sheet`
+- `toG2(neighbor: SheetEdge): Sheet`
+
+### `BridgeBuilder`
+
+#### `bulge(a: number, b: number): this` — Tune the influence of each side (Rhino-style bulge).
+
+- `g0(): Sheet`
+- `g1(): Sheet`
+- `g2(): Sheet`
+
 ### `ShapeRef`
 
 A first-class reference path over a shape's semantic faces and face relationships.
@@ -1406,15 +1497,26 @@ Namespaced file-format import helpers — the single vocabulary for bringing ext
 
 - `dxfSketch(fileName: string, options?: DxfImportOptions): Sketch` — Parse a DXF file and return closed 2D profile geometry as a Sketch. The result can be extruded directly.
 - `svgSketch(fileName: string, options?: SvgImportOptions): Sketch` — Parse an SVG file and return it as a Sketch with options for region filtering, scaling, and simplification.
-- `mesh(fileName: string, options?: { scale?: number; center?: boolean; object?: string; separateObjects?: boolean; }): Shape | ShapeGroup` — Import an external mesh file (STL, OBJ, 3MF).
+- `mesh(fileName: string, options?: MeshImportOptions): Shape | ShapeGroup` — Import an external mesh file (STL, OBJ, 3MF).
 
   By default, 3MF build items are flattened into one Shape for compatibility. Use `separateObjects: true` to import 3MF build items/resource objects as a named ShapeGroup whose children are targetable by `forgecad ls`. Use `object` to import one item by the stable ref/name reported by `forgecad run`.
 
   For 3MF sources, `forgecad run` prints a source-structure table with one line per build item: `[3mf:build:NNN:object:N] name type=... verts=... tris=... bbox=[min] → [max]`. Build items are numbered from `001`; files with no build items list resource objects as `3mf:object:N` instead. Per-item bboxes reveal multi-part structure — account for every substantial item before flattening. Pass any listed stable ref or name as `object` to import that item alone.
 
+  Use `sourceFrame: { up: "+Y" }` when the file was authored in a non-Z-up coordinate system. ForgeCAD remains Z-up; the import is rotated so the named source axis becomes ForgeCAD +Z. Supported values: `"+X"`, `"-X"`, `"+Y"`, `"-Y"`, `"+Z"`, `"-Z"`.
+
   ```js
   const all = Import.mesh("./assembly.3mf", { separateObjects: true });
   const pin = all.child("Pin #001");
   const plate = Import.mesh("./assembly.3mf", { object: "3mf:build:001:object:7" });
+  const yUpPart = Import.mesh("./part.obj", { sourceFrame: { up: "+Y" } });
   ```
-- `step(fileName: string): Shape` — Import a STEP file (.step, .stp) as an exact OCCT-backed Shape. Preserves NURBS curves, B-spline surfaces, and exact topology. Requires running with the OCCT backend.
+- `step(fileName: string, options?: StepImportOptions): Shape` — Import a STEP file (.step, .stp) as an exact OCCT-backed Shape. Preserves NURBS curves, B-spline surfaces, and exact topology. Requires running with the OCCT backend. Use `sourceFrame: { up: "+Y" }` to rotate Y-up source files into ForgeCAD's Z-up world.
+- `image(fileName: string): ImageHandle` — Import a bitmap image (PNG, JPEG, or WebP) as an ImageHandle for projected texturing. Reads the pixel dimensions from the file header and embeds the bytes as a data URI. Pass the result to `Shape.wrapTexture(image, projection)` with a `Wrap.*` projection.
+
+### `Wrap`
+
+- `flat(opts: FlatWrapOptions): UvProjectionSpec` — Project the image flat onto an axis-aligned face — `onto` is one of top/bottom/front/back/left/right. Auto-fits the face (no width/height needed).
+- `aroundCylinder(opts: CylinderWrapOptions): UvProjectionSpec` — Wrap the image around a cylinder like a can label — `axis` is 'x' | 'y' | 'z'. Auto-fits one wrap around and the full height.
+- `onSphere(opts?: SphereWrapOptions): UvProjectionSpec` — Map the image over a sphere like a globe (longitude/latitude). Auto-centers on the sphere.
+- `box(opts?: BoxWrapOptions): UvProjectionSpec` — Cube-map the image onto a box — one copy per face. Auto-fits the box (no size needed).

@@ -46,7 +46,9 @@ ForgeCAD includes a local editor. Open it around a dedicated project folder, edi
 | `dev <project-path> [project-path ...]` | Start the Vite dev server for ForgeCAD source development. |
 | `web` | Start a local dev server in web/playground mode (no filesystem, localStorage only). |
 
-`forgecad studio <project-path>` is the normal installed-CLI command; `forgecad dev` starts the Vite dev server and is mainly for ForgeCAD source development. Keep one long-running `forgecad studio <project-path> [project-path ...]` process open with every active project folder as an argument — the user opens the single printed localhost port once, and AI agents only create or edit files under those folders so the browser updates live without starting more servers.
+`forgecad studio <project-path>` is the normal installed-CLI command for users. `forgecad dev <project-path>` starts the Vite dev server and is mainly for ForgeCAD source development.
+
+Keep one long-running `forgecad studio <project-path> [project-path ...]` process open with every active project folder listed in its arguments; the user opens the single printed localhost port once, and AI agents should only create or edit files under those folders so the browser updates live without starting more servers.
 
 <details>
 <summary>Common flags for studio / dev</summary>
@@ -76,7 +78,7 @@ Direct `.stl`/`.obj`/`.3mf`/`.step`/`.stp` inputs are imported automatically; ST
 
 ```bash
 forgecad run model.forge.js
-forgecad run model.forge.js --details --history
+forgecad run model.forge.js other-model.forge.js --quality live
 ```
 
 ### `forgecad ls`
@@ -102,7 +104,7 @@ Without a target, `show` renders the whole scene and behaves like a shorter, int
 
 ```bash
 forgecad show model.forge.js
-forgecad show model.forge.js Bench
+forgecad show model.forge.js --target Bench
 ```
 
 ### Object Filtering: `--focus` and `--hide`
@@ -110,7 +112,7 @@ forgecad show model.forge.js Bench
 `render 3d`, `render wireframe`, `inspect <family> <mode>`, `capture`, and `check print` can filter the visible object set without changing model code. Use `forgecad ls model.forge.js` to list exact object paths, then pass names or globs:
 
 ```bash
-forgecad render 3d model.forge.js bench.png --focus "Bench.*"
+forgecad render 3d model.forge.js --output bench.png --focus "Bench.*"
 forgecad inspect visual objects model.forge.js --hide "Bench.Slat0,Bench.Slat1" --camera iso
 ```
 
@@ -198,7 +200,7 @@ Runs the script headlessly and prints every named render view with an exact came
 
 ```bash
 forgecad render views model.forge.js
-forgecad render views model.forge.js --json
+forgecad render views model.forge.js reference.step
 ```
 
 ### `forgecad render wireframe`
@@ -222,7 +224,7 @@ Exports the scene to Blender and renders with Cycles (path tracer); requires Ble
 
 ```bash
 forgecad render hq model.forge.js
-forgecad render hq model.forge.js hero.png --preset dramatic --samples 1024
+forgecad render hq model.forge.js --output hero.png --preset dramatic --samples 1024
 ```
 
 ### `forgecad capture gif|mp4` **\[Pro\]**
@@ -233,18 +235,22 @@ Renders an animated sequence: `--capture orbit` (default) for a turntable, `--ca
 
 ```bash
 forgecad capture gif model.forge.js
-forgecad capture gif model.forge.js out/sweep.gif --capture section-sweep --sweep-plane YZ
+forgecad capture gif model.forge.js other-model.forge.js
 ```
 
 ### `forgecad render section`
 
 Render a 2D cross-section of a 3D model (cut by a plane) to SVG or PNG.
 
-Cuts all shapes with an axis-aligned plane (default XY at Z=0; `--plane XZ|YZ` reorients, `--offset` shifts the cut) and writes a 2D cross-section drawing. The file extension picks the format: `.svg` (default, vector) or `.png` (rasterized at `--size` pixels); `--edges=<off|thin|bold>` sets the outline stroke. Useful for verifying internal geometry, wall thicknesses, and fits that aren't visible in 3D renders.
+Cuts all shapes in the scene with an axis-aligned plane and produces a 2D cross-section drawing. The default plane is XY at Z=0. Use `--plane XZ` or `--plane YZ` for other orientations, and `--offset` to shift the cut position.
+
+Output defaults to `.svg`; pass `--format png` or a single-input `--output *.png` path for a rasterized PNG at `--size` pixels. Use `--edges=<off|thin|bold>` to control the outline stroke on cut shapes.
+
+Useful for verifying internal geometry, wall thicknesses, and fit checks that aren't visible in 3D renders.
 
 ```bash
 forgecad render section model.forge.js
-forgecad render section model.forge.js out/section.svg --plane XZ --offset 10
+forgecad render section model.forge.js --output out/section.svg --plane XZ --offset 10
 ```
 
 | Command | Description |
@@ -259,7 +265,7 @@ forgecad render section model.forge.js out/section.svg --plane XZ --offset 10
 
 ### Cross-cutting flags
 
-These flags work across run / render / capture / inspect commands:
+These flags work across script-backed run, render, export, capture, inspect, and check commands that evaluate `.forge.js` files. Use `--param Key=Value` for parameter overrides; repeat it for multiple parameters.
 
 | Option | Description |
 |--------|-------------|
@@ -270,8 +276,8 @@ These flags work across run / render / capture / inspect commands:
 | `--camera <front\|back\|side\|right\|top\|iso\|az:el\|az:el:dist\|spec>` | Camera preset, spherical (az:el), or full spec such as `proj=perspective;pos=x,y,z;target=x,y,z;up=x,y,z;fov=45`. Repeatable. |
 | `--view <name>` | Named camera view declared by the model with scene({ views }) |
 | `--size <px>` | Image size in pixels |
+| `--backend <manifold\|occt\|truck\|sdf>` | Geometry backend (default: manifold; STEP inputs default to OCCT) |
 | `--quality <default\|live\|high>` | Mesh quality preset |
-| `--backend <manifold\|occt\|truck>` | Geometry backend (default: manifold; STEP inputs default to OCCT) |
 | `--json` | Print machine-readable JSON |
 
 Every command has more — Blender-only `render hq` flags (`--preset`, `--samples`, `--engine`, `--hdri`, `--transparent`, `--video`) and capture-only flags (`--capture`, `--animation`, `--cut-plane`, `--sweep-*`, `--fps`) among them. Run `forgecad <command> --help` for the full list.
@@ -291,43 +297,55 @@ Export to every format you need.
 | `export stl` | STL | 3D printing |
 | `export gcode` **\[Production\]** | G-code | Toolpath (scripted, not sliced) |
 | `export sdf` **\[Production\]** | SDF package | Gazebo robot simulation |
+| `export mjcf` **\[Production\]** | MJCF package | MuJoCo / MJX robot simulation |
 | `export urdf` **\[Production\]** | URDF package | ROS / PyBullet / MuJoCo |
+| `export usd` **\[Production\]** | USD package | Isaac Sim / OpenUSD simulation |
 | `export report` **\[Production\]** | PDF report | Multi-view report with BOM and dimensions |
 | `export cutting-layout` **\[Production\]** | PDF/DXF | Sheet cutting layout with cut sequence |
 | `link` | URL | Share link from a GitHub Gist URL or ID (copied to clipboard) |
 
 ```bash
 # Sheet material
-forgecad cut-list shelf.forge.js
+forgecad cut-list shelf.forge.js --param Material=plywood
 forgecad export cutting-layout shelf.forge.js --sheet-width 420 --sheet-height 594 --kerf 3
+forgecad export cutting-layout shelf.forge.js --output out/layout.dxf
 
 # 3D printing
 forgecad check print bracket.forge.js
-forgecad export stl bracket.forge.js
+forgecad export stl bracket.forge.js --param Width=42
 forgecad export 3mf bracket.forge.js --quality high
 
 # CAD interchange
-forgecad export step bracket.forge.js
+forgecad export step bracket.forge.js --param Width=42
 
 # Technical drawings
-forgecad export report bracket.forge.js out/report.pdf
+forgecad export report bracket.forge.js --output out/report.pdf
 
 # Robot simulation
 forgecad export sdf rover.forge.js --output out/forge_scout
+forgecad export mjcf rover.forge.js --param Wheelbase=180 --output out/forge_scout_mjcf
+forgecad export usd rover.forge.js --output out/forge_scout_usd
 ```
+
+Script-backed exports accept repeatable `--param Key=Value` overrides before the model is evaluated. The MuJoCo/MJX package export command is `export mjcf`.
 
 <details>
 <summary>Export flags</summary>
 
 | Option | Description |
 |--------|-------------|
+| `--param <Key=Value>` | Override a parameter value (Key=Value). Repeatable. |
+| `-p <Key=Value>` | Shorthand for --param |
 | `--joint <JointName=Value>` | Override a Motion tab joint value (JointName=Value). Repeatable. |
-| `--output <path>` | Output STEP path |
+| `--output <path>` | Output SVG path for a single input |
 | `--backend <occt\|truck>` | Exact BREP exporter: occt (default) or truck (native analytic kernel) |
 | `--quality <default\|live\|high>` | Forge quality preset |
 | `-o <path>` | Shorthand for --output |
+| `--format <json\|webgpu-brick>` | Implicit artifact format |
+| `-q <live\|default\|high>` | Shorthand for --quality |
+| `--workgroup-size <x>x<y>x<z>` | WebGPU compute workgroup size |
 | `--dim-angle-tol <deg>` | Dimension routing tolerance in degrees |
-| `--format <pdf\|dxf>` | Output format |
+| `--out <path>` | Alias for --output |
 | `--sheet-width <mm>` | Stock sheet width in mm |
 | `--sheet-height <mm>` | Stock sheet height in mm |
 | `--kerf <mm>` | Cutting clearance (saw blade width) in mm |
@@ -451,7 +469,7 @@ forgecad skill flattened-files ~/Desktop/forgecad-skills
 
 ## Validation
 
-Check printability and run focused model integrity reviews.
+Check printability, simulation readiness, and focused model integrity.
 
 ### `forgecad compare 3d`
 
@@ -474,7 +492,18 @@ Checks include script `verify.*` results, exact positive-volume object collision
 
 ```bash
 forgecad check print model.forge.js
-forgecad check print model.forge.js --json
+forgecad check print model.forge.js other-model.forge.js
+```
+
+### `forgecad check simready`
+
+Validate source-authored robot and physics metadata before simulation export.
+
+Runs a Forge script and checks the returned `assembly(...).withSimulation(...)` contract without Isaac Sim, OpenUSD, or NVIDIA validators. The gate validates Sim.body metadata, explicit colliders, contact connectors, controller joints, numeric physics values, and the robot joint graph.
+
+```bash
+forgecad check simready model.forge.js
+forgecad check simready model.forge.js other-model.forge.js
 ```
 
 ### `forgecad inspect mechanical-integrity`
@@ -514,7 +543,7 @@ The CLI is free for personal non-commercial use. Pro covers human-operated comme
 
 | Free | Production outputs | Pro | Enterprise |
 |------|--------------------|-----|------------|
-| `run`, `dev`, `studio`, `render 3d`, `export stl`, `export 3mf`, `export svg`, `compare 3d`, `check print`, `inspect fit interference`, `inspect mechanical-integrity` for personal non-commercial use | `cut-list`, `export sketch-pdf`, `export step`, `export brep`, `export gcode`, `export sdf`, `export urdf`, `export report`, `export cutting-layout` are free to run for personal non-commercial use; Pro covers human-operated commercial CAD work | `render hq`, `capture gif`, `capture mp4` plus commercial coverage for client/customer work | Backend, hosted, embedded, or application workflows that call ForgeCAD automatically |
+| `run`, `dev`, `studio`, `render 3d`, `export stl`, `export 3mf`, `export svg`, `compare 3d`, `check print`, `inspect fit interference`, `inspect mechanical-integrity` for personal non-commercial use | `cut-list`, `export sketch-pdf`, `export step`, `export brep`, `export gcode`, `export implicit`, `export sdf`, `export mjcf`, `export urdf`, `export usd`, `export report`, `export cutting-layout` are free to run for personal non-commercial use; Pro covers human-operated commercial CAD work | `render hq`, `capture gif`, `capture mp4` plus commercial coverage for client/customer work | Backend, hosted, embedded, or application workflows that call ForgeCAD automatically |
 
 ```bash
 forgecad license                    # Check local license status

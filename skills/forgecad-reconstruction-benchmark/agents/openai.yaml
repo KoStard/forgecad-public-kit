@@ -1,4 +1,0 @@
-interface:
-  display_name: "ForgeCAD Reconstruction Benchmark"
-  short_description: "Solve fixed-path CAD reconstruction tasks"
-  default_prompt: "Use $forgecad-reconstruction-benchmark to rebuild the reference CAD asset as readable parametric ForgeCAD in the required benchmark submission path."

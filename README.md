@@ -168,7 +168,7 @@ Install the ForgeCAD public skill library:
 forgecad skill install
 ```
 
-That installs the core `forgecad` skill plus public workflow skills such as `forgecad-make-a-model`, `forgecad-render-inspect`, and `forgecad-lld` into `~/.agents/skills`. Use `--target` when you want to update a different agent location:
+That installs the core `forgecad` skill plus public workflow skills such as `forgecad-build-model`, `forgecad-design-spec`, and `forgecad-inspect-model` into `~/.agents/skills`. Use `--target` when you want to update a different agent location:
 
 ```bash
 forgecad skill install --target claude    # ~/.claude/skills
@@ -178,12 +178,15 @@ forgecad skill install --target opencode  # ~/.config/opencode/skills
 
 The library includes public prompts for:
 
-- build-brief preparation with [`forgecad-prepare-prompt`](skills/forgecad-prepare-prompt/SKILL.md)
-- model authoring with [`forgecad-make-a-model`](skills/forgecad-make-a-model/SKILL.md)
-- component discipline with [`forgecad-component-model`](skills/forgecad-component-model/SKILL.md)
-- high-level and low-level design with [`forgecad-high-level-spec`](skills/forgecad-high-level-spec/SKILL.md) and [`forgecad-lld`](skills/forgecad-lld/SKILL.md)
-- render-bundle verification with [`forgecad-render-inspect`](skills/forgecad-render-inspect/SKILL.md)
-- visual prompt generation with [`forgecad-visual-spec`](skills/forgecad-visual-spec/SKILL.md)
+- design briefs, HLDs, and LLDs with [`forgecad-design-spec`](skills/forgecad-design-spec/SKILL.md)
+- model authoring and assembly discipline with [`forgecad-build-model`](skills/forgecad-build-model/SKILL.md)
+- reconstruction from CAD or mesh files with [`forgecad-reconstruct-cad-file`](skills/forgecad-reconstruct-cad-file/SKILL.md)
+- reconstruction from images with [`forgecad-reconstruct-from-images`](skills/forgecad-reconstruct-from-images/SKILL.md)
+- inspection-bundle verification with [`forgecad-inspect-model`](skills/forgecad-inspect-model/SKILL.md)
+- model grading with [`forgecad-grade-model`](skills/forgecad-grade-model/SKILL.md)
+- MuJoCo simulation verification with [`forgecad-verify-mujoco`](skills/forgecad-verify-mujoco/SKILL.md)
+- hosted project sync with [`forgecad-project-sync`](skills/forgecad-project-sync/SKILL.md)
+- AI image prompt generation with [`forgecad-image-prompt`](skills/forgecad-image-prompt/SKILL.md)
 
 The generated core modeling skill is checked in at [`skills/forgecad/SKILL.md`](skills/forgecad/SKILL.md). The full public skill index is [`skills/README.md`](skills/README.md).
 

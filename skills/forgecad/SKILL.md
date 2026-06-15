@@ -65,7 +65,7 @@ Smooth curves, Hermite splines, lofted and swept solids. For straps, inlays, gua
 
 ### 5. Assemblies and Mechanisms (for joints or kinematics)
 
-Assembly graph, joint types, couplings, validation, robot export.
+Assembly graph, joint types, couplings, validation, and simulation export.
 
 - `{{SKILL_DIR}}/docs/generated/assembly.md`
 

@@ -426,7 +426,11 @@ const outlet = route.port("outlet");
 
 #### `pointAt(u: number, v: number): Vec3` — Evaluate the surface at parameters (u, v) ∈ [0, 1]². Uses tensor product evaluation: evaluate basis functions in U and V independently.
 
-#### `normalAt(u: number, v: number): Vec3` — Evaluate the surface normal at (u, v) via cross product of partial derivatives.
+#### `normalAt(u: number, v: number): Vec3` — Evaluate the surface unit normal at (u, v) from analytic first derivatives.
+
+Uses Algorithm A2.3 basis-function derivatives with the rational quotient rule, so the normal is exact (no finite-difference epsilon, no error near the boundary). Constant chain-rule factors from the parameter remap scale Su and Sv positively and cancel under normalization, so they are omitted.
+
+#### `derivativesAt(u: number, v: number): { S: Vec3; Su: Vec3; Sv: Vec3; }` — Analytic first partial derivatives S_u, S_v (rational quotient rule).
 
 #### `tessellate(resU?: number, resV?: number): { positions: Vec3[]; normals: Vec3[]; indices: number[]; }` — Tessellate the surface into a triangle mesh. Returns positions, normals, and triangle indices.
 
@@ -1165,16 +1169,19 @@ Members (full entries under [Curves & Surfacing](#curves-surfacing)): `Curve.Ble
 - `Trim(shape: Shape, tool: Shape | SurfacePlaneOp): Shape`
 - `Split(shape: Shape, tool: Shape | SurfacePlaneOp): [ Shape, Shape ]`
 - `Match(shape: Shape, options: { edge: "u0" | "u1" | "v0" | "v1"; target: EdgeRef; continuity?: SurfaceContinuity; }): Shape`
+- `Net(): CurveNet` — Begin a curve-network (Gordon) surface — the class-A keystone. Chain `.lengthwise(...)/.crosswise(...)` (or `.alongRails(a,b).sections(...)`, or `.cage(grid)`), then `.thicken(wall)` to get a solid Shape. Returns a fluent [`Sheet`](/docs/core#sheet) builder with analytic point/normal/curvature queries and named edges.
 
 ### `Blend`
 
 - `Edge(options: BlendEdgeOptions): Shape`
 - `Surface(options: BlendSurfaceOptions): Shape`
+- `Bridge(edgeA: SheetEdge, edgeB: SheetEdge): BridgeBuilder` — Build a transition strip between two `Surface.Net` sheet edges. Chain `.bulge(a, b)` then `.g0()/.g1()/.g2()` for the continuity order. Returns a [`Sheet`](/docs/core#sheet); verify the seam with `Analysis.EdgeMatch`.
 
 ### `Analysis`
 
 - `EdgeContinuity(shape: Shape, options?: EdgeContinuityThresholds): EdgeContinuityReport`
 - `SurfaceContinuity(shape: Shape, options?: EdgeContinuityThresholds): EdgeContinuityReport`
+- `EdgeMatch(edgeA: SheetEdge, edgeB: SheetEdge, options?: { samples?: number; }): ContinuityReport` — Measure G0/G1/G2 agreement between two `Surface.Net` sheet edges: worst position gap, cross-boundary tangent angle (0 = G1), and normal-curvature mismatch (0 = G2). The reflection/fairness check for matched panel seams.
 - `CurvatureComb(input: NurbsCurve3D | EdgeRef, options?: { samples?: number; }): CurvatureSample[]`
 - `SurfaceHealth(shape: Shape, options?: { tinyEdgeThreshold?: number; sliverThreshold?: number; }): SurfaceHealthReport`
 - `BRepValidity(shape: Shape, options?: BRepValidityOptions): BRepValidityReport` — Validate B-rep/shell/solid structure and return closedness, manifoldness, orientation, and issue diagnostics.

@@ -24,12 +24,12 @@ lib, Line2D, linearPattern, linearPattern2d, loadFont, loft, Loft, mirrorCopy
 mock, ngon, NurbsCurve3D, NurbsSurface, offsetSolid, param, Param, path
 Point2D, Points, polygon, polygonVertices, port, Product, ProductPanelBuilder, ProductRibbonBuilder
 ProductSkin, ProductSkinBuilder, ProductStationBuilder, ProductSurfaceBuilder, ProductSurfaceRef, projectToPlane, queueMicrotask, rect
-Rectangle2D, robotExport, roundedRect, Route3D, scene, Sculpt, sdf, SdfShape
-selectEdge, selectEdges, self, setActiveBackend, setImmediate, setInterval, setTimeout, Shape
-ShapeGroup, sheetMetal, SheetMetalPart, sheetStock, Sketch, sketchToDxf, sketchToSvg, slot
+Rectangle2D, roundedRect, Route3D, scene, Sculpt, sdf, SdfShape, selectEdge
+selectEdges, self, setActiveBackend, setImmediate, setInterval, setTimeout, Shape, ShapeGroup
+sheetMetal, SheetMetalPart, sheetStock, Sim, Sketch, sketchToDxf, sketchToSvg, slot
 SolvedAssembly, spec, sphere, spline2d, stroke, Surface, SurfaceBody, SurfaceMembers
 sweep, text2d, textWidth, torus, toShape, Transform, union, union2d
-variableSweep, verify, Viewport, window, Wood
+variableSweep, verify, Viewport, window, Wood, Wrap
 ```
 
 `showLabels` is also a runtime global, but it is not part of the top-level collision check. Avoid reusing it unless you intentionally want a local value with that name.
